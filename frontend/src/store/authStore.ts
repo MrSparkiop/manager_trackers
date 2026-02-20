@@ -1,55 +1,51 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import api from '../lib/axios';
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+import api from '../lib/axios'
 
 interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  avatar?: string;
+  id: string
+  email: string
+  firstName: string
+  lastName: string
 }
 
 interface AuthState {
-  user: User | null;
-  accessToken: string | null;
-  isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
-  logout: () => void;
-}
-
-interface RegisterData {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
+  user: User | null
+  isAuthenticated: boolean
+  login: (email: string, password: string) => Promise<void>
+  register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>
+  logout: () => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
-      accessToken: null,
       isAuthenticated: false,
 
       login: async (email, password) => {
-        const { data } = await api.post('/auth/login', { email, password });
-        localStorage.setItem('accessToken', data.accessToken);
-        set({ user: data.user, accessToken: data.accessToken, isAuthenticated: true });
+        const res = await api.post('/auth/login', { email, password })
+        // Token is now in HttpOnly cookie — only store user info in Zustand
+        set({ user: res.data.user, isAuthenticated: true })
       },
 
-      register: async (registerData) => {
-        const { data } = await api.post('/auth/register', registerData);
-        localStorage.setItem('accessToken', data.accessToken);
-        set({ user: data.user, accessToken: data.accessToken, isAuthenticated: true });
+      register: async (email, password, firstName, lastName) => {
+        const res = await api.post('/auth/register', { email, password, firstName, lastName })
+        set({ user: res.data.user, isAuthenticated: true })
       },
 
-      logout: () => {
-        localStorage.removeItem('accessToken');
-        set({ user: null, accessToken: null, isAuthenticated: false });
+      logout: async () => {
+        await api.post('/auth/logout')
+        set({ user: null, isAuthenticated: false })
       },
     }),
-    { name: 'auth-storage', partialize: (state) => ({ user: state.user, accessToken: state.accessToken, isAuthenticated: state.isAuthenticated }) }
+    {
+      name: 'auth-storage',
+      // Only persist user info — NO token in localStorage anymore!
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+      }),
+    }
   )
-);
+)

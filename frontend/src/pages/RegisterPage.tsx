@@ -14,7 +14,7 @@ export default function RegisterPage() {
     setError('')
     setLoading(true)
     try {
-      await register(form)
+      await register(form.email, form.password, form.firstName, form.lastName)
       navigate('/dashboard')
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed')

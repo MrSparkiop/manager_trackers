@@ -1,32 +1,36 @@
-import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
+import { Controller, Post, Get, Body, Req, Res, UseGuards } from '@nestjs/common'
+import { AuthGuard } from '@nestjs/passport'
+import { AuthService } from './auth.service'
+import type { Response, Request } from 'express'
 
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  register(@Body() dto: any, @Res({ passthrough: true }) res: Response) {
+    return this.authService.register(dto, res)
   }
 
   @Post('login')
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  login(@Body() dto: any, @Res({ passthrough: true }) res: Response) {
+    return this.authService.login(dto, res)
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @Post('refresh')
+  refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    return this.authService.refresh(req, res)
+  }
+
   @Post('logout')
-  logout(@Req() req: any) {
-    return this.authService.logout(req.user.id);
+  @UseGuards(AuthGuard('jwt'))
+  logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    return this.authService.logout(res, req.user?.id)
   }
 
-  @UseGuards(AuthGuard('jwt'))
   @Get('me')
+  @UseGuards(AuthGuard('jwt'))
   getMe(@Req() req: any) {
-    return this.authService.getMe(req.user.id);
+    return this.authService.getMe(req.user.id)
   }
 }
