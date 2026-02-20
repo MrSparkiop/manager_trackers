@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Plus, X, Trash2 } from 'lucide-react'
 import api from '../lib/axios'
 import { useThemeStore } from '../store/themeStore'
+import toast from 'react-hot-toast'
+
 
 interface CalendarEvent {
   id: string
@@ -65,12 +67,21 @@ export default function CalendarPage() {
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/calendar', data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['calendar-events'] }); closeModal() }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+      closeModal()
+      toast.success('Event created!')
+    },
+    onError: () => toast.error('Failed to create event')
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/calendar/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+      toast.success('Event deleted')
+    },
+    onError: () => toast.error('Failed to delete event')
   })
 
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1))
@@ -345,7 +356,21 @@ export default function CalendarPage() {
                           )}
                         </div>
                         <button
-                          onClick={() => { if (confirm('Delete event?')) deleteMutation.mutate(event.id) }}
+                          onClick={() => {
+                            toast((t) => (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ fontSize: '14px' }}>Delete this event?</span>
+                                <button onClick={() => { deleteMutation.mutate(event.id); toast.dismiss(t.id) }} style={{
+                                  backgroundColor: '#ef4444', border: 'none', borderRadius: '6px',
+                                  padding: '4px 10px', color: '#fff', cursor: 'pointer', fontSize: '13px'
+                                }}>Delete</button>
+                                <button onClick={() => toast.dismiss(t.id)} style={{
+                                  backgroundColor: '#334155', border: 'none', borderRadius: '6px',
+                                  padding: '4px 10px', color: '#fff', cursor: 'pointer', fontSize: '13px'
+                                }}>Cancel</button>
+                              </div>
+                            ), { duration: 5000 })
+                          }}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, padding: '2px', flexShrink: 0 }}
                         >
                           <Trash2 size={12} />

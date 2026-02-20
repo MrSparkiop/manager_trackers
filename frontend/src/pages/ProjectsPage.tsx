@@ -13,6 +13,8 @@ import { CSS } from '@dnd-kit/utilities'
 import api from '../lib/axios'
 import { useThemeStore } from '../store/themeStore'
 import { ProjectCardSkeleton } from '../components/Skeleton'
+import toast from 'react-hot-toast'
+
 
 interface Project {
   id: string
@@ -197,17 +199,31 @@ export default function ProjectsPage() {
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/projects', data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['projects'] }); closeModal() }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      closeModal()
+      toast.success('Project created!')
+    },
+    onError: () => toast.error('Failed to create project')
   })
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: any) => api.put(`/projects/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['projects'] }); closeModal() }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      closeModal()
+      toast.success('Project updated!')
+    },
+    onError: () => toast.error('Failed to update project')
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/projects/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      toast.success('Project deleted')
+    },
+    onError: () => toast.error('Failed to delete project')
   })
 
   const updateTaskMutation = useMutation({
@@ -380,7 +396,21 @@ export default function ProjectsPage() {
                         }}>
                           <Edit2 size={14} />
                         </button>
-                        <button onClick={() => { if (confirm('Delete this project?')) deleteMutation.mutate(project.id) }} style={{
+                        <button onClick={() => {
+                          toast((t) => (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <span style={{ fontSize: '14px' }}>Delete this project?</span>
+                              <button onClick={() => { deleteMutation.mutate(project.id); toast.dismiss(t.id) }} style={{
+                                backgroundColor: '#ef4444', border: 'none', borderRadius: '6px',
+                                padding: '4px 10px', color: '#fff', cursor: 'pointer', fontSize: '13px'
+                              }}>Delete</button>
+                              <button onClick={() => toast.dismiss(t.id)} style={{
+                                backgroundColor: '#334155', border: 'none', borderRadius: '6px',
+                                padding: '4px 10px', color: '#fff', cursor: 'pointer', fontSize: '13px'
+                              }}>Cancel</button>
+                            </div>
+                          ), { duration: 5000 })
+                        }} style={{
                           background: 'none', border: 'none', cursor: 'pointer',
                           color: colors.textMuted, padding: '4px', borderRadius: '6px'
                         }}>

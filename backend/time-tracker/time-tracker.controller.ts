@@ -1,45 +1,54 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { TimeTrackerService } from './time-tracker.service';
-import { CreateTimeEntryDto } from './dto/create-time-entry.dto';
+import { Controller, Get, Post, Delete, Body, Param, Req, UseGuards } from '@nestjs/common'
+import { ApiTags, ApiOperation, ApiCookieAuth } from '@nestjs/swagger'
+import { AuthGuard } from '@nestjs/passport'
+import { TimeTrackerService } from './time-tracker.service'
 
+@ApiTags('time-tracker')
+@ApiCookieAuth('access_token')
 @UseGuards(AuthGuard('jwt'))
 @Controller('time-tracker')
 export class TimeTrackerController {
   constructor(private timeTrackerService: TimeTrackerService) {}
 
   @Get()
+  @ApiOperation({ summary: 'Get all time entries' })
   findAll(@Req() req: any) {
-    return this.timeTrackerService.findAll(req.user.id);
+    return this.timeTrackerService.findAll(req.user.id)
   }
 
   @Get('running')
-  getRunning(@Req() req: any) {
-    return this.timeTrackerService.getRunning(req.user.id);
+  @ApiOperation({ summary: 'Get currently running timer' })
+  findRunning(@Req() req: any) {
+    return this.timeTrackerService.getRunning(req.user.id)  // was findRunning
   }
 
   @Get('summary')
+  @ApiOperation({ summary: 'Get time summary (today, week, total)' })
   getSummary(@Req() req: any) {
-    return this.timeTrackerService.getSummary(req.user.id);
+    return this.timeTrackerService.getSummary(req.user.id)
   }
 
   @Post('start')
-  start(@Body() dto: CreateTimeEntryDto, @Req() req: any) {
-    return this.timeTrackerService.start(req.user.id, dto);
+  @ApiOperation({ summary: 'Start a new timer' })
+  start(@Req() req: any, @Body() dto: any) {
+    return this.timeTrackerService.start(req.user.id, dto)
   }
 
   @Post('stop/:id')
-  stop(@Param('id') id: string, @Req() req: any) {
-    return this.timeTrackerService.stop(id, req.user.id);
+  @ApiOperation({ summary: 'Stop a running timer' })
+  stop(@Req() req: any, @Param('id') id: string) {
+    return this.timeTrackerService.stop(req.user.id, id)
   }
 
   @Post('manual')
-  createManual(@Body() dto: CreateTimeEntryDto, @Req() req: any) {
-    return this.timeTrackerService.create(req.user.id, dto);
+  @ApiOperation({ summary: 'Add a manual time entry' })
+  manual(@Req() req: any, @Body() dto: any) {
+    return this.timeTrackerService.create(req.user.id, dto)  // was manual
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Req() req: any) {
-    return this.timeTrackerService.remove(id, req.user.id);
+  @ApiOperation({ summary: 'Delete a time entry' })
+  remove(@Req() req: any, @Param('id') id: string) {
+    return this.timeTrackerService.remove(req.user.id, id)
   }
 }

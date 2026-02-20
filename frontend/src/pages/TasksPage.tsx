@@ -14,6 +14,8 @@ import { CSS } from '@dnd-kit/utilities'
 import api from '../lib/axios'
 import { useThemeStore } from '../store/themeStore'
 import { TaskRowSkeleton } from '../components/Skeleton'
+import toast from 'react-hot-toast'
+
 
 interface Project { id: string; name: string; color: string }
 interface Task {
@@ -162,7 +164,21 @@ function SortableTaskRow({
           }}>
             <Edit2 size={13} />
           </button>
-          <button onClick={() => onDelete(task.id)} style={{
+          <button onClick={() => {
+            toast((t) => (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '14px' }}>Delete this task?</span>
+                <button onClick={() => { onDelete(task.id); toast.dismiss(t.id) }} style={{
+                  backgroundColor: '#ef4444', border: 'none', borderRadius: '6px',
+                  padding: '4px 10px', color: '#fff', cursor: 'pointer', fontSize: '13px'
+                }}>Delete</button>
+                <button onClick={() => toast.dismiss(t.id)} style={{
+                  backgroundColor: '#334155', border: 'none', borderRadius: '6px',
+                  padding: '4px 10px', color: '#fff', cursor: 'pointer', fontSize: '13px'
+                }}>Cancel</button>
+              </div>
+            ), { duration: 5000 })
+          }} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             color: colors.textMuted, padding: '4px', borderRadius: '6px',
             display: 'flex', alignItems: 'center'
@@ -254,6 +270,7 @@ function SortableTaskRow({
       )}
     </div>
   )
+  
 }
 
 export default function TasksPage() {
@@ -308,21 +325,33 @@ export default function TasksPage() {
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/tasks', data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tasks'] }); closeModal() }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      closeModal()
+      toast.success('Task created!')
+    },
+    onError: () => toast.error('Failed to create task')
   })
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: any) => api.put(`/tasks/${id}`, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      // Only close modal if it was a form submit, not a drag
-      if (variables.closeModal) closeModal()
-    }
+      if (variables.closeModal) {
+        closeModal()
+        toast.success('Task updated!')
+      }
+    },
+    onError: () => toast.error('Failed to update task')
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/tasks/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      toast.success('Task deleted')
+    },
+    onError: () => toast.error('Failed to delete task')
   })
 
   const openCreate = () => {
@@ -389,10 +418,15 @@ export default function TasksPage() {
   }
 
   const bulkDelete = async () => {
-    if (!confirm(`Delete ${selected.size} tasks?`)) return
-    await Promise.all([...selected].map(id => api.delete(`/tasks/${id}`)))
-    queryClient.invalidateQueries({ queryKey: ['tasks'] })
-    setSelected(new Set())
+    const toastId = toast.loading(`Deleting ${selected.size} tasks...`)
+    try {
+      await Promise.all([...selected].map(id => api.delete(`/tasks/${id}`)))
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      setSelected(new Set())
+      toast.success(`${selected.size} tasks deleted`, { id: toastId })
+    } catch {
+      toast.error('Failed to delete tasks', { id: toastId })
+    }
   }
 
   // Drag & drop
@@ -621,7 +655,7 @@ export default function TasksPage() {
                           onSelect={toggleSelect}
                           onToggleDone={toggleDone}
                           onEdit={openEdit}
-                          onDelete={(id: string) => { if (confirm('Delete?')) deleteMutation.mutate(id) }}
+                          onDelete={(id: string) => deleteMutation.mutate(id)}
                           onAddSubtask={handleAddSubtask}
                         />
                       ))}
