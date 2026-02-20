@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, X, CheckCircle2, Circle, Clock, AlertCircle, Trash2, Edit2, ChevronDown } from 'lucide-react'
 import api from '../lib/axios'
+import { useThemeStore } from '../store/themeStore'
+import { TaskRowSkeleton } from '../components/Skeleton'
 
 interface Project { id: string; name: string; color: string }
 interface Task {
@@ -37,8 +39,9 @@ const statusConfig: Record<string, { color: string; icon: any; label: string }> 
 
 export default function TasksPage() {
   const queryClient = useQueryClient()
-  const [showModal, setShowModal]     = useState(false)
-  const [editTask, setEditTask]       = useState<Task | null>(null)
+  const { isDark } = useThemeStore()
+  const [showModal, setShowModal]           = useState(false)
+  const [editTask, setEditTask]             = useState<Task | null>(null)
   const [filterStatus, setFilterStatus]     = useState('')
   const [filterPriority, setFilterPriority] = useState('')
   const [filterProject, setFilterProject]   = useState('')
@@ -46,6 +49,19 @@ export default function TasksPage() {
     title: '', description: '', status: 'TODO', priority: 'MEDIUM',
     dueDate: '', estimatedTime: '', projectId: ''
   })
+
+  const colors = {
+    bg: isDark ? '#030712' : '#f1f5f9',
+    card: isDark ? '#0f172a' : '#ffffff',
+    border: isDark ? '#1e293b' : '#e2e8f0',
+    text: isDark ? '#ffffff' : '#0f172a',
+    textMuted: isDark ? '#64748b' : '#94a3b8',
+    input: isDark ? '#1e293b' : '#f8fafc',
+    inputBorder: isDark ? '#334155' : '#e2e8f0',
+    subBg: isDark ? '#1e293b' : '#f8fafc',
+    modalBg: isDark ? '#0f172a' : '#ffffff',
+    filterBg: isDark ? '#0f172a' : '#ffffff',
+  }
 
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
     queryKey: ['tasks', filterStatus, filterPriority, filterProject],
@@ -121,27 +137,26 @@ export default function TasksPage() {
   }
 
   const inputStyle = {
-    width: '100%', backgroundColor: '#1e293b', border: '1px solid #334155',
-    borderRadius: '10px', padding: '10px 14px', color: '#ffffff',
-    fontSize: '14px', outline: 'none', boxSizing: 'border-box' as const
+    width: '100%', backgroundColor: colors.input,
+    border: `1px solid ${colors.inputBorder}`,
+    borderRadius: '10px', padding: '10px 14px',
+    color: colors.text, fontSize: '14px', outline: 'none',
+    boxSizing: 'border-box' as const
   }
 
-  const labelStyle = { display: 'block', fontSize: '13px', color: '#94a3b8', marginBottom: '6px' }
+  const labelStyle = { display: 'block', fontSize: '13px', color: colors.textMuted, marginBottom: '6px' }
 
-  // Group tasks by status
   const grouped: Record<string, Task[]> = { TODO: [], IN_PROGRESS: [], IN_REVIEW: [], DONE: [], CANCELLED: [] }
   tasks.forEach(t => { if (grouped[t.status]) grouped[t.status].push(t) })
 
-  const activeGroups = Object.entries(grouped).filter(([, t]) => t.length > 0 || !filterStatus)
-
   return (
-    <div style={{ padding: '32px', fontFamily: 'Inter, sans-serif', minHeight: '100vh' }}>
+    <div style={{ padding: '32px', fontFamily: 'Inter, sans-serif', minHeight: '100vh', backgroundColor: colors.bg }}>
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: '700', color: '#ffffff', margin: 0 }}>Tasks</h1>
-          <p style={{ color: '#64748b', marginTop: '4px', fontSize: '14px' }}>{tasks.length} tasks total</p>
+          <h1 style={{ fontSize: '24px', fontWeight: '700', color: colors.text, margin: 0 }}>Tasks</h1>
+          <p style={{ color: colors.textMuted, marginTop: '4px', fontSize: '14px' }}>{tasks.length} tasks total</p>
         </div>
         <button onClick={openCreate} style={{
           display: 'flex', alignItems: 'center', gap: '8px',
@@ -155,34 +170,33 @@ export default function TasksPage() {
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '28px', flexWrap: 'wrap' }}>
-        {[
-          { label: 'All Statuses', value: filterStatus, setter: setFilterStatus, options: STATUSES },
-        ].map(({ label, value, setter, options }) => (
-          <select key={label} value={value} onChange={e => setter(e.target.value)} style={{
-            backgroundColor: '#0f172a', border: '1px solid #1e293b',
-            borderRadius: '8px', padding: '8px 12px', color: value ? '#ffffff' : '#64748b',
-            fontSize: '13px', outline: 'none', cursor: 'pointer'
-          }}>
-            <option value="">{label}</option>
-            {options.map(o => <option key={o} value={o}>{o.replace('_', ' ')}</option>)}
-          </select>
-        ))}
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{
+          backgroundColor: colors.filterBg, border: `1px solid ${colors.border}`,
+          borderRadius: '8px', padding: '8px 12px', color: filterStatus ? colors.text : colors.textMuted,
+          fontSize: '13px', outline: 'none', cursor: 'pointer'
+        }}>
+          <option value="">All Statuses</option>
+          {STATUSES.map(o => <option key={o} value={o}>{o.replace('_', ' ')}</option>)}
+        </select>
+
         <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} style={{
-          backgroundColor: '#0f172a', border: '1px solid #1e293b',
-          borderRadius: '8px', padding: '8px 12px', color: filterPriority ? '#ffffff' : '#64748b',
+          backgroundColor: colors.filterBg, border: `1px solid ${colors.border}`,
+          borderRadius: '8px', padding: '8px 12px', color: filterPriority ? colors.text : colors.textMuted,
           fontSize: '13px', outline: 'none', cursor: 'pointer'
         }}>
           <option value="">All Priorities</option>
           {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
+
         <select value={filterProject} onChange={e => setFilterProject(e.target.value)} style={{
-          backgroundColor: '#0f172a', border: '1px solid #1e293b',
-          borderRadius: '8px', padding: '8px 12px', color: filterProject ? '#ffffff' : '#64748b',
+          backgroundColor: colors.filterBg, border: `1px solid ${colors.border}`,
+          borderRadius: '8px', padding: '8px 12px', color: filterProject ? colors.text : colors.textMuted,
           fontSize: '13px', outline: 'none', cursor: 'pointer'
         }}>
           <option value="">All Projects</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
+
         {(filterStatus || filterPriority || filterProject) && (
           <button onClick={() => { setFilterStatus(''); setFilterPriority(''); setFilterProject('') }} style={{
             backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
@@ -196,32 +210,32 @@ export default function TasksPage() {
 
       {/* Task List */}
       {isLoading ? (
-        <div style={{ textAlign: 'center', color: '#64748b', paddingTop: '64px' }}>Loading...</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {[...Array(5)].map((_, i) => <TaskRowSkeleton key={i} />)}
+        </div>
       ) : tasks.length === 0 ? (
         <div style={{ textAlign: 'center', paddingTop: '80px' }}>
-          <CheckCircle2 size={48} color="#1e293b" style={{ margin: '0 auto 16px' }} />
-          <p style={{ color: '#64748b', fontSize: '16px' }}>No tasks yet</p>
-          <p style={{ color: '#475569', fontSize: '14px', marginTop: '4px' }}>Create your first task to get started</p>
+          <CheckCircle2 size={48} color={colors.border} style={{ margin: '0 auto 16px' }} />
+          <p style={{ color: colors.textMuted, fontSize: '16px' }}>No tasks yet</p>
+          <p style={{ color: colors.textMuted, fontSize: '14px', marginTop: '4px' }}>Create your first task to get started</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {activeGroups.map(([status, statusTasks]) => {
+          {Object.entries(grouped).map(([status, statusTasks]) => {
             if (statusTasks.length === 0) return null
             const cfg = statusConfig[status]
             const Icon = cfg.icon
             return (
               <div key={status}>
-                {/* Group header */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                   <Icon size={15} color={cfg.color} />
                   <span style={{ fontSize: '13px', fontWeight: '600', color: cfg.color }}>{cfg.label}</span>
                   <span style={{
-                    fontSize: '11px', backgroundColor: '#1e293b', color: '#64748b',
+                    fontSize: '11px', backgroundColor: colors.subBg, color: colors.textMuted,
                     borderRadius: '999px', padding: '1px 8px', fontWeight: '500'
                   }}>{statusTasks.length}</span>
                 </div>
 
-                {/* Tasks */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {statusTasks.map(task => {
                     const pc = priorityColors[task.priority] || priorityColors.MEDIUM
@@ -229,24 +243,20 @@ export default function TasksPage() {
                     return (
                       <div key={task.id} style={{
                         display: 'flex', alignItems: 'center', gap: '12px',
-                        backgroundColor: '#0f172a', border: '1px solid #1e293b',
-                        borderRadius: '12px', padding: '14px 16px',
-                        transition: 'border-color 0.15s',
-                        opacity: isDone ? 0.6 : 1
+                        backgroundColor: colors.card, border: `1px solid ${colors.border}`,
+                        borderRadius: '12px', padding: '14px 16px', opacity: isDone ? 0.6 : 1
                       }}>
-                        {/* Checkbox */}
                         <button onClick={() => toggleDone(task)} style={{
                           background: 'none', border: 'none', cursor: 'pointer',
-                          color: isDone ? '#4ade80' : '#334155', padding: 0, flexShrink: 0,
+                          color: isDone ? '#4ade80' : colors.textMuted, padding: 0, flexShrink: 0,
                           display: 'flex', alignItems: 'center'
                         }}>
                           {isDone ? <CheckCircle2 size={18} /> : <Circle size={18} />}
                         </button>
 
-                        {/* Content */}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{
-                            fontSize: '14px', fontWeight: '500', color: '#f1f5f9', margin: 0,
+                            fontSize: '14px', fontWeight: '500', color: colors.text, margin: 0,
                             textDecoration: isDone ? 'line-through' : 'none',
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                           }}>
@@ -259,19 +269,18 @@ export default function TasksPage() {
                               </span>
                             )}
                             {task.dueDate && (
-                              <span style={{ fontSize: '11px', color: '#64748b' }}>
+                              <span style={{ fontSize: '11px', color: colors.textMuted }}>
                                 📅 {new Date(task.dueDate).toLocaleDateString()}
                               </span>
                             )}
                             {task.estimatedTime && (
-                              <span style={{ fontSize: '11px', color: '#64748b' }}>
+                              <span style={{ fontSize: '11px', color: colors.textMuted }}>
                                 ⏱ {task.estimatedTime}m
                               </span>
                             )}
                           </div>
                         </div>
 
-                        {/* Priority badge */}
                         <span style={{
                           fontSize: '11px', padding: '2px 8px', borderRadius: '999px',
                           backgroundColor: pc.bg, color: pc.color, fontWeight: '600', flexShrink: 0
@@ -279,18 +288,17 @@ export default function TasksPage() {
                           {task.priority}
                         </span>
 
-                        {/* Actions */}
                         <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                           <button onClick={() => openEdit(task)} style={{
                             background: 'none', border: 'none', cursor: 'pointer',
-                            color: '#475569', padding: '4px', borderRadius: '6px',
+                            color: colors.textMuted, padding: '4px', borderRadius: '6px',
                             display: 'flex', alignItems: 'center'
                           }}>
                             <Edit2 size={14} />
                           </button>
                           <button onClick={() => { if (confirm('Delete this task?')) deleteMutation.mutate(task.id) }} style={{
                             background: 'none', border: 'none', cursor: 'pointer',
-                            color: '#475569', padding: '4px', borderRadius: '6px',
+                            color: colors.textMuted, padding: '4px', borderRadius: '6px',
                             display: 'flex', alignItems: 'center'
                           }}>
                             <Trash2 size={14} />
@@ -314,16 +322,15 @@ export default function TasksPage() {
           zIndex: 50, padding: '16px'
         }}>
           <div style={{
-            backgroundColor: '#0f172a', borderRadius: '20px',
-            border: '1px solid #1e293b', padding: '32px',
-            width: '100%', maxWidth: '500px',
-            maxHeight: '90vh', overflowY: 'auto'
+            backgroundColor: colors.modalBg, borderRadius: '20px',
+            border: `1px solid ${colors.border}`, padding: '32px',
+            width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#ffffff', margin: 0 }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '700', color: colors.text, margin: 0 }}>
                 {editTask ? 'Edit Task' : 'New Task'}
               </h2>
-              <button onClick={closeModal} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+              <button onClick={closeModal} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted }}>
                 <X size={20} />
               </button>
             </div>
@@ -331,31 +338,29 @@ export default function TasksPage() {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
                 <label style={labelStyle}>Task Title *</label>
-                <input
-                  value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
-                  placeholder="What needs to be done?" required style={inputStyle}
-                />
+                <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
+                  placeholder="What needs to be done?" required style={inputStyle} />
               </div>
 
               <div>
                 <label style={labelStyle}>Description</label>
-                <textarea
-                  value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
-                  placeholder="Add more details..."
-                  rows={3} style={{ ...inputStyle, resize: 'vertical' as const }}
-                />
+                <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
+                  placeholder="Add more details..." rows={3}
+                  style={{ ...inputStyle, resize: 'vertical' as const }} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label style={labelStyle}>Priority</label>
-                  <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} style={{ ...inputStyle, cursor: 'pointer' }}>
+                  <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}
+                    style={{ ...inputStyle, cursor: 'pointer' }}>
                     {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <div>
                   <label style={labelStyle}>Status</label>
-                  <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} style={{ ...inputStyle, cursor: 'pointer' }}>
+                  <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
+                    style={{ ...inputStyle, cursor: 'pointer' }}>
                     {STATUSES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
                   </select>
                 </div>
@@ -364,26 +369,20 @@ export default function TasksPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label style={labelStyle}>Due Date</label>
-                  <input
-                    type="date" value={form.dueDate}
-                    onChange={e => setForm({ ...form, dueDate: e.target.value })}
-                    style={{ ...inputStyle, colorScheme: 'dark' }}
-                  />
+                  <input type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })}
+                    style={{ ...inputStyle, colorScheme: isDark ? 'dark' : 'light' }} />
                 </div>
                 <div>
                   <label style={labelStyle}>Estimated Time (min)</label>
-                  <input
-                    type="number" value={form.estimatedTime}
-                    onChange={e => setForm({ ...form, estimatedTime: e.target.value })}
-                    placeholder="e.g. 60" min="1"
-                    style={inputStyle}
-                  />
+                  <input type="number" value={form.estimatedTime} onChange={e => setForm({ ...form, estimatedTime: e.target.value })}
+                    placeholder="e.g. 60" min="1" style={inputStyle} />
                 </div>
               </div>
 
               <div>
                 <label style={labelStyle}>Project</label>
-                <select value={form.projectId} onChange={e => setForm({ ...form, projectId: e.target.value })} style={{ ...inputStyle, cursor: 'pointer' }}>
+                <select value={form.projectId} onChange={e => setForm({ ...form, projectId: e.target.value })}
+                  style={{ ...inputStyle, cursor: 'pointer' }}>
                   <option value="">No project</option>
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
@@ -392,8 +391,8 @@ export default function TasksPage() {
               <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
                 <button type="button" onClick={closeModal} style={{
                   flex: 1, padding: '11px', borderRadius: '10px',
-                  backgroundColor: '#1e293b', border: '1px solid #334155',
-                  color: '#94a3b8', cursor: 'pointer', fontSize: '14px', fontWeight: '500'
+                  backgroundColor: colors.input, border: `1px solid ${colors.inputBorder}`,
+                  color: colors.textMuted, cursor: 'pointer', fontSize: '14px', fontWeight: '500'
                 }}>
                   Cancel
                 </button>

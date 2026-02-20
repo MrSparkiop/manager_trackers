@@ -1,7 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { CheckSquare, FolderKanban, Timer, AlertCircle, Clock } from 'lucide-react'
+import { CheckSquare, FolderKanban, Timer, AlertCircle, Clock, TrendingUp } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import api from '../lib/axios'
 import { useAuthStore } from '../store/authStore'
+import { useThemeStore } from '../store/themeStore'
+import { StatCardSkeleton } from '../components/Skeleton'
 
 interface Task {
   id: string
@@ -25,7 +28,7 @@ function formatDuration(seconds: number) {
 }
 
 const priorityColors: Record<string, { bg: string; color: string }> = {
-  URGENT: { bg: 'rgba(239,68,68,0.15)', color: '#f87171' },
+  URGENT: { bg: 'rgba(239,68,68,0.15)',  color: '#f87171' },
   HIGH:   { bg: 'rgba(249,115,22,0.15)', color: '#fb923c' },
   MEDIUM: { bg: 'rgba(234,179,8,0.15)',  color: '#facc15' },
   LOW:    { bg: 'rgba(34,197,94,0.15)',  color: '#4ade80' },
@@ -45,8 +48,19 @@ function PriorityBadge({ priority }: { priority: string }) {
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
+  const { isDark } = useThemeStore()
 
-  const { data: todayTasks = [] } = useQuery<Task[]>({
+  const colors = {
+    bg: isDark ? '#030712' : '#f1f5f9',
+    card: isDark ? '#0f172a' : '#ffffff',
+    border: isDark ? '#1e293b' : '#e2e8f0',
+    text: isDark ? '#ffffff' : '#0f172a',
+    textMuted: isDark ? '#64748b' : '#94a3b8',
+    subBg: isDark ? '#1e293b' : '#f8fafc',
+    tooltip: isDark ? '#1e293b' : '#ffffff',
+  }
+
+  const { data: todayTasks = [], isLoading: loadingToday } = useQuery<Task[]>({
     queryKey: ['tasks', 'today'],
     queryFn: () => api.get('/tasks/today').then(r => r.data),
   })
@@ -56,9 +70,14 @@ export default function DashboardPage() {
     queryFn: () => api.get('/tasks/overdue').then(r => r.data),
   })
 
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [], isLoading: loadingProjects } = useQuery<any[]>({
     queryKey: ['projects'],
     queryFn: () => api.get('/projects').then(r => r.data),
+  })
+
+  const { data: allTasks = [], isLoading: loadingAll } = useQuery<Task[]>({
+    queryKey: ['tasks'],
+    queryFn: () => api.get('/tasks').then(r => r.data),
   })
 
   const { data: timeSummary } = useQuery<TimeSummary>({
@@ -66,75 +85,185 @@ export default function DashboardPage() {
     queryFn: () => api.get('/time-tracker/summary').then(r => r.data),
   })
 
+  const isLoading = loadingToday || loadingProjects || loadingAll
+
+  const statusCounts = [
+    { name: 'To Do',       value: allTasks.filter(t => t.status === 'TODO').length,        color: '#64748b' },
+    { name: 'In Progress', value: allTasks.filter(t => t.status === 'IN_PROGRESS').length, color: '#60a5fa' },
+    { name: 'In Review',   value: allTasks.filter(t => t.status === 'IN_REVIEW').length,   color: '#a78bfa' },
+    { name: 'Done',        value: allTasks.filter(t => t.status === 'DONE').length,        color: '#4ade80' },
+  ].filter(s => s.value > 0)
+
+  const priorityData = [
+    { name: 'Low',    value: allTasks.filter(t => t.priority === 'LOW').length,    color: '#4ade80' },
+    { name: 'Medium', value: allTasks.filter(t => t.priority === 'MEDIUM').length, color: '#facc15' },
+    { name: 'High',   value: allTasks.filter(t => t.priority === 'HIGH').length,   color: '#fb923c' },
+    { name: 'Urgent', value: allTasks.filter(t => t.priority === 'URGENT').length, color: '#f87171' },
+  ]
+
+  const projectChartData = projects.slice(0, 5).map(p => ({
+    name: p.name.length > 12 ? p.name.slice(0, 12) + '…' : p.name,
+    total: p.tasks?.length || 0,
+    done: p.tasks?.filter((t: any) => t.status === 'DONE').length || 0,
+  }))
+
   const stats = [
-    { label: "Today's Tasks", value: todayTasks.length, icon: CheckSquare, color: '#60a5fa', bg: 'rgba(96,165,250,0.1)' },
+    { label: "Today's Tasks", value: todayTasks.length,   icon: CheckSquare, color: '#60a5fa', bg: 'rgba(96,165,250,0.1)' },
     { label: 'Overdue',       value: overdueTasks.length, icon: AlertCircle, color: '#f87171', bg: 'rgba(248,113,113,0.1)' },
-    { label: 'Projects',      value: projects.length, icon: FolderKanban,  color: '#a78bfa', bg: 'rgba(167,139,250,0.1)' },
+    { label: 'Projects',      value: projects.length,     icon: FolderKanban, color: '#a78bfa', bg: 'rgba(167,139,250,0.1)' },
     { label: 'Time Today',    value: timeSummary ? formatDuration(timeSummary.todaySeconds) : '0h 0m', icon: Clock, color: '#34d399', bg: 'rgba(52,211,153,0.1)' },
   ]
 
-  const card = {
-    backgroundColor: '#0f172a',
+  const card: React.CSSProperties = {
+    backgroundColor: colors.card,
     borderRadius: '16px',
-    border: '1px solid #1e293b',
+    border: `1px solid ${colors.border}`,
     padding: '24px',
   }
 
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div style={{
+          backgroundColor: colors.tooltip, border: `1px solid ${colors.border}`,
+          borderRadius: '10px', padding: '10px 14px', fontSize: '13px', color: colors.text
+        }}>
+          <p style={{ margin: 0, fontWeight: '600' }}>{label}</p>
+          {payload.map((p: any) => (
+            <p key={p.name} style={{ margin: '4px 0 0', color: p.color }}>
+              {p.name}: {p.value}
+            </p>
+          ))}
+        </div>
+      )
+    }
+    return null
+  }
+
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+
   return (
-    <div style={{ padding: '32px', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ padding: '32px', fontFamily: 'Inter, sans-serif', backgroundColor: colors.bg, minHeight: '100vh' }}>
 
       {/* Header */}
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#ffffff', margin: 0 }}>
-          Good morning, {user?.firstName}! 👋
+      <div style={{ marginBottom: '28px' }}>
+        <h1 style={{ fontSize: '26px', fontWeight: '700', color: colors.text, margin: 0 }}>
+          {greeting}, {user?.firstName}! 👋
         </h1>
-        <p style={{ color: '#64748b', marginTop: '6px', fontSize: '15px' }}>
-          Here's what's happening today.
+        <p style={{ color: colors.textMuted, marginTop: '6px', fontSize: '15px' }}>
+          Here's your overview for today.
         </p>
       </div>
 
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
-        {stats.map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} style={card}>
-            <div style={{
-              width: '42px', height: '42px', backgroundColor: bg,
-              borderRadius: '12px', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', marginBottom: '16px'
-            }}>
-              <Icon size={20} color={color} />
+        {isLoading ? (
+          [...Array(4)].map((_, i) => <StatCardSkeleton key={i} />)
+        ) : (
+          stats.map(({ label, value, icon: Icon, color, bg }) => (
+            <div key={label} style={card}>
+              <div style={{
+                width: '42px', height: '42px', backgroundColor: bg,
+                borderRadius: '12px', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', marginBottom: '16px'
+              }}>
+                <Icon size={20} color={color} />
+              </div>
+              <p style={{ fontSize: '28px', fontWeight: '700', color: colors.text, margin: 0 }}>{value}</p>
+              <p style={{ fontSize: '13px', color: colors.textMuted, marginTop: '4px' }}>{label}</p>
             </div>
-            <p style={{ fontSize: '28px', fontWeight: '700', color: '#ffffff', margin: 0 }}>{value}</p>
-            <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>{label}</p>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
-      {/* Bottom grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-
-        {/* Today Tasks */}
+      {/* Charts */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
         <div style={card}>
-          <h2 style={{ fontSize: '15px', fontWeight: '600', color: '#ffffff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h2 style={{ fontSize: '15px', fontWeight: '600', color: colors.text, margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <TrendingUp size={16} color="#6366f1" /> Tasks by Status
+          </h2>
+          {statusCounts.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: colors.textMuted, fontSize: '14px' }}>No tasks yet</div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+              <ResponsiveContainer width={140} height={140}>
+                <PieChart>
+                  <Pie data={statusCounts} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={3} dataKey="value">
+                    {statusCounts.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {statusCounts.map(s => (
+                  <div key={s.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: s.color }} />
+                      <span style={{ fontSize: '13px', color: colors.textMuted }}>{s.name}</span>
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: colors.text }}>{s.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={card}>
+          <h2 style={{ fontSize: '15px', fontWeight: '600', color: colors.text, margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={16} color="#6366f1" /> Tasks by Priority
+          </h2>
+          <ResponsiveContainer width="100%" height={140}>
+            <BarChart data={priorityData} barSize={28}>
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: colors.textMuted }} axisLine={false} tickLine={false} />
+              <YAxis hide />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                {priorityData.map((entry, index) => <Cell key={index} fill={entry.color} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {projectChartData.length > 0 && (
+        <div style={{ ...card, marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '15px', fontWeight: '600', color: colors.text, margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FolderKanban size={16} color="#6366f1" /> Project Progress
+          </h2>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={projectChartData} barSize={20} barGap={4}>
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: colors.textMuted }} axisLine={false} tickLine={false} />
+              <YAxis hide />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="total" name="Total" fill={isDark ? '#1e293b' : '#e2e8f0'} radius={[6, 6, 0, 0]} />
+              <Bar dataKey="done"  name="Done"  fill="#6366f1" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Bottom */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div style={card}>
+          <h2 style={{ fontSize: '15px', fontWeight: '600', color: colors.text, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <CheckSquare size={16} color="#60a5fa" /> Today's Tasks
           </h2>
           {todayTasks.length === 0 ? (
-            <p style={{ color: '#475569', fontSize: '14px', textAlign: 'center', padding: '24px 0' }}>No tasks due today 🎉</p>
+            <p style={{ color: colors.textMuted, fontSize: '14px', textAlign: 'center', padding: '24px 0' }}>No tasks due today 🎉</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {todayTasks.map(task => (
                 <div key={task.id} style={{
                   display: 'flex', alignItems: 'center', gap: '12px',
-                  padding: '10px 12px', backgroundColor: '#1e293b', borderRadius: '10px'
+                  padding: '10px 12px', backgroundColor: colors.subBg, borderRadius: '10px'
                 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '13px', fontWeight: '500', color: '#f1f5f9', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <p style={{ fontSize: '13px', fontWeight: '500', color: colors.text, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {task.title}
                     </p>
                     {task.project && (
-                      <p style={{ fontSize: '11px', color: task.project.color, margin: '2px 0 0' }}>
-                        {task.project.name}
-                      </p>
+                      <p style={{ fontSize: '11px', color: task.project.color, margin: '2px 0 0' }}>{task.project.name}</p>
                     )}
                   </div>
                   <PriorityBadge priority={task.priority} />
@@ -144,57 +273,22 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Overdue */}
         <div style={card}>
-          <h2 style={{ fontSize: '15px', fontWeight: '600', color: '#ffffff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertCircle size={16} color="#f87171" /> Overdue Tasks
-          </h2>
-          {overdueTasks.length === 0 ? (
-            <p style={{ color: '#475569', fontSize: '14px', textAlign: 'center', padding: '24px 0' }}>No overdue tasks! 🚀</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {overdueTasks.map(task => (
-                <div key={task.id} style={{
-                  display: 'flex', alignItems: 'center', gap: '12px',
-                  padding: '10px 12px',
-                  backgroundColor: 'rgba(239,68,68,0.05)',
-                  border: '1px solid rgba(239,68,68,0.15)',
-                  borderRadius: '10px'
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '13px', fontWeight: '500', color: '#f1f5f9', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {task.title}
-                    </p>
-                    {task.project && (
-                      <p style={{ fontSize: '11px', color: task.project.color, margin: '2px 0 0' }}>
-                        {task.project.name}
-                      </p>
-                    )}
-                  </div>
-                  <PriorityBadge priority={task.priority} />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Time Summary */}
-        <div style={{ ...card, gridColumn: 'span 2' }}>
-          <h2 style={{ fontSize: '15px', fontWeight: '600', color: '#ffffff', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h2 style={{ fontSize: '15px', fontWeight: '600', color: colors.text, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Timer size={16} color="#34d399" /> Time Summary
           </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {[
-              { label: 'Today',     value: timeSummary ? formatDuration(timeSummary.todaySeconds) : '0h 0m' },
-              { label: 'This Week', value: timeSummary ? formatDuration(timeSummary.weekSeconds)  : '0h 0m' },
-              { label: 'All Time',  value: timeSummary ? formatDuration(timeSummary.totalSeconds) : '0h 0m' },
-            ].map(({ label, value }) => (
+              { label: 'Today',     value: timeSummary ? formatDuration(timeSummary.todaySeconds) : '0h 0m', color: '#34d399' },
+              { label: 'This Week', value: timeSummary ? formatDuration(timeSummary.weekSeconds)  : '0h 0m', color: '#60a5fa' },
+              { label: 'All Time',  value: timeSummary ? formatDuration(timeSummary.totalSeconds) : '0h 0m', color: '#a78bfa' },
+            ].map(({ label, value, color }) => (
               <div key={label} style={{
-                backgroundColor: '#1e293b', borderRadius: '12px',
-                padding: '20px', textAlign: 'center'
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '12px 16px', backgroundColor: colors.subBg, borderRadius: '10px'
               }}>
-                <p style={{ fontSize: '26px', fontWeight: '700', color: '#ffffff', margin: 0 }}>{value}</p>
-                <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>{label}</p>
+                <span style={{ fontSize: '14px', color: colors.textMuted }}>{label}</span>
+                <span style={{ fontSize: '16px', fontWeight: '700', color }}>{value}</span>
               </div>
             ))}
           </div>
