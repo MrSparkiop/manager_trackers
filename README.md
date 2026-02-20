@@ -1,61 +1,22 @@
-# TrackFlow — Personal Schedule Manager
+# TrackFlow 📋
 
-> A professional full-stack schedule and task management application built with React, NestJS, and PostgreSQL.
+A full-stack personal schedule and project management SaaS application built with React, NestJS, and PostgreSQL.
 
-![TrackFlow Dashboard]
+![Version](https://img.shields.io/badge/version-2.0.0-6366f1)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Docker](https://img.shields.io/badge/docker-ready-2496ED)
 
 ---
 
 ## ✨ Features
 
-### 📊 Dashboard
-- Overview of today's tasks and overdue items
-- Time summary (today, this week, all time)
-- Active projects count
-- Quick glance at priority tasks
-
-### 📁 Projects
-- Create and manage projects with custom colors
-- Track project status (Active, On Hold, Completed, Archived)
-- Visual progress bar showing task completion per project
-- Set project deadlines
-- Edit and delete projects
-
-### ✅ Tasks
-- Full task management with title, description, priority and status
-- Group tasks by status: To Do, In Progress, In Review, Done, Cancelled
-- Set task priority: Low, Medium, High, Urgent
-- Link tasks to projects
-- Set due dates and estimated time
-- Filter tasks by status, priority, and project
-- One-click toggle to mark tasks as done
-- Edit and delete tasks
-
-### ⏱ Time Tracker
-- Live running timer with real-time seconds display
-- Start and stop timer with one click
-- Link time entries to specific tasks
-- Add manual time entries with custom date and time range
-- View time history grouped by date
-- Time summary: today, this week, all time
-- Delete time entries
-
-### 📅 Calendar
-- Full monthly calendar view
-- Click any day to see events in the side panel
-- Double-click a day to quickly create an event
-- Create events with custom colors
-- Set all-day or timed events
-- Link calendar events to tasks
-- Navigate between months
-- Delete events
-
-### 🔐 Authentication
-- Secure user registration and login
-- JWT-based authentication with refresh tokens
-- Password hashing with bcrypt
-- Protected routes
-- Persistent login session
+- **Dashboard** — Overview with charts (tasks by status, priority, project progress), today's tasks and time summary
+- **Projects** — Grid and Kanban board view with drag & drop, progress tracking, color labels
+- **Tasks** — Grouped by status, quick add, inline subtasks, bulk select & delete, drag & drop, search & filters
+- **Time Tracker** — Live timer with seconds, manual entries, history grouped by date, weekly summary
+- **Calendar** — Monthly view, color-coded events, link events to tasks, side panel
+- **Settings** — Profile management, appearance (dark/light mode)
+- **Auth** — Secure JWT authentication with HttpOnly cookies and automatic token refresh
 
 ---
 
@@ -64,236 +25,179 @@
 ### Frontend
 | Technology | Purpose |
 |---|---|
-| React 18 | UI Framework |
-| TypeScript | Type Safety |
-| Vite | Build Tool |
-| React Router v6 | Client-side Routing |
-| TanStack Query | Server State Management |
-| Zustand | Client State Management |
-| Axios | HTTP Client |
+| React 18 + TypeScript | UI framework |
+| Vite | Build tool |
+| React Router v6 | Routing |
+| TanStack Query | Server state management |
+| Zustand + persist | Client state management |
+| Axios | HTTP client with interceptors |
+| Recharts | Dashboard charts |
+| @dnd-kit | Drag and drop |
 | Lucide React | Icons |
 
 ### Backend
 | Technology | Purpose |
 |---|---|
-| NestJS | Backend Framework |
-| TypeScript | Type Safety |
-| Prisma ORM | Database Access |
+| NestJS | Backend framework |
+| Prisma ORM | Database ORM |
 | PostgreSQL | Database |
 | JWT + Passport | Authentication |
-| bcrypt | Password Hashing |
-| class-validator | Input Validation |
+| bcrypt | Password hashing |
+| cookie-parser | HttpOnly cookie support |
 
 ### Infrastructure
 | Technology | Purpose |
 |---|---|
-| Docker | Local PostgreSQL |
-| Vercel | Frontend Hosting |
-| Railway | Backend + DB Hosting |
-| GitHub | Version Control |
+| Docker + Docker Compose | Containerization |
+| Prisma Migrations | Database versioning |
 
 ---
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### Option 1 — Docker (Recommended)
+
+The easiest way to run the entire stack with a single command:
+```bash
+git clone https://github.com/MrSparkiop/manager_trackers.git
+cd manager_trackers
+docker-compose up --build
+```
+
+This starts all 3 services automatically:
+- **PostgreSQL** on port `5432`
+- **Backend API** on port `3000`
+- **Frontend** on port `5173`
+
+Open http://localhost:5173 and register a new account.
+
+---
+
+### Option 2 — Manual Setup
+
+#### Prerequisites
 - Node.js 20+
+- PostgreSQL 15+
 - npm
-- Docker Desktop
-- Git
 
-### 1. Clone the repository
+#### 1. Clone the repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/client-trackers.git
-cd client-trackers
+git clone https://github.com/MrSparkiop/manager_trackers.git
+cd manager_trackers
 ```
 
-### 2. Start the database
-```bash
-docker-compose up -d
-```
-
-### 3. Setup the Backend
+#### 2. Setup the backend
 ```bash
 cd backend
-cp .env.example .env
 npm install
-npx prisma migrate dev --name init
-npx prisma generate
+cp .env.example .env   # edit with your values
+npx prisma migrate dev
 npm run start:dev
 ```
 
-Backend will run on: `http://localhost:3000`
-
-### 4. Setup the Frontend
+#### 3. Setup the frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Frontend will run on: `http://localhost:5173`
-
 ---
 
-## 📁 Project Structure
+## ⚙️ Environment Variables
 
-```
-client-trackers/
-├── backend/
-│   ├── src/
-│   │   ├── auth/               # Authentication module
-│   │   │   ├── dto/
-│   │   │   └── strategies/
-│   │   ├── calendar/           # Calendar events module
-│   │   │   └── dto/
-│   │   ├── prisma/             # Prisma service & module
-│   │   ├── projects/           # Projects module
-│   │   │   └── dto/
-│   │   ├── tasks/              # Tasks module
-│   │   │   └── dto/
-│   │   ├── time-tracker/       # Time tracking module
-│   │   │   └── dto/
-│   │   ├── app.module.ts
-│   │   └── main.ts
-│   ├── prisma/
-│   │   └── schema.prisma       # Database schema
-│   └── .env.example
-│
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   └── Layout.tsx      # App shell & sidebar
-│   │   ├── lib/
-│   │   │   └── axios.ts        # API client
-│   │   ├── pages/
-│   │   │   ├── DashboardPage.tsx
-│   │   │   ├── ProjectsPage.tsx
-│   │   │   ├── TasksPage.tsx
-│   │   │   ├── TimeTrackerPage.tsx
-│   │   │   ├── CalendarPage.tsx
-│   │   │   ├── LoginPage.tsx
-│   │   │   └── RegisterPage.tsx
-│   │   ├── store/
-│   │   │   └── authStore.ts    # Auth state (Zustand)
-│   │   └── App.tsx
-│   └── .env
-│
-└── docker-compose.yml
-```
-
----
-
-## 🗄 Database Schema
-
-```
-User
- ├── Projects (1:many)
- ├── Tasks (1:many)
- ├── TimeEntries (1:many)
- └── CalendarEvents (1:many)
-
-Project
- └── Tasks (1:many)
-
-Task
- ├── TimeEntries (1:many)
- ├── CalendarEvents (1:many)
- ├── SubTasks (self-relation)
- └── Tags (many:many)
-
-TimeEntry
- └── Task (many:1, optional)
-
-CalendarEvent
- └── Task (many:1, optional)
-```
-
----
-
-## 🔌 API Endpoints
-
-### Auth
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/auth/register` | Register new user |
-| POST | `/api/auth/login` | Login |
-| POST | `/api/auth/logout` | Logout |
-| GET | `/api/auth/me` | Get current user |
-
-### Projects
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/projects` | Get all projects |
-| GET | `/api/projects/:id` | Get project by ID |
-| GET | `/api/projects/stats` | Get project stats |
-| POST | `/api/projects` | Create project |
-| PUT | `/api/projects/:id` | Update project |
-| DELETE | `/api/projects/:id` | Delete project |
-
-### Tasks
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/tasks` | Get all tasks (with filters) |
-| GET | `/api/tasks/today` | Get today's tasks |
-| GET | `/api/tasks/overdue` | Get overdue tasks |
-| POST | `/api/tasks` | Create task |
-| PUT | `/api/tasks/:id` | Update task |
-| DELETE | `/api/tasks/:id` | Delete task |
-
-### Time Tracker
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/time-tracker` | Get all entries |
-| GET | `/api/time-tracker/running` | Get running timer |
-| GET | `/api/time-tracker/summary` | Get time summary |
-| POST | `/api/time-tracker/start` | Start timer |
-| POST | `/api/time-tracker/stop/:id` | Stop timer |
-| POST | `/api/time-tracker/manual` | Add manual entry |
-| DELETE | `/api/time-tracker/:id` | Delete entry |
-
-### Calendar
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/calendar` | Get all events |
-| POST | `/api/calendar` | Create event |
-| DELETE | `/api/calendar/:id` | Delete event |
-
----
-
-## 🌍 Deployment
-
-### Frontend → Vercel
-1. Push to GitHub
-2. Connect repo to Vercel
-3. Set `VITE_API_URL` environment variable to your Railway backend URL
-4. Deploy
-
-### Backend + DB → Railway
-1. Create new Railway project
-2. Add PostgreSQL service
-3. Deploy backend from GitHub
-4. Set environment variables (DATABASE_URL, JWT_SECRET, etc.)
-5. Done
-
----
-
-## 📄 Environment Variables
-
-### Backend `.env`
+### Backend (`backend/.env`)
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/client_tracker"
-JWT_SECRET="your-secret-key"
-JWT_REFRESH_SECRET="your-refresh-secret-key"
+JWT_SECRET="your-super-secret-jwt-key"
+JWT_REFRESH_SECRET="your-super-secret-refresh-key"
 JWT_EXPIRES_IN="15m"
 JWT_REFRESH_EXPIRES_IN="7d"
 PORT=3000
-FRONTEND_URL="http://localhost:5173"
+ALLOWED_ORIGINS=http://localhost:5173
+NODE_ENV=development
 ```
 
-### Frontend `.env`
+### Frontend (`frontend/.env`)
 ```env
 VITE_API_URL=http://localhost:3000/api
 ```
 
 ---
+
+## 🗄️ Database Schema
+```
+User
+ ├── Projects (userId)
+ ├── Tasks (userId, projectId?, parentId?)
+ │    └── SubTasks (parentId)
+ ├── TimeEntries (userId, taskId?)
+ └── CalendarEvents (userId, taskId?)
+```
+
+---
+
+## 🔐 Security
+
+- Passwords hashed with **bcrypt** (10 rounds)
+- JWT tokens stored in **HttpOnly cookies** (not localStorage — XSS safe)
+- **Refresh token rotation** — new refresh token issued on every refresh
+- Refresh tokens **hashed in database** before storage
+- **CORS** restricted to allowed origins via environment variable
+- Automatic token refresh on 401 with request queue
+
+---
+
+## 📁 Project Structure
+```
+manager_trackers/
+├── frontend/                  # React + Vite app
+│   ├── src/
+│   │   ├── components/        # Layout, Skeleton
+│   │   ├── pages/             # Dashboard, Projects, Tasks, etc.
+│   │   ├── store/             # Zustand stores (auth, theme)
+│   │   └── lib/               # Axios instance
+│   └── Dockerfile
+├── backend/                   # NestJS app
+│   ├── src/
+│   │   ├── auth/              # JWT auth, strategies, guards
+│   │   ├── projects/          # Projects CRUD
+│   │   ├── tasks/             # Tasks CRUD
+│   │   ├── time-tracker/      # Time entries
+│   │   ├── calendar/          # Calendar events
+│   │   └── prisma/            # Prisma service
+│   ├── prisma/
+│   │   └── schema.prisma      # Database schema
+│   └── Dockerfile
+└── docker-compose.yml         # Full stack orchestration
+```
+
+---
+
+## 📜 Changelog
+
+### v2.0.0
+- 🔐 Replaced localStorage JWT with HttpOnly cookies
+- 🔄 Implemented refresh token rotation with automatic retry
+- 🗂️ Added Kanban board view with drag & drop
+- ⚡ Quick add tasks inline, bulk delete, subtasks, search
+- 📊 Dashboard charts (Recharts) — status, priority, project progress
+- 🌙 Dark/Light mode toggle persisted to localStorage
+- 💀 Loading skeleton animations
+- ⚙️ Settings page with profile management
+- 🐳 Full Docker Compose setup (DB + backend + frontend)
+- 📈 Prisma database indexes on all foreign keys
+- 🌐 CORS configuration via environment variables
+
+### v1.0.0
+- ✅ Auth (register, login, logout)
+- 📁 Projects CRUD with colors and status
+- ✅ Tasks with status, priority, due dates
+- ⏱ Time tracker with live timer and history
+- 📅 Calendar with events linked to tasks
+
+---
+
+## 👤 Author
+
+**Blagoy Hristov** — [@MrSparkiop](https://github.com/MrSparkiop)
