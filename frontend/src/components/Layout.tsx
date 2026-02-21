@@ -4,15 +4,16 @@ import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import {
   LayoutDashboard, FolderKanban, CheckSquare,
-  Timer, Calendar, LogOut, User, Sun, Moon, Settings, Menu, X
+  Timer, Calendar, LogOut, User, Sun, Moon, Settings, Menu, X, Tag
 } from 'lucide-react'
 
 const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/projects', icon: FolderKanban, label: 'Projects' },
-  { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
-  { to: '/time-tracker', icon: Timer, label: 'Time Tracker' },
-  { to: '/calendar', icon: Calendar, label: 'Calendar' },
+  { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/projects',     icon: FolderKanban,    label: 'Projects' },
+  { to: '/tasks',        icon: CheckSquare,     label: 'Tasks' },
+  { to: '/time-tracker', icon: Timer,           label: 'Time Tracker' },
+  { to: '/calendar',     icon: Calendar,        label: 'Calendar' },
+  { to: '/tags',         icon: Tag,             label: 'Tags' },
 ]
 
 function useIsMobile() {

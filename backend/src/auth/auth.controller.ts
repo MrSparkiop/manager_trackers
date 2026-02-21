@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Body, Req, Res, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
+import { ApiOperation } from '@nestjs/swagger'
 import { AuthService } from './auth.service'
 import type { Response, Request } from 'express'
 
@@ -32,5 +33,17 @@ export class AuthController {
   @UseGuards(AuthGuard('jwt'))
   getMe(@Req() req: any) {
     return this.authService.getMe(req.user.id)
+  }
+
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request a password reset email' })
+  forgotPassword(@Body() body: any) {
+    return this.authService.forgotPassword(body.email)
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset password using token from email' })
+  resetPassword(@Body() body: any) {
+    return this.authService.resetPassword(body.token, body.password)
   }
 }

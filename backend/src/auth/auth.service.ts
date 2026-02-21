@@ -1,7 +1,9 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { PrismaService } from '../prisma/prisma.service'
+import { MailService } from '../mail/mail.service'
 import * as bcrypt from 'bcrypt'
+import * as crypto from 'crypto'
 import type { Response } from 'express'
 
 @Injectable()
@@ -9,6 +11,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private mailService: MailService,
   ) {}
 
   private generateTokens(userId: string) {
@@ -156,5 +159,52 @@ export class AuthService {
       where: { id: userId },
       select: { id: true, email: true, firstName: true, lastName: true }
     })
+  }
+
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } })
+
+    // Always return success to prevent email enumeration
+    if (!user) return { message: 'If that email exists, a reset link has been sent' }
+
+    const token = crypto.randomBytes(32).toString('hex')
+    const expiry = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetPasswordToken: token,
+        resetPasswordExpiry: expiry,
+      }
+    })
+
+    await this.mailService.sendPasswordReset(user.email, user.firstName, token)
+
+    return { message: 'If that email exists, a reset link has been sent' }
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        resetPasswordToken: token,
+        resetPasswordExpiry: { gt: new Date() }
+      }
+    })
+
+    if (!user) throw new UnauthorizedException('Invalid or expired reset token')
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10)
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetPasswordToken: null,
+        resetPasswordExpiry: null,
+        refreshToken: null, // invalidate all sessions
+      }
+    })
+
+    return { message: 'Password reset successfully' }
   }
 }

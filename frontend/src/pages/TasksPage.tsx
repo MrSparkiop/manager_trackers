@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, X, CheckCircle2, Circle, Clock, Trash2, Edit2,
-  ChevronDown, ChevronRight, Search, Square, CheckSquare2
+  ChevronDown, ChevronRight, Search, Square, CheckSquare2, Check
 } from 'lucide-react'
 import {
   DndContext, PointerSensor, useSensor, useSensors,
@@ -30,6 +30,7 @@ interface Task {
   project?: Project
   parentId?: string
   subtasks?: Task[]
+  tags?: { id: string; name: string; color: string }[]
 }
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
@@ -131,6 +132,18 @@ function SortableTaskRow({
               <span style={{ fontSize: '11px', color: colors.textMuted }}>
                 📅 {new Date(task.dueDate).toLocaleDateString()}
               </span>
+            )}
+            {task.tags && task.tags.length > 0 && (
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                {task.tags.map((tag: any) => (
+                  <span key={tag.id} style={{
+                    fontSize: '10px', padding: '1px 7px', borderRadius: '999px',
+                    backgroundColor: tag.color + '20', color: tag.color, fontWeight: '600'
+                  }}>
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
             )}
             {hasSubtasks && (
               <span style={{ fontSize: '11px', color: colors.textMuted }}>
@@ -288,7 +301,7 @@ export default function TasksPage() {
   const quickInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({
     title: '', description: '', status: 'TODO', priority: 'MEDIUM',
-    dueDate: '', estimatedTime: '', projectId: ''
+    dueDate: '', estimatedTime: '', projectId: '', tagIds: [] as string[]
   })
 
   const colors = {
@@ -321,6 +334,11 @@ export default function TasksPage() {
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ['projects'],
     queryFn: () => api.get('/projects').then(r => r.data)
+  })
+
+  const { data: tags = [] } = useQuery<any[]>({
+    queryKey: ['tags'],
+    queryFn: () => api.get('/tags').then(r => r.data),
   })
 
   const createMutation = useMutation({
@@ -356,7 +374,7 @@ export default function TasksPage() {
 
   const openCreate = () => {
     setEditTask(null)
-    setForm({ title: '', description: '', status: 'TODO', priority: 'MEDIUM', dueDate: '', estimatedTime: '', projectId: '' })
+    setForm({ title: '', description: '', status: 'TODO', priority: 'MEDIUM', dueDate: '', estimatedTime: '', projectId: '', tagIds: [] })
     setShowModal(true)
   }
 
@@ -367,7 +385,8 @@ export default function TasksPage() {
       status: t.status, priority: t.priority,
       dueDate: t.dueDate ? t.dueDate.split('T')[0] : '',
       estimatedTime: t.estimatedTime ? String(t.estimatedTime) : '',
-      projectId: t.projectId || ''
+      projectId: t.projectId || '',
+      tagIds: t.tags?.map((tag: any) => tag.id) || []
     })
     setShowModal(true)
   }
@@ -382,6 +401,7 @@ export default function TasksPage() {
       dueDate: form.dueDate || undefined,
       estimatedTime: form.estimatedTime ? parseInt(form.estimatedTime) : undefined,
       projectId: form.projectId || undefined,
+      tagIds: form.tagIds,
     }
     if (editTask) updateMutation.mutate({ id: editTask.id, data: payload, closeModal: true })
     else createMutation.mutate(payload)
@@ -753,6 +773,39 @@ export default function TasksPage() {
                   <option value="">No project</option>
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Tags</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {tags.map((tag: any) => {
+                    const selected = form.tagIds.includes(tag.id)
+                    return (
+                      <button key={tag.id} type="button" onClick={() => {
+                        setForm(prev => ({
+                          ...prev,
+                          tagIds: selected
+                            ? prev.tagIds.filter(id => id !== tag.id)
+                            : [...prev.tagIds, tag.id]
+                        }))
+                      }} style={{
+                        padding: '4px 12px', borderRadius: '999px', fontSize: '12px', fontWeight: '600',
+                        border: `1px solid ${selected ? tag.color : colors.inputBorder}`,
+                        backgroundColor: selected ? tag.color + '20' : 'transparent',
+                        color: selected ? tag.color : colors.textMuted,
+                        cursor: 'pointer', transition: 'all 0.15s',
+                        display: 'flex', alignItems: 'center', gap: '5px'
+                      }}>
+                        {selected && <Check size={10} />}
+                        {tag.name}
+                      </button>
+                    )
+                  })}
+                  {tags.length === 0 && (
+                    <p style={{ fontSize: '13px', color: colors.textMuted, margin: 0 }}>
+                      No tags yet — create some in the Tags page
+                    </p>
+                  )}
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
                 <button type="button" onClick={closeModal} style={{
