@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsDateString, IsInt, IsPositive } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsDateString, IsInt, IsPositive, IsArray } from 'class-validator';
 import { TaskStatus, Priority } from '@prisma/client';
 
 export class CreateTaskDto {
@@ -33,4 +33,9 @@ export class CreateTaskDto {
   @IsString()
   @IsOptional()
   parentId?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  tagIds?: string[];
 }

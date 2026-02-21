@@ -13,6 +13,7 @@ export class TasksService {
     if (filters?.status) where.status = filters.status;
     if (filters?.priority) where.priority = filters.priority;
     if (filters?.projectId) where.projectId = filters.projectId;
+    if (filters?.tagId) where.tags = { some: { id: filters.tagId } };
 
     return this.prisma.task.findMany({
       where,
@@ -41,14 +42,17 @@ export class TasksService {
   }
 
   async create(userId: string, dto: CreateTaskDto) {
+    const { tagIds, ...rest } = dto as any
     return this.prisma.task.create({
       data: {
-        ...dto,
+        ...rest,
         userId,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+        ...(tagIds?.length ? { tags: { connect: tagIds.map((id: string) => ({ id })) } } : {}),
       },
       include: {
         project: { select: { id: true, name: true, color: true } },
+        tags: true,
       },
     })
   }
@@ -56,12 +60,16 @@ export class TasksService {
 
   async update(id: string, userId: string, dto: UpdateTaskDto) {
     await this.findOne(id, userId)
+    const { tagIds, ...rest } = dto as any
     const data: any = {
-      ...dto,
+      ...rest,
       dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
     }
     if (dto.status === TaskStatus.DONE) {
       data.completedAt = new Date()
+    }
+    if (tagIds !== undefined) {
+      data.tags = { set: tagIds.map((id: string) => ({ id })) }
     }
     return this.prisma.task.update({
       where: { id },
