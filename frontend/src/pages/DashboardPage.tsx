@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
+import { useOutletContext } from 'react-router-dom'
 import { CheckSquare, FolderKanban, Timer, AlertCircle, Clock, TrendingUp } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import api from '../lib/axios'
 import { useAuthStore } from '../store/authStore'
-import { useThemeStore } from '../store/themeStore'
 import { StatCardSkeleton } from '../components/Skeleton'
 
 interface Task {
@@ -48,7 +48,7 @@ function PriorityBadge({ priority }: { priority: string }) {
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
-  const { isDark } = useThemeStore()
+  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
 
   const colors = {
     bg: isDark ? '#030712' : '#f1f5f9',
@@ -118,7 +118,7 @@ export default function DashboardPage() {
     backgroundColor: colors.card,
     borderRadius: '16px',
     border: `1px solid ${colors.border}`,
-    padding: '24px',
+    padding: isMobile ? '16px' : '24px',
   }
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -144,41 +144,56 @@ export default function DashboardPage() {
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
   return (
-    <div style={{ padding: '32px', fontFamily: 'Inter, sans-serif', backgroundColor: colors.bg, minHeight: '100vh' }}>
+    <div style={{
+      padding: isMobile ? '16px' : '32px',
+      fontFamily: 'Inter, sans-serif',
+      backgroundColor: colors.bg,
+      minHeight: '100vh'
+    }}>
 
       {/* Header */}
-      <div style={{ marginBottom: '28px' }}>
-        <h1 style={{ fontSize: '26px', fontWeight: '700', color: colors.text, margin: 0 }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: isMobile ? '20px' : '26px', fontWeight: '700', color: colors.text, margin: 0 }}>
           {greeting}, {user?.firstName}! 👋
         </h1>
-        <p style={{ color: colors.textMuted, marginTop: '6px', fontSize: '15px' }}>
+        <p style={{ color: colors.textMuted, marginTop: '6px', fontSize: '14px' }}>
           Here's your overview for today.
         </p>
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+        gap: '12px',
+        marginBottom: '20px'
+      }}>
         {isLoading ? (
           [...Array(4)].map((_, i) => <StatCardSkeleton key={i} />)
         ) : (
           stats.map(({ label, value, icon: Icon, color, bg }) => (
             <div key={label} style={card}>
               <div style={{
-                width: '42px', height: '42px', backgroundColor: bg,
-                borderRadius: '12px', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', marginBottom: '16px'
+                width: '38px', height: '38px', backgroundColor: bg,
+                borderRadius: '10px', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', marginBottom: '12px'
               }}>
-                <Icon size={20} color={color} />
+                <Icon size={18} color={color} />
               </div>
-              <p style={{ fontSize: '28px', fontWeight: '700', color: colors.text, margin: 0 }}>{value}</p>
-              <p style={{ fontSize: '13px', color: colors.textMuted, marginTop: '4px' }}>{label}</p>
+              <p style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: '700', color: colors.text, margin: 0 }}>{value}</p>
+              <p style={{ fontSize: '12px', color: colors.textMuted, marginTop: '4px' }}>{label}</p>
             </div>
           ))
         )}
       </div>
 
       {/* Charts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+        gap: '16px',
+        marginBottom: '16px'
+      }}>
         <div style={card}>
           <h2 style={{ fontSize: '15px', fontWeight: '600', color: colors.text, margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <TrendingUp size={16} color="#6366f1" /> Tasks by Status
@@ -226,6 +241,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Project Progress */}
       {projectChartData.length > 0 && (
         <div style={{ ...card, marginBottom: '16px' }}>
           <h2 style={{ fontSize: '15px', fontWeight: '600', color: colors.text, margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -244,7 +260,11 @@ export default function DashboardPage() {
       )}
 
       {/* Bottom */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+        gap: '16px'
+      }}>
         <div style={card}>
           <h2 style={{ fontSize: '15px', fontWeight: '600', color: colors.text, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <CheckSquare size={16} color="#60a5fa" /> Today's Tasks

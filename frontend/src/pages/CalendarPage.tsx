@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Plus, X, Trash2 } from 'lucide-react'
 import api from '../lib/axios'
-import { useThemeStore } from '../store/themeStore'
+import { useOutletContext } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 
@@ -26,7 +26,7 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 
 export default function CalendarPage() {
   const queryClient = useQueryClient()
-  const { isDark } = useThemeStore()
+  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
   const today = new Date()
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
@@ -161,10 +161,10 @@ export default function CalendarPage() {
   }
 
   return (
-    <div style={{ padding: '32px', fontFamily: 'Inter, sans-serif', minHeight: '100vh', backgroundColor: colors.bg }}>
+    <div style={{ padding: isMobile ? '12px' : '32px', fontFamily: 'Inter, sans-serif', minHeight: '100vh', backgroundColor: colors.bg }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: colors.text, margin: 0 }}>
             {MONTHS[month]} {year}
@@ -203,7 +203,7 @@ export default function CalendarPage() {
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: '20px' }}>
+      <div style={{ display: 'flex', gap: '20px', flexDirection: isMobile ? 'column' : 'row' }}>
         {/* Calendar Grid */}
         <div style={{ flex: 1 }}>
           {/* Day headers */}
@@ -245,7 +245,7 @@ export default function CalendarPage() {
                   onClick={() => setSelectedDay(date)}
                   onDoubleClick={() => { setSelectedDay(date); openCreate(date) }}
                   style={{
-                    minHeight: '90px', padding: '8px',
+                    minHeight: isMobile ? '60px' : '90px', padding: isMobile ? '4px' : '8px',
                     backgroundColor: isSelected
                       ? (isDark ? 'rgba(99,102,241,0.12)' : 'rgba(99,102,241,0.06)')
                       : colors.cellBg,
@@ -269,7 +269,7 @@ export default function CalendarPage() {
 
                   {/* Events */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    {dayEvents.slice(0, 3).map(event => (
+                    {dayEvents.slice(0, isMobile ? 1 : 3).map(event => (
                       <div key={event.id} style={{
                         fontSize: '11px', fontWeight: '500',
                         backgroundColor: event.color + '30',
@@ -281,9 +281,9 @@ export default function CalendarPage() {
                         {event.title}
                       </div>
                     ))}
-                    {dayEvents.length > 3 && (
+                    {dayEvents.length > (isMobile ? 1 : 3) && (
                       <div style={{ fontSize: '10px', color: colors.textMuted, paddingLeft: '4px' }}>
-                        +{dayEvents.length - 3} more
+                        +{dayEvents.length - (isMobile ? 1 : 3)} more
                       </div>
                     )}
                   </div>
@@ -295,7 +295,7 @@ export default function CalendarPage() {
 
         {/* Side Panel */}
         <div style={{
-          width: '260px', flexShrink: 0,
+          width: isMobile ? '100%' : '260px', flexShrink: 0,
           backgroundColor: colors.sidePanelBg,
           border: `1px solid ${colors.border}`,
           borderRadius: '16px', padding: '20px',

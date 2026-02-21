@@ -11,7 +11,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import api from '../lib/axios'
-import { useThemeStore } from '../store/themeStore'
+import { useOutletContext } from 'react-router-dom'
 import { ProjectCardSkeleton } from '../components/Skeleton'
 import toast from 'react-hot-toast'
 
@@ -165,7 +165,7 @@ function KanbanColumn({ column, tasks, colors }: { column: any; tasks: Task[]; c
 
 export default function ProjectsPage() {
   const queryClient = useQueryClient()
-  const { isDark } = useThemeStore()
+  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
   const [view, setView] = useState<'grid' | 'kanban'>('grid')
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [showModal, setShowModal] = useState(false)
@@ -303,17 +303,17 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div style={{ padding: '32px', fontFamily: 'Inter, sans-serif', minHeight: '100vh', backgroundColor: colors.bg }}>
+    <div style={{ padding: isMobile ? '16px' : '32px', fontFamily: 'Inter, sans-serif', minHeight: '100vh', backgroundColor: colors.bg }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: '28px', flexWrap: 'wrap', gap: '12px', flexDirection: isMobile ? 'column' : 'row' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: colors.text, margin: 0 }}>Projects</h1>
           <p style={{ color: colors.textMuted, marginTop: '4px', fontSize: '14px' }}>
             {projects.length} project{projects.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
           {/* View toggle */}
           <div style={{
             display: 'flex', backgroundColor: colors.card,
@@ -337,7 +337,8 @@ export default function ProjectsPage() {
             display: 'flex', alignItems: 'center', gap: '8px',
             backgroundColor: '#6366f1', color: '#ffffff', border: 'none',
             borderRadius: '10px', padding: '10px 18px', fontSize: '14px',
-            fontWeight: '600', cursor: 'pointer'
+            fontWeight: '600', cursor: 'pointer',
+            flex: isMobile ? 1 : 'none', justifyContent: isMobile ? 'center' : 'flex-start'
           }}>
             <Plus size={16} /> New Project
           </button>
@@ -348,7 +349,7 @@ export default function ProjectsPage() {
       {view === 'grid' && (
         <>
           {isLoading ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
               {[...Array(4)].map((_, i) => <ProjectCardSkeleton key={i} />)}
             </div>
           ) : projects.length === 0 ? (
@@ -358,7 +359,7 @@ export default function ProjectsPage() {
               <p style={{ color: colors.textMuted, fontSize: '14px', marginTop: '4px' }}>Create your first project to get started</p>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
               {projects.map(project => {
                 const progress = getProgress(project)
                 const taskCount = project._count?.tasks || project.tasks?.length || 0

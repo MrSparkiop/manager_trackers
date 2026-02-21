@@ -12,7 +12,7 @@ import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import api from '../lib/axios'
-import { useThemeStore } from '../store/themeStore'
+import { useOutletContext } from 'react-router-dom'
 import { TaskRowSkeleton } from '../components/Skeleton'
 import toast from 'react-hot-toast'
 
@@ -275,7 +275,7 @@ function SortableTaskRow({
 
 export default function TasksPage() {
   const queryClient = useQueryClient()
-  const { isDark } = useThemeStore()
+  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
   const [showModal, setShowModal]           = useState(false)
   const [editTask, setEditTask]             = useState<Task | null>(null)
   const [filterStatus, setFilterStatus]     = useState('')
@@ -473,10 +473,10 @@ export default function TasksPage() {
   const labelStyle = { display: 'block', fontSize: '13px', color: colors.textMuted, marginBottom: '6px' }
 
   return (
-    <div style={{ padding: '32px', fontFamily: 'Inter, sans-serif', minHeight: '100vh', backgroundColor: colors.bg }}>
+    <div style={{ padding: isMobile ? '16px' : '32px', fontFamily: 'Inter, sans-serif', minHeight: '100vh', backgroundColor: colors.bg }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: '700', color: colors.text, margin: 0 }}>Tasks</h1>
           <p style={{ color: colors.textMuted, marginTop: '4px', fontSize: '14px' }}>{filteredTasks.length} tasks</p>
@@ -520,7 +520,7 @@ export default function TasksPage() {
       </div>
 
       {/* Search + Filters */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
         {/* Search */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '8px',
@@ -544,7 +544,8 @@ export default function TasksPage() {
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{
           backgroundColor: colors.filterBg, border: `1px solid ${colors.border}`,
           borderRadius: '8px', padding: '8px 12px', color: filterStatus ? colors.text : colors.textMuted,
-          fontSize: '13px', outline: 'none', cursor: 'pointer'
+          fontSize: '13px', outline: 'none', cursor: 'pointer',
+          width: isMobile ? '100%' : 'auto'
         }}>
           <option value="">All Statuses</option>
           {STATUSES.map(o => <option key={o} value={o}>{o.replace('_', ' ')}</option>)}
@@ -553,7 +554,8 @@ export default function TasksPage() {
         <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} style={{
           backgroundColor: colors.filterBg, border: `1px solid ${colors.border}`,
           borderRadius: '8px', padding: '8px 12px', color: filterPriority ? colors.text : colors.textMuted,
-          fontSize: '13px', outline: 'none', cursor: 'pointer'
+          fontSize: '13px', outline: 'none', cursor: 'pointer',
+          width: isMobile ? '100%' : 'auto'
         }}>
           <option value="">All Priorities</option>
           {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
@@ -562,7 +564,8 @@ export default function TasksPage() {
         <select value={filterProject} onChange={e => setFilterProject(e.target.value)} style={{
           backgroundColor: colors.filterBg, border: `1px solid ${colors.border}`,
           borderRadius: '8px', padding: '8px 12px', color: filterProject ? colors.text : colors.textMuted,
-          fontSize: '13px', outline: 'none', cursor: 'pointer'
+          fontSize: '13px', outline: 'none', cursor: 'pointer',
+          width: isMobile ? '100%' : 'auto'
         }}>
           <option value="">All Projects</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
