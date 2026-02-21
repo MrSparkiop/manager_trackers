@@ -8,12 +8,12 @@ import {
 } from 'lucide-react'
 
 const navItems = [
-  { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/projects',     icon: FolderKanban,    label: 'Projects' },
-  { to: '/tasks',        icon: CheckSquare,     label: 'Tasks' },
-  { to: '/time-tracker', icon: Timer,           label: 'Time Tracker' },
-  { to: '/calendar',     icon: Calendar,        label: 'Calendar' },
-  { to: '/tags',         icon: Tag,             label: 'Tags' },
+  { to: '/app/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/app/projects',     icon: FolderKanban,    label: 'Projects' },
+  { to: '/app/tasks',        icon: CheckSquare,     label: 'Tasks' },
+  { to: '/app/time-tracker', icon: Timer,           label: 'Time Tracker' },
+  { to: '/app/calendar',     icon: Calendar,        label: 'Calendar' },
+  { to: '/app/tags',         icon: Tag,             label: 'Tags' },
 ]
 
 function useIsMobile() {
