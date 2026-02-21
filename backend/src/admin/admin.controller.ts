@@ -32,15 +32,42 @@ export class AdminController {
     return this.adminService.getMostActiveUsers()
   }
 
+  @Get('users/:id')
+  @ApiOperation({ summary: 'Get user details' })
+  getUserDetails(@Param('id') id: string) {
+    return this.adminService.getUserDetails(id)
+  }
+
   @Put('users/:id/role')
   @ApiOperation({ summary: 'Update user role' })
   updateUserRole(@Param('id') id: string, @Body() body: { role: 'USER' | 'ADMIN' }) {
     return this.adminService.updateUserRole(id, body.role)
   }
 
+  @Put('users/:id/suspend')
+  @ApiOperation({ summary: 'Suspend or unsuspend a user' })
+  toggleSuspend(@Param('id') id: string, @Body() body: { isSuspended: boolean }) {
+    return this.adminService.toggleSuspend(id, body.isSuspended)
+  }
+
   @Delete('users/:id')
   @ApiOperation({ summary: 'Delete a user' })
   deleteUser(@Param('id') id: string) {
     return this.adminService.deleteUser(id)
+  }
+
+  @Get('activity')
+  @ApiOperation({ summary: 'Get platform activity log' })
+  getActivityLog(
+    @Query('page')  page  = '1',
+    @Query('limit') limit = '30',
+  ) {
+    return this.adminService.getActivityLog(+page, +limit)
+  }
+
+  @Get('search')
+  @ApiOperation({ summary: 'Global search across users, tasks, projects' })
+  globalSearch(@Query('q') q = '') {
+    return this.adminService.globalSearch(q)
   }
 }

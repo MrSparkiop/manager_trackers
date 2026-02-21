@@ -26,8 +26,13 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
 
       login: async (email, password) => {
-        const res = await api.post('/auth/login', { email, password })
-        set({ user: res.data.user, isAuthenticated: true })
+        try {
+          const res = await api.post('/auth/login', { email, password })
+          set({ user: res.data.user, isAuthenticated: true })
+        } catch (error: any) {
+          const message = error?.response?.data?.message || 'Invalid email or password'
+          throw new Error(message)
+        }
       },
 
       register: async (email, password, firstName, lastName) => {

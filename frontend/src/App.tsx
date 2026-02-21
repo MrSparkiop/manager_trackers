@@ -16,6 +16,9 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import TagsPage from './pages/TagsPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import AdminUsersPage from './pages/admin/AdminUsersPage'
+import AdminActivityPage from './pages/admin/AdminActivityPage'
+import AdminSearchPage from './pages/admin/AdminSearchPage'
+import AdminUserDetailPage from './pages/admin/AdminUserDetailPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -57,6 +60,9 @@ export default function App() {
           <Route index element={<Navigate to="/admin/dashboard" />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
           <Route path="users" element={<AdminUsersPage />} />
+          <Route path="users/:id" element={<AdminUserDetailPage />} />
+          <Route path="activity" element={<AdminActivityPage />} />
+          <Route path="search" element={<AdminSearchPage />} />
         </Route>
 
         {/* Catch all */}

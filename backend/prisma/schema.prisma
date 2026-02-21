@@ -15,6 +15,7 @@ model User {
   lastName            String
   avatar              String?
   role                Role      @default(USER)
+  isSuspended         Boolean   @default(false)
   refreshToken        String?
   resetPasswordToken  String?
   resetPasswordExpiry DateTime?

@@ -83,6 +83,8 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.password)
     if (!valid) throw new UnauthorizedException('Invalid credentials')
 
+    if (user.isSuspended) throw new UnauthorizedException('Your account has been suspended')
+
     const { accessToken, refreshToken } = this.generateTokens(user.id)
 
     // Store hashed refresh token in DB

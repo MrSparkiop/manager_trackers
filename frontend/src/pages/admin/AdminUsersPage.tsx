@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useOutletContext } from 'react-router-dom'
-import { Search, Shield, User, Trash2, ChevronLeft, ChevronRight, Crown } from 'lucide-react'
+import { useOutletContext, useNavigate } from 'react-router-dom'
+import { Search, Shield, User, Trash2, ChevronLeft, ChevronRight, Crown, Ban } from 'lucide-react'
 import api from '../../lib/axios'
 import toast from 'react-hot-toast'
 
 export default function AdminUsersPage() {
   const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [search, setSearch]   = useState('')
   const [page, setPage]       = useState(1)
   const [searchInput, setSearchInput] = useState('')
@@ -45,6 +46,16 @@ export default function AdminUsersPage() {
       toast.success('User deleted')
     },
     onError: () => toast.error('Failed to delete user'),
+  })
+
+  const suspendMutation = useMutation({
+    mutationFn: ({ id, isSuspended }: { id: string; isSuspended: boolean }) =>
+      api.put(`/admin/users/${id}/suspend`, { isSuspended }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+      toast.success('User updated!')
+    },
+    onError: () => toast.error('Failed to update user'),
   })
 
   const handleSearch = (e: React.FormEvent) => {
@@ -152,14 +163,17 @@ export default function AdminUsersPage() {
           </div>
         ) : (
           data?.users?.map((u: any) => (
-            <div key={u.id} style={{
-              display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr auto' : '2fr 1fr 1fr 1fr auto',
-              gap: '12px', padding: '14px 20px',
-              borderBottom: `1px solid ${colors.border}`,
-              alignItems: 'center',
-              transition: 'background 0.1s',
-            }}
+            <div key={u.id}
+              onClick={() => navigate(`/admin/users/${u.id}`)}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr auto' : '2fr 1fr 1fr 1fr auto',
+                gap: '12px', padding: '14px 20px',
+                borderBottom: `1px solid ${colors.border}`,
+                alignItems: 'center',
+                transition: 'background 0.1s',
+                cursor: 'pointer',
+              }}
               onMouseEnter={e => e.currentTarget.style.backgroundColor = colors.subBg + '80'}
               onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
             >
@@ -215,7 +229,7 @@ export default function AdminUsersPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {/* Role toggle */}
                 <button
-                  onClick={() => roleMutation.mutate({ id: u.id, role: u.role === 'ADMIN' ? 'USER' : 'ADMIN' })}
+                  onClick={(e) => { e.stopPropagation(); roleMutation.mutate({ id: u.id, role: u.role === 'ADMIN' ? 'USER' : 'ADMIN' }) }}
                   title={u.role === 'ADMIN' ? 'Revoke admin' : 'Make admin'}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '4px',
@@ -229,8 +243,31 @@ export default function AdminUsersPage() {
                   {u.role === 'ADMIN' ? <><Shield size={11} /> Admin</> : <><User size={11} /> User</>}
                 </button>
 
+                {/* Suspend toggle */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); suspendMutation.mutate({ id: u.id, isSuspended: !u.isSuspended }) }}
+                  title={u.isSuspended ? 'Unsuspend' : 'Suspend'}
+                  style={{
+                    display: 'flex', alignItems: 'center',
+                    padding: '6px', borderRadius: '7px', border: 'none',
+                    cursor: 'pointer', backgroundColor: 'transparent',
+                    color: u.isSuspended ? '#4ade80' : colors.textMuted,
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = u.isSuspended ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)'
+                    e.currentTarget.style.color = u.isSuspended ? '#4ade80' : '#f87171'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                    e.currentTarget.style.color = u.isSuspended ? '#4ade80' : colors.textMuted
+                  }}
+                >
+                  <Ban size={14} />
+                </button>
+
                 {/* Delete */}
-                <button onClick={() => handleDelete(u)} style={{
+                <button onClick={(e) => { e.stopPropagation(); handleDelete(u) }} style={{
                   display: 'flex', alignItems: 'center',
                   padding: '6px', borderRadius: '7px', border: 'none',
                   cursor: 'pointer', backgroundColor: 'transparent', color: colors.textMuted,
