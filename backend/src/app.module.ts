@@ -7,6 +7,7 @@ import { TasksModule } from './tasks/tasks.module'
 import { TimeTrackerModule } from './time-tracker/time-tracker.module'
 import { CalendarModule } from './calendar/calendar.module'
 import { TagsModule } from './tags/tags.module'
+import { AdminModule } from './admin/admin.module'
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { TagsModule } from './tags/tags.module'
     TimeTrackerModule,
     CalendarModule,
     TagsModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

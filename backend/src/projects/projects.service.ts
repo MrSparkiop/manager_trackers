@@ -36,7 +36,12 @@ export class ProjectsService {
 
   async create(userId: string, dto: CreateProjectDto) {
     return this.prisma.project.create({
-      data: { ...dto, userId },
+      data: {
+        ...dto,
+        userId,
+        deadline: dto.deadline ? new Date(dto.deadline) : undefined,
+      },
+      include: { _count: { select: { tasks: true } } }
     });
   }
 
@@ -44,7 +49,11 @@ export class ProjectsService {
     await this.findOne(id, userId);
     return this.prisma.project.update({
       where: { id },
-      data: dto,
+      data: {
+        ...dto,
+        deadline: dto.deadline ? new Date(dto.deadline) : undefined,
+      },
+      include: { _count: { select: { tasks: true } } }
     });
   }
 

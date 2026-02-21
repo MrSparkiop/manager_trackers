@@ -60,7 +60,7 @@ export class AuthService {
         firstName: dto.firstName,
         lastName: dto.lastName,
       },
-      select: { id: true, email: true, firstName: true, lastName: true }
+      select: { id: true, email: true, firstName: true, lastName: true, role: true }
     })
 
     const { accessToken, refreshToken } = this.generateTokens(user.id)
@@ -100,6 +100,7 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        role: user.role,
       }
     }
   }
@@ -157,7 +158,7 @@ export class AuthService {
   async getMe(userId: string) {
     return this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, firstName: true, lastName: true }
+      select: { id: true, email: true, firstName: true, lastName: true, role: true }
     })
   }
 

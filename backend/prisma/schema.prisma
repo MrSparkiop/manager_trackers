@@ -14,17 +14,17 @@ model User {
   firstName           String
   lastName            String
   avatar              String?
+  role                Role      @default(USER)
   refreshToken        String?
   resetPasswordToken  String?
   resetPasswordExpiry DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
-  tags           Tag[]
-
-  projects       Project[]
-  tasks          Task[]
-  timeEntries    TimeEntry[]
-  calendarEvents CalendarEvent[]
+  tags                Tag[]
+  projects            Project[]
+  tasks               Task[]
+  timeEntries         TimeEntry[]
+  calendarEvents      CalendarEvent[]
 
   @@map("users")
 }
@@ -157,4 +157,9 @@ enum Priority {
   MEDIUM
   HIGH
   URGENT
+}
+
+enum Role {
+  USER
+  ADMIN
 }

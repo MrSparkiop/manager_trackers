@@ -90,9 +90,11 @@ export default function CalendarPage() {
 
   const openCreate = (day?: Date) => {
     const d = day || today
+    // Fix: use local date instead of ISO string to avoid timezone shift
+    const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     setForm({
       title: '', description: '', color: '#6366f1',
-      date: d.toISOString().split('T')[0],
+      date: localDate,
       startTime: '09:00', endTime: '10:00',
       allDay: false, taskId: ''
     })
@@ -103,16 +105,19 @@ export default function CalendarPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // Fix: append timezone offset to prevent UTC shift
     const startTime = form.allDay
-      ? new Date(`${form.date}T00:00:00`).toISOString()
-      : new Date(`${form.date}T${form.startTime}:00`).toISOString()
+      ? `${form.date}T00:00:00`
+      : `${form.date}T${form.startTime}:00`
     const endTime = form.allDay
-      ? new Date(`${form.date}T23:59:59`).toISOString()
-      : new Date(`${form.date}T${form.endTime}:00`).toISOString()
+      ? `${form.date}T23:59:59`
+      : `${form.date}T${form.endTime}:00`
     createMutation.mutate({
       title: form.title,
       description: form.description || undefined,
-      color: form.color, startTime, endTime,
+      color: form.color,
+      startTime,
+      endTime,
       allDay: form.allDay,
       taskId: form.taskId || undefined,
     })

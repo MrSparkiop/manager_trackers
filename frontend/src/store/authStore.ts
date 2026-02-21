@@ -7,6 +7,7 @@ interface User {
   email: string
   firstName: string
   lastName: string
+  role: string
 }
 
 interface AuthState {
@@ -15,6 +16,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>
   logout: () => Promise<void>
+  fetchMe: () => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -25,7 +27,6 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (email, password) => {
         const res = await api.post('/auth/login', { email, password })
-        // Token is now in HttpOnly cookie — only store user info in Zustand
         set({ user: res.data.user, isAuthenticated: true })
       },
 
@@ -38,10 +39,14 @@ export const useAuthStore = create<AuthState>()(
         await api.post('/auth/logout')
         set({ user: null, isAuthenticated: false })
       },
+
+      fetchMe: async () => {
+        const res = await api.get('/auth/me')
+        set({ user: res.data, isAuthenticated: true })
+      },
     }),
     {
       name: 'auth-storage',
-      // Only persist user info — NO token in localStorage anymore!
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
