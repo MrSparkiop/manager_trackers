@@ -14,11 +14,18 @@ import SettingsPage from './pages/SettingsPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import TagsPage from './pages/TagsPage'
+import TeamsPage from './pages/TeamsPage'
+import TeamWorkspacePage from './pages/TeamWorkspacePage'
+import TeamProjectPage from './pages/TeamProjectPage'
+import JoinTeamPage from './pages/JoinTeamPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import AdminUsersPage from './pages/admin/AdminUsersPage'
 import AdminActivityPage from './pages/admin/AdminActivityPage'
 import AdminSearchPage from './pages/admin/AdminSearchPage'
 import AdminUserDetailPage from './pages/admin/AdminUserDetailPage'
+import AdminSettingsPage from './pages/admin/AdminSettingsPage'
+import TeamSettingsPage from './pages/TeamSettingsPage'
+
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -53,6 +60,11 @@ export default function App() {
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="tags" element={<TagsPage />} />
+          <Route path="teams" element={<TeamsPage />} />
+          <Route path="teams/:id" element={<TeamWorkspacePage />} />
+          <Route path="teams/:id/settings" element={<TeamSettingsPage />} />
+          <Route path="teams/:id/projects/:projectId" element={<TeamProjectPage />} />
+          <Route path="join" element={<JoinTeamPage />} />
         </Route>
 
         {/* Admin routes */}
@@ -63,6 +75,7 @@ export default function App() {
           <Route path="users/:id" element={<AdminUserDetailPage />} />
           <Route path="activity" element={<AdminActivityPage />} />
           <Route path="search" element={<AdminSearchPage />} />
+          <Route path="settings" element={<AdminSettingsPage />} />
         </Route>
 
         {/* Catch all */}

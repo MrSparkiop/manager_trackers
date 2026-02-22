@@ -229,18 +229,22 @@ export default function AdminUsersPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {/* Role toggle */}
                 <button
-                  onClick={(e) => { e.stopPropagation(); roleMutation.mutate({ id: u.id, role: u.role === 'ADMIN' ? 'USER' : 'ADMIN' }) }}
-                  title={u.role === 'ADMIN' ? 'Revoke admin' : 'Make admin'}
+                  onClick={(e) => { e.stopPropagation(); roleMutation.mutate({ id: u.id, role: u.role === 'ADMIN' ? 'USER' : u.role === 'PRO' ? 'ADMIN' : 'PRO' }) }}
+                  title={u.role === 'ADMIN' ? 'Revoke to User' : u.role === 'PRO' ? 'Make Admin' : 'Make Pro'}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '4px',
                     padding: '5px 10px', borderRadius: '7px', border: 'none',
                     cursor: 'pointer', fontSize: '11px', fontWeight: '600',
-                    backgroundColor: u.role === 'ADMIN' ? 'rgba(239,68,68,0.15)' : 'rgba(99,102,241,0.15)',
-                    color: u.role === 'ADMIN' ? '#f87171' : '#818cf8',
+                    backgroundColor: u.role === 'ADMIN' ? 'rgba(239,68,68,0.15)' :
+                                     u.role === 'PRO'   ? 'rgba(245,158,11,0.15)' :
+                                     'rgba(99,102,241,0.15)',
+                    color: u.role === 'ADMIN' ? '#f87171' : u.role === 'PRO' ? '#f59e0b' : '#818cf8',
                     transition: 'all 0.15s'
                   }}
                 >
-                  {u.role === 'ADMIN' ? <><Shield size={11} /> Admin</> : <><User size={11} /> User</>}
+                  {u.role === 'ADMIN' ? <><Shield size={11} /> Admin</> :
+                   u.role === 'PRO'   ? '✨ Pro' :
+                   <><User size={11} /> User</>}
                 </button>
 
                 {/* Suspend toggle */}

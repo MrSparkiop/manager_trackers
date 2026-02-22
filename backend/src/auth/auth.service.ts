@@ -49,6 +49,26 @@ export class AuthService {
   }
 
   async register(dto: any, res: Response) {
+    // Check maintenance mode
+    const maintenanceConfig = await this.prisma.systemConfig.findUnique({
+      where: { key: 'maintenanceMode' }
+    })
+    if (maintenanceConfig?.value === 'true') {
+      const messageConfig = await this.prisma.systemConfig.findUnique({
+        where: { key: 'maintenanceMessage' }
+      })
+      throw new ConflictException(
+        messageConfig?.value || 'Platform is under maintenance. Please try again later.'
+      )
+    }
+
+    const regConfig = await this.prisma.systemConfig.findUnique({
+      where: { key: 'disableRegistrations' }
+    })
+    if (regConfig?.value === 'true') {
+      throw new ConflictException('New registrations are currently disabled')
+    }
+
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } })
     if (existing) throw new ConflictException('Email already in use')
 
@@ -82,6 +102,21 @@ export class AuthService {
 
     const valid = await bcrypt.compare(dto.password, user.password)
     if (!valid) throw new UnauthorizedException('Invalid credentials')
+
+    // Check maintenance mode — skip for admins
+    if (user.role !== 'ADMIN') {
+      const maintenanceConfig = await this.prisma.systemConfig.findUnique({
+        where: { key: 'maintenanceMode' }
+      })
+      if (maintenanceConfig?.value === 'true') {
+        const messageConfig = await this.prisma.systemConfig.findUnique({
+          where: { key: 'maintenanceMessage' }
+        })
+        throw new UnauthorizedException(
+          messageConfig?.value || 'Platform is under maintenance. Please try again later.'
+        )
+      }
+    }
 
     if (user.isSuspended) throw new UnauthorizedException('Your account has been suspended')
 

@@ -4,8 +4,9 @@ import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import {
   LayoutDashboard, FolderKanban, CheckSquare,
-  Timer, Calendar, LogOut, User, Sun, Moon, Settings, Menu, X, Tag, Shield
+  Timer, Calendar, LogOut, User, Sun, Moon, Settings, Menu, X, Tag, Users, Shield
 } from 'lucide-react'
+import AnnouncementBanner from './AnnouncementBanner'
 
 const navItems = [
   { to: '/app/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
@@ -13,7 +14,8 @@ const navItems = [
   { to: '/app/tasks',        icon: CheckSquare,     label: 'Tasks' },
   { to: '/app/time-tracker', icon: Timer,           label: 'Time Tracker' },
   { to: '/app/calendar',     icon: Calendar,        label: 'Calendar' },
-  { to: '/app/tags',         icon: Tag,             label: 'Tags' },
+  { to: '/app/tags',         icon: Tag,             label: 'Tags'  },
+  { to: '/app/teams',        icon: Users,           label: 'Teams' },
 ]
 
 function useIsMobile() {
@@ -150,16 +152,34 @@ export default function Layout() {
           border: `1px solid ${colors.border}`
         }}>
           <div style={{
-            width: '30px', height: '30px', backgroundColor: '#6366f1',
-            borderRadius: '50%', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', flexShrink: 0
+            width: '30px', height: '30px', borderRadius: '50%', flexShrink: 0,
+            background: (user as any)?.role === 'ADMIN' ? 'linear-gradient(135deg, #ef4444, #dc2626)' :
+                        (user as any)?.role === 'PRO'   ? 'linear-gradient(135deg, #f59e0b, #f97316)' :
+                        'linear-gradient(135deg, #6366f1, #8b5cf6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '11px', fontWeight: '700', color: '#fff'
           }}>
-            <User size={13} color="#ffffff" />
+            {user?.firstName?.[0]}{user?.lastName?.[0]}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: '12px', fontWeight: '600', color: colors.text, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.firstName} {user?.lastName}
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <p style={{ fontSize: '12px', fontWeight: '600', color: colors.text, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user?.firstName} {user?.lastName}
+              </p>
+              {(user as any)?.role === 'ADMIN' && (
+                <span style={{
+                  fontSize: '9px', padding: '1px 6px', borderRadius: '999px', fontWeight: '800',
+                  backgroundColor: 'rgba(239,68,68,0.15)', color: '#f87171', flexShrink: 0
+                }}>ADMIN</span>
+              )}
+              {(user as any)?.role === 'PRO' && (
+                <span style={{
+                  fontSize: '9px', padding: '1px 6px', borderRadius: '999px', fontWeight: '800',
+                  background: 'linear-gradient(135deg, #f59e0b, #f97316)',
+                  color: '#fff', flexShrink: 0
+                }}>✨ PRO</span>
+              )}
+            </div>
             <p style={{ fontSize: '10px', color: colors.textMuted, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user?.email}
             </p>
@@ -259,6 +279,7 @@ export default function Layout() {
           </div>
         )}
 
+        <AnnouncementBanner />
         <main style={{ flex: 1, overflow: 'auto', backgroundColor: colors.main }}>
           <Outlet context={{ isDark, colors, isMobile }} />
         </main>

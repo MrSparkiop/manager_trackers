@@ -2,6 +2,7 @@ generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -21,13 +22,105 @@ model User {
   resetPasswordExpiry DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+
   tags                Tag[]
   projects            Project[]
   tasks               Task[]
   timeEntries         TimeEntry[]
   calendarEvents      CalendarEvent[]
+  ownedTeams          Team[]        @relation("TeamOwner")
+  teamMemberships     TeamMember[]
 
   @@map("users")
+}
+
+model Team {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  color       String       @default("#6366f1")
+  inviteCode  String       @unique @default(cuid())
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  ownerId     String
+  owner       User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     TeamMember[]
+  projects    TeamProject[]
+
+  @@index([ownerId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String     @id @default(cuid())
+  role      TeamRole   @default(MEMBER)
+  joinedAt  DateTime   @default(now())
+
+  teamId    String
+  team      Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+model TeamProject {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  color       String        @default("#6366f1")
+  status      ProjectStatus @default(ACTIVE)
+  deadline    DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  teamId      String
+  team        Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  tasks       TeamTask[]
+
+  @@index([teamId])
+  @@map("team_projects")
+}
+
+model TeamTask {
+  id            String      @id @default(cuid())
+  title         String
+  description   String?
+  status        TaskStatus  @default(TODO)
+  priority      Priority    @default(MEDIUM)
+  dueDate       DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  projectId     String
+  project       TeamProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assigneeId    String?
+  comments      TeamTaskComment[]
+
+  @@index([projectId])
+  @@index([assigneeId])
+  @@map("team_tasks")
+}
+
+model TeamTaskComment {
+  id          String   @id @default(cuid())
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  taskId      String
+  task        TeamTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId      String
+  authorName  String
+  authorEmail String
+
+  @@index([taskId])
+  @@map("team_task_comments")
 }
 
 model Project {
@@ -44,8 +137,8 @@ model Project {
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks       Task[]
 
-  @@index([userId])                    // fetch all projects by user
-  @@index([userId, status])            // filter projects by user + status
+  @@index([userId])
+  @@index([userId, status])
   @@map("projects")
 }
 
@@ -72,12 +165,12 @@ model Task {
   calendarEvents CalendarEvent[]
   tags          Tag[]
 
-  @@index([userId])                    // fetch all tasks by user
-  @@index([projectId])                 // fetch all tasks by project
-  @@index([parentId])                  // fetch subtasks by parent
-  @@index([userId, status])            // filter tasks by user + status
-  @@index([userId, priority])          // filter tasks by user + priority
-  @@index([userId, dueDate])           // fetch overdue/today tasks by user
+  @@index([userId])
+  @@index([projectId])
+  @@index([parentId])
+  @@index([userId, status])
+  @@index([userId, priority])
+  @@index([userId, dueDate])
   @@map("tasks")
 }
 
@@ -95,9 +188,9 @@ model TimeEntry {
   taskId      String?
   task        Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
-  @@index([userId])                    // fetch all entries by user
-  @@index([taskId])                    // fetch entries by task
-  @@index([userId, startTime])         // time summary queries (today, this week)
+  @@index([userId])
+  @@index([taskId])
+  @@index([userId, startTime])
   @@map("time_entries")
 }
 
@@ -118,9 +211,9 @@ model CalendarEvent {
   taskId      String?
   task        Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
-  @@index([userId])                    // fetch all events by user
-  @@index([taskId])                    // fetch events by task
-  @@index([userId, startTime])         // fetch events by month/date range
+  @@index([userId])
+  @@index([taskId])
+  @@index([userId, startTime])
   @@map("calendar_events")
 }
 
@@ -136,6 +229,33 @@ model Tag {
 
   @@index([userId])
   @@map("tags")
+}
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("system_configs")
+}
+
+model Announcement {
+  id        String           @id @default(cuid())
+  message   String
+  type      AnnouncementType @default(INFO)
+  active    Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@map("announcements")
+}
+
+enum AnnouncementType {
+  INFO
+  WARNING
+  ERROR
+  SUCCESS
 }
 
 enum ProjectStatus {
@@ -162,5 +282,11 @@ enum Priority {
 
 enum Role {
   USER
+  PRO
   ADMIN
+}
+
+enum TeamRole {
+  OWNER
+  MEMBER
 }

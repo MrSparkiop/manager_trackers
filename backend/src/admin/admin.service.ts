@@ -5,6 +5,84 @@ import { PrismaService } from '../prisma/prisma.service'
 export class AdminService {
   constructor(private prisma: PrismaService) {}
 
+  // ── existing methods stay the same ──────────────────────────────
+
+  // ── System Config ────────────────────────────────────────────────
+  async getSystemConfig() {
+    const configs = await this.prisma.systemConfig.findMany()
+
+    // Build defaults if not set
+    const defaults: Record<string, string> = {
+      disableRegistrations: 'false',
+      maintenanceMode:      'false',
+      maintenanceMessage:   'We are currently performing scheduled maintenance. Please check back soon.',
+      siteName:             'TrackFlow',
+      maxUsersAllowed:      '0', // 0 = unlimited
+    }
+
+    const result: Record<string, string> = { ...defaults }
+    configs.forEach(c => { result[c.key] = c.value })
+    return result
+  }
+
+  async updateSystemConfig(key: string, value: string) {
+    return this.prisma.systemConfig.upsert({
+      where: { key },
+      update: { value },
+      create: { key, value },
+    })
+  }
+
+  async updateSystemConfigs(configs: Record<string, string>) {
+    const updates = Object.entries(configs).map(([key, value]) =>
+      this.prisma.systemConfig.upsert({
+        where: { key },
+        update: { value },
+        create: { key, value },
+      })
+    )
+    await Promise.all(updates)
+    return this.getSystemConfig()
+  }
+
+  // ── Announcements ────────────────────────────────────────────────
+  async getAnnouncements() {
+    return this.prisma.announcement.findMany({
+      orderBy: { createdAt: 'desc' }
+    })
+  }
+
+  async getActiveAnnouncements() {
+    return this.prisma.announcement.findMany({
+      where: { active: true },
+      orderBy: { createdAt: 'desc' }
+    })
+  }
+
+  async createAnnouncement(dto: { message: string; type: string }) {
+    return this.prisma.announcement.create({
+      data: {
+        message: dto.message,
+        type: dto.type as any,
+        active: true,
+      }
+    })
+  }
+
+  async updateAnnouncement(id: string, dto: { message?: string; type?: string; active?: boolean }) {
+    const announcement = await this.prisma.announcement.findUnique({ where: { id } })
+    if (!announcement) throw new NotFoundException('Announcement not found')
+    return this.prisma.announcement.update({
+      where: { id },
+      data: dto as any,
+    })
+  }
+
+  async deleteAnnouncement(id: string) {
+    return this.prisma.announcement.delete({ where: { id } })
+  }
+
+  // keep all existing methods below...
   async getStats() {
     const [totalUsers, totalTasks, totalProjects, totalTimeEntries] = await Promise.all([
       this.prisma.user.count(),
@@ -12,16 +90,13 @@ export class AdminService {
       this.prisma.project.count(),
       this.prisma.timeEntry.count(),
     ])
-
     const completedTasks = await this.prisma.task.count({ where: { status: 'DONE' } })
     const activeProjects = await this.prisma.project.count({ where: { status: 'ACTIVE' } })
-
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
     const newUsersThisWeek = await this.prisma.user.count({
       where: { createdAt: { gte: sevenDaysAgo } }
     })
-
     const signupsPerDay = await Promise.all(
       Array.from({ length: 7 }, (_, i) => {
         const date = new Date()
@@ -37,11 +112,7 @@ export class AdminService {
         }))
       })
     )
-
-    const suspendedUsers = await this.prisma.user.count({
-      where: { isSuspended: true }
-    })
-
+    const suspendedUsers = await this.prisma.user.count({ where: { isSuspended: true } })
     return {
       totalUsers, totalTasks, totalProjects, totalTimeEntries,
       completedTasks, activeProjects, newUsersThisWeek,
@@ -58,7 +129,6 @@ export class AdminService {
         { lastName:  { contains: search, mode: 'insensitive' } },
       ]
     } : {}
-
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
@@ -72,7 +142,6 @@ export class AdminService {
       }),
       this.prisma.user.count({ where })
     ])
-
     return { users, total, page, limit, totalPages: Math.ceil(total / limit) }
   }
 
@@ -100,16 +169,12 @@ export class AdminService {
   async toggleSuspend(userId: string, isSuspended: boolean) {
     return this.prisma.user.update({
       where: { id: userId },
-      data: {
-        isSuspended,
-        // Clear refresh token on suspend to force logout
-        refreshToken: isSuspended ? null : undefined,
-      },
+      data: { isSuspended, refreshToken: isSuspended ? null : undefined },
       select: { id: true, email: true, firstName: true, lastName: true, role: true, isSuspended: true }
     })
   }
 
-  async updateUserRole(userId: string, role: 'USER' | 'ADMIN') {
+  async updateUserRole(userId: string, role: 'USER' | 'PRO' | 'ADMIN') {
     return this.prisma.user.update({
       where: { id: userId },
       data: { role },
@@ -134,7 +199,6 @@ export class AdminService {
 
   async getActivityLog(page = 1, limit = 30) {
     const skip = (page - 1) * limit
-
     const [tasks, projects, users] = await Promise.all([
       this.prisma.task.findMany({
         orderBy: { createdAt: 'desc' }, take: limit,
@@ -155,39 +219,32 @@ export class AdminService {
         select: { id: true, firstName: true, lastName: true, email: true, createdAt: true, role: true }
       }),
     ])
-
-    // Merge into unified activity feed
     const activity = [
       ...tasks.map(t => ({
         id: `task-${t.id}`, type: 'task' as const,
-        action: 'Created task',
-        title: t.title, meta: t.status,
+        action: 'Created task', title: t.title, meta: t.status,
         user: t.user, createdAt: t.createdAt,
       })),
       ...projects.map(p => ({
         id: `project-${p.id}`, type: 'project' as const,
-        action: 'Created project',
-        title: p.name, meta: p.status,
+        action: 'Created project', title: p.name, meta: p.status,
         user: p.user, createdAt: p.createdAt,
       })),
       ...users.map(u => ({
         id: `user-${u.id}`, type: 'user' as const,
         action: 'Joined TrackFlow',
-        title: `${u.firstName} ${u.lastName}`,
-        meta: u.role,
+        title: `${u.firstName} ${u.lastName}`, meta: u.role,
         user: { id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email },
         createdAt: u.createdAt,
       })),
     ]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(skip, skip + limit)
-
     return { activity, page, limit }
   }
 
   async globalSearch(query: string) {
     if (!query || query.length < 2) return { users: [], tasks: [], projects: [] }
-
     const [users, tasks, projects] = await Promise.all([
       this.prisma.user.findMany({
         where: {
@@ -227,7 +284,6 @@ export class AdminService {
         take: 5,
       }),
     ])
-
     return { users, tasks, projects }
   }
 }

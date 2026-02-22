@@ -8,6 +8,8 @@ import { TimeTrackerModule } from './time-tracker/time-tracker.module'
 import { CalendarModule } from './calendar/calendar.module'
 import { TagsModule } from './tags/tags.module'
 import { AdminModule } from './admin/admin.module'
+import { AnnouncementsModule } from './announcements/announcements.module'
+import { TeamsModule } from './teams/teams.module'
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { AdminModule } from './admin/admin.module'
     CalendarModule,
     TagsModule,
     AdminModule,
+    AnnouncementsModule,
+    TeamsModule,
   ],
 })
 export class AppModule {}

@@ -136,7 +136,6 @@ export default function SettingsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {[
               { label: 'Member since', value: 'February 2026' },
-              { label: 'Account type', value: 'Personal' },
               { label: 'Status', value: 'Active' },
             ].map(({ label, value }) => (
               <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${colors.border}` }}>
@@ -144,6 +143,22 @@ export default function SettingsPage() {
                 <span style={{ fontSize: '14px', fontWeight: '500', color: colors.text }}>{value}</span>
               </div>
             ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${colors.border}` }}>
+              <span style={{ fontSize: '14px', color: colors.textMuted }}>Account type</span>
+              <span style={{
+                padding: '2px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: '700',
+                background: (user as any)?.role === 'ADMIN' ? 'rgba(239,68,68,0.15)' :
+                            (user as any)?.role === 'PRO'   ? 'linear-gradient(135deg, #f59e0b, #f97316)' :
+                            'rgba(99,102,241,0.15)',
+                color: (user as any)?.role === 'ADMIN' ? '#f87171' :
+                       (user as any)?.role === 'PRO'   ? '#fff' :
+                       '#818cf8',
+              }}>
+                {(user as any)?.role === 'ADMIN' ? '👑 Admin' :
+                 (user as any)?.role === 'PRO'   ? '✨ Pro' :
+                 'Personal'}
+              </span>
+            </div>
           </div>
         </div>
       </div>

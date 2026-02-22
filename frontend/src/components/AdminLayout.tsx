@@ -4,14 +4,15 @@ import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import {
   LayoutDashboard, Users, LogOut, User,
-  Sun, Moon, Menu, X, Shield, Timer, ArrowLeft, Activity, Search
+  Sun, Moon, Menu, X, Shield, Timer, ArrowLeft, Activity, Search, Settings
 } from 'lucide-react'
 
 const navItems = [
-  { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/admin/users',     icon: Users,           label: 'Users' },
+  { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard'    },
+  { to: '/admin/users',     icon: Users,           label: 'Users'        },
   { to: '/admin/activity',  icon: Activity,        label: 'Activity Log' },
-  { to: '/admin/search',    icon: Search,          label: 'Search' },
+  { to: '/admin/search',    icon: Search,          label: 'Search'       },
+  { to: '/admin/settings',  icon: Settings,        label: 'Settings'     },
 ]
 
 function useIsMobile() {
