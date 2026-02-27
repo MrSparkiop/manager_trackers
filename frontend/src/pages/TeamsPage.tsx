@@ -5,6 +5,8 @@ import { Users, Plus, X, Crown, LogIn, Trash2, Settings, Link, Copy, Check } fro
 import api from '../lib/axios'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'
+import { CardSkeleton } from '../components/Skeleton'
+import EmptyState from '../components/EmptyState'
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#22c55e', '#14b8a6', '#3b82f6']
 
@@ -163,26 +165,17 @@ export default function TeamsPage() {
       {/* Teams Grid */}
       {isLoading ? (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-          {[...Array(3)].map((_, i) => (
-            <div key={i} style={{ height: '180px', backgroundColor: colors.card, borderRadius: '16px', border: `1px solid ${colors.border}` }} />
-          ))}
+          {[...Array(4)].map((_, i) => <CardSkeleton key={i} isDark={isDark} />)}
         </div>
       ) : teams.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '80px 0' }}>
-          <div style={{
-            width: '72px', height: '72px', borderRadius: '20px', margin: '0 auto 20px',
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <Users size={32} color="#818cf8" />
-          </div>
-          <h3 style={{ fontSize: '18px', fontWeight: '700', color: colors.text, margin: '0 0 8px' }}>
-            No teams yet
-          </h3>
-          <p style={{ color: colors.textMuted, fontSize: '14px', margin: '0 0 24px' }}>
-            Create a team or join one with an invite link
-          </p>
-        </div>
+        <EmptyState
+          icon={Users}
+          title="No teams yet"
+          description="Create a team to collaborate with others on shared projects and tasks."
+          action={{ label: isPro ? '+ New Team' : '✨ Upgrade to PRO', onClick: () => isPro ? setShowCreateModal(true) : setShowUpgradeModal(true) }}
+          isDark={isDark}
+          color="#6366f1"
+        />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
           {teams.map((team: any) => (

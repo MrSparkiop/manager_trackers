@@ -4,6 +4,8 @@ import { useOutletContext } from 'react-router-dom'
 import { Plus, Tag, Edit2, Trash2, X, Check } from 'lucide-react'
 import api from '../lib/axios'
 import toast from 'react-hot-toast'
+import { CardSkeleton } from '../components/Skeleton'
+import EmptyState from '../components/EmptyState'
 
 interface Tag {
   id: string
@@ -127,42 +129,18 @@ export default function TagsPage() {
 
       {/* Tags Grid */}
       {isLoading ? (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))',
-          gap: '12px'
-        }}>
-          {[...Array(6)].map((_, i) => (
-            <div key={i} style={{
-              height: '80px', backgroundColor: colors.card,
-              borderRadius: '14px', border: `1px solid ${colors.border}`,
-              animation: 'pulse 1.5s ease-in-out infinite'
-            }} />
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {[...Array(5)].map((_, i) => <CardSkeleton key={i} isDark={isDark} />)}
         </div>
       ) : tags.length === 0 ? (
-        <div style={{ textAlign: 'center', paddingTop: '80px' }}>
-          <div style={{
-            width: '64px', height: '64px', backgroundColor: 'rgba(99,102,241,0.1)',
-            borderRadius: '16px', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', margin: '0 auto 16px'
-          }}>
-            <Tag size={28} color="#6366f1" />
-          </div>
-          <p style={{ color: colors.text, fontSize: '16px', fontWeight: '600', margin: '0 0 8px' }}>
-            No tags yet
-          </p>
-          <p style={{ color: colors.textMuted, fontSize: '14px', margin: '0 0 24px' }}>
-            Create tags to organize and filter your tasks
-          </p>
-          <button onClick={openCreate} style={{
-            backgroundColor: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
-            borderRadius: '10px', padding: '10px 20px', color: '#818cf8',
-            fontSize: '14px', fontWeight: '600', cursor: 'pointer'
-          }}>
-            + Create your first tag
-          </button>
-        </div>
+        <EmptyState
+          icon={Tag}
+          title="No tags yet"
+          description="Create tags to organize and filter your tasks more effectively."
+          action={{ label: '+ New Tag', onClick: () => setShowModal(true) }}
+          isDark={isDark}
+          color="#14b8a6"
+        />
       ) : (
         <div style={{
           display: 'grid',

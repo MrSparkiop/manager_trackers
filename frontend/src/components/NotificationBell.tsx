@@ -4,6 +4,7 @@ import { Bell, X, CheckCheck, CheckSquare, MessageSquare, Users, Trash2 } from '
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/axios'
 import { getSocket } from '../lib/socket'
+import { NotificationSkeleton } from './Skeleton'
 
 const typeConfig: Record<string, any> = {
   TASK_ASSIGNED: { icon: CheckSquare, color: '#6366f1', bg: 'rgba(99,102,241,0.15)' },
@@ -27,7 +28,7 @@ export default function NotificationBell({ isDark }: { isDark: boolean }) {
     hover:     isDark ? '#1e293b' : '#f8fafc',
   }
 
-  const { data: notifications = [] } = useQuery({
+  const { data: notifications = [], isLoading } = useQuery({
     queryKey: ['notifications'],
     queryFn: () => api.get('/notifications').then(r => r.data),
   })
@@ -164,7 +165,9 @@ export default function NotificationBell({ isDark }: { isDark: boolean }) {
 
           {/* Notifications list */}
           <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
-            {notifications.length === 0 ? (
+            {isLoading ? (
+              [...Array(4)].map((_, i) => <NotificationSkeleton key={i} isDark={isDark} />)
+            ) : notifications.length === 0 ? (
               <div style={{ padding: '40px', textAlign: 'center' }}>
                 <Bell size={28} color={colors.textMuted} style={{ margin: '0 auto 12px', display: 'block' }} />
                 <p style={{ fontSize: '13px', color: colors.textMuted, margin: 0 }}>No notifications yet</p>

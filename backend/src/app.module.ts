@@ -13,6 +13,7 @@ import { AnnouncementsModule } from './announcements/announcements.module'
 import { TeamsModule } from './teams/teams.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { LastSeenMiddleware } from './auth/last-seen.middleware'
+import { SearchModule } from './search/search.module'
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { LastSeenMiddleware } from './auth/last-seen.middleware'
     AnnouncementsModule,
     TeamsModule,
     NotificationsModule,
+    SearchModule,
   ],
 })
 export class AppModule implements NestModule {

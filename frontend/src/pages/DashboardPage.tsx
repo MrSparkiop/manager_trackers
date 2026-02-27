@@ -4,7 +4,7 @@ import { CheckSquare, FolderKanban, Timer, AlertCircle, Clock, TrendingUp } from
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import api from '../lib/axios'
 import { useAuthStore } from '../store/authStore'
-import { StatCardSkeleton } from '../components/Skeleton'
+import { StatCardSkeleton, TaskRowSkeleton } from '../components/Skeleton'
 
 interface Task {
   id: string
@@ -169,7 +169,7 @@ export default function DashboardPage() {
         marginBottom: '20px'
       }}>
         {isLoading ? (
-          [...Array(4)].map((_, i) => <StatCardSkeleton key={i} />)
+          [...Array(4)].map((_, i) => <StatCardSkeleton key={i} isDark={isDark} />)
         ) : (
           stats.map(({ label, value, icon: Icon, color, bg }) => (
             <div key={label} style={card}>
@@ -269,7 +269,11 @@ export default function DashboardPage() {
           <h2 style={{ fontSize: '15px', fontWeight: '600', color: colors.text, margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <CheckSquare size={16} color="#60a5fa" /> Today's Tasks
           </h2>
-          {todayTasks.length === 0 ? (
+          {isLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {[...Array(4)].map((_, i) => <TaskRowSkeleton key={i} isDark={isDark} />)}
+            </div>
+          ) : todayTasks.length === 0 ? (
             <p style={{ color: colors.textMuted, fontSize: '14px', textAlign: 'center', padding: '24px 0' }}>No tasks due today 🎉</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

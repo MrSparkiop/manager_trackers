@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext, useNavigate } from 'react-router-dom'
-import { Search, Shield, User, Trash2, ChevronLeft, ChevronRight, Crown, Ban } from 'lucide-react'
+import { Search, Shield, User, Trash2, ChevronLeft, ChevronRight, Crown, Ban, Users } from 'lucide-react'
 import api from '../../lib/axios'
 import toast from 'react-hot-toast'
+import { TableRowSkeleton } from '../../components/Skeleton'
+import EmptyState from '../../components/EmptyState'
 
 export default function AdminUsersPage() {
   const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
@@ -151,16 +153,17 @@ export default function AdminUsersPage() {
 
         {/* Rows */}
         {isLoading ? (
-          [...Array(8)].map((_, i) => (
-            <div key={i} style={{
-              height: '60px', borderBottom: `1px solid ${colors.border}`,
-              backgroundColor: i % 2 === 0 ? 'transparent' : colors.subBg + '40'
-            }} />
-          ))
-        ) : data?.users?.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', color: colors.textMuted, fontSize: '14px' }}>
-            No users found
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px' }}>
+            {[...Array(8)].map((_, i) => <TableRowSkeleton key={i} isDark={isDark} />)}
           </div>
+        ) : data?.users?.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="No users found"
+            description="No users match your search or filters."
+            isDark={isDark}
+            color="#6366f1"
+          />
         ) : (
           data?.users?.map((u: any) => (
             <div key={u.id}

@@ -1,10 +1,12 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext, useNavigate, useParams } from 'react-router-dom'
-import { Plus, X, ArrowLeft, MessageSquare, User, Trash2, ChevronDown, ChevronUp, LayoutList, LayoutDashboard } from 'lucide-react'
+import { Plus, X, ArrowLeft, MessageSquare, User, Trash2, ChevronDown, ChevronUp, LayoutList, LayoutDashboard, CheckSquare } from 'lucide-react'
 import api from '../lib/axios'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'
+import { TaskRowSkeleton } from '../components/Skeleton'
+import EmptyState from '../components/EmptyState'
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
 const STATUSES   = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE', 'CANCELLED']
@@ -395,13 +397,18 @@ export default function TeamProjectPage() {
           </div>
 
           {isLoading ? (
-            [...Array(4)].map((_, i) => (
-              <div key={i} style={{ height: '64px', backgroundColor: colors.card, borderRadius: '12px', border: `1px solid ${colors.border}`, marginBottom: '8px' }} />
-            ))
-          ) : filteredTasks.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 0', color: colors.textMuted }}>
-              No tasks yet. Create the first one!
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {[...Array(5)].map((_, i) => <TaskRowSkeleton key={i} isDark={isDark} />)}
             </div>
+          ) : filteredTasks.length === 0 ? (
+            <EmptyState
+              icon={CheckSquare}
+              title={statusFilter !== 'ALL' ? `No ${statusFilter.toLowerCase().replace('_', ' ')} tasks` : 'No tasks yet'}
+              description={statusFilter !== 'ALL' ? 'Try a different filter or create a new task.' : 'Create the first task for this project and assign it to a team member.'}
+              action={{ label: '+ New Task', onClick: () => setShowTaskModal(true) }}
+              isDark={isDark}
+              color={project?.color || '#6366f1'}
+            />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {filteredTasks.map((task: any) => <TaskCard key={task.id} task={task} />)}
@@ -457,9 +464,11 @@ export default function TeamProjectPage() {
                 {columnTasks.length === 0 ? (
                   <div style={{
                     padding: '24px 12px', textAlign: 'center', borderRadius: '10px',
-                    border: `2px dashed ${colors.border}`, color: colors.textMuted, fontSize: '12px'
+                    border: `2px dashed ${isDragTarget ? statusColors[status] : colors.border}`,
+                    color: colors.textMuted, fontSize: '12px',
+                    transition: 'all 0.15s'
                   }}>
-                    Drop tasks here
+                    {isDragTarget ? '📥 Drop here' : 'No tasks'}
                   </div>
                 ) : (
                   columnTasks.map((task: any) => <TaskCard key={task.id} task={task} kanban />)

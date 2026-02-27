@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Folder, Trash2, Edit2, X, Check, LayoutGrid, Kanban, GripVertical } from 'lucide-react'
+import { Plus, Folder, Trash2, Edit2, X, Check, LayoutGrid, Kanban, GripVertical, FolderKanban } from 'lucide-react'
 import {
   DndContext, PointerSensor, useSensor, useSensors,
   DragOverlay, closestCorners
@@ -12,7 +12,8 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import api from '../lib/axios'
 import { useOutletContext } from 'react-router-dom'
-import { ProjectCardSkeleton } from '../components/Skeleton'
+import { CardSkeleton } from '../components/Skeleton'
+import EmptyState from '../components/EmptyState'
 import toast from 'react-hot-toast'
 
 
@@ -349,15 +350,18 @@ export default function ProjectsPage() {
       {view === 'grid' && (
         <>
           {isLoading ? (
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-              {[...Array(4)].map((_, i) => <ProjectCardSkeleton key={i} />)}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+              {[...Array(6)].map((_, i) => <CardSkeleton key={i} isDark={isDark} />)}
             </div>
           ) : projects.length === 0 ? (
-            <div style={{ textAlign: 'center', paddingTop: '80px' }}>
-              <Folder size={48} color={colors.border} style={{ margin: '0 auto 16px' }} />
-              <p style={{ color: colors.textMuted, fontSize: '16px' }}>No projects yet</p>
-              <p style={{ color: colors.textMuted, fontSize: '14px', marginTop: '4px' }}>Create your first project to get started</p>
-            </div>
+            <EmptyState
+              icon={FolderKanban}
+              title="No projects yet"
+              description="Create your first project to start organizing your tasks and tracking progress."
+              action={{ label: '+ New Project', onClick: () => setShowModal(true) }}
+              isDark={isDark}
+              color="#8b5cf6"
+            />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
               {projects.map(project => {

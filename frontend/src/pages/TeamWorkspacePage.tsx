@@ -5,6 +5,8 @@ import { Users, Plus, X, Crown, FolderKanban, ArrowLeft, Trash2, Copy, Check, Re
 import api from '../lib/axios'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'
+import { CardSkeleton } from '../components/Skeleton'
+import EmptyState from '../components/EmptyState'
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#22c55e', '#14b8a6', '#3b82f6']
 
@@ -214,11 +216,19 @@ export default function TeamWorkspacePage() {
             </button>
           </div>
 
-          {team.projects.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 0' }}>
-              <FolderKanban size={40} color={colors.textMuted} style={{ margin: '0 auto 16px' }} />
-              <p style={{ color: colors.textMuted, fontSize: '14px' }}>No projects yet. Create the first one!</p>
+          {isLoading ? (
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
+              {[...Array(3)].map((_, i) => <CardSkeleton key={i} isDark={isDark} />)}
             </div>
+          ) : team.projects.length === 0 ? (
+            <EmptyState
+              icon={FolderKanban}
+              title="No projects yet"
+              description="Create the first project for your team to start collaborating."
+              action={{ label: '+ New Project', onClick: () => setShowProjectModal(true) }}
+              isDark={isDark}
+              color={team.color}
+            />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
               {team.projects.map((project: any) => (

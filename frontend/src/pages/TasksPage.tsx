@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, X, CheckCircle2, Circle, Clock, Trash2, Edit2,
-  ChevronDown, ChevronRight, Search, Square, CheckSquare2, Check
+  ChevronDown, ChevronRight, Search, Square, CheckSquare2, Check, CheckSquare
 } from 'lucide-react'
 import {
   DndContext, PointerSensor, useSensor, useSensors,
@@ -14,6 +14,7 @@ import { CSS } from '@dnd-kit/utilities'
 import api from '../lib/axios'
 import { useOutletContext } from 'react-router-dom'
 import { TaskRowSkeleton } from '../components/Skeleton'
+import EmptyState from '../components/EmptyState'
 import toast from 'react-hot-toast'
 
 
@@ -636,16 +637,18 @@ export default function TasksPage() {
 
       {/* Task List */}
       {isLoading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {[...Array(5)].map((_, i) => <TaskRowSkeleton key={i} />)}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {[...Array(6)].map((_, i) => <TaskRowSkeleton key={i} isDark={isDark} />)}
         </div>
       ) : filteredTasks.length === 0 ? (
-        <div style={{ textAlign: 'center', paddingTop: '80px' }}>
-          <CheckCircle2 size={48} color={colors.border} style={{ margin: '0 auto 16px' }} />
-          <p style={{ color: colors.textMuted, fontSize: '16px' }}>
-            {search ? 'No tasks match your search' : 'No tasks yet'}
-          </p>
-        </div>
+        <EmptyState
+          icon={CheckSquare}
+          title={filterStatus || filterPriority || filterProject || search ? 'No tasks match your filters' : 'No tasks yet'}
+          description={filterStatus || filterPriority || filterProject || search ? 'Try adjusting your filters or create a new task.' : 'Create your first task to get started tracking your work.'}
+          action={{ label: '+ New Task', onClick: () => setShowModal(true) }}
+          isDark={isDark}
+          color="#6366f1"
+        />
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>

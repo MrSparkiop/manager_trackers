@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import AnnouncementBanner from './AnnouncementBanner'
 import NotificationBell from './NotificationBell'
+import GlobalSearch from './GlobalSearch'
+import { Search } from 'lucide-react'
 
 const navItems = [
   { to: '/app/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
@@ -73,13 +75,25 @@ export default function Layout() {
           </div>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
             {!isMobile && <NotificationBell isDark={isDark} />}
-            <button onClick={toggle} style={{
-              background: 'none', border: `1px solid ${colors.border}`,
-              borderRadius: '8px', padding: '6px', cursor: 'pointer',
-              color: colors.textMuted, display: 'flex', alignItems: 'center',
-              backgroundColor: isDark ? '#1e293b' : '#f1f5f9'
-            }}>
-              {isDark ? <Sun size={14} /> : <Moon size={14} />}
+            <button
+              onClick={() => {
+                window.dispatchEvent(new KeyboardEvent('keydown', {
+                  key: 'k', ctrlKey: true, bubbles: true
+                }))
+              }}
+              title="Search (Ctrl+K)"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '36px', height: '36px', borderRadius: '10px',
+                border: 'none', background: 'none',
+                color: colors.textMuted, cursor: 'pointer',
+                transition: 'all 0.15s',
+                backgroundColor: 'transparent',
+              }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = isDark ? '#1e293b' : '#f1f5f9'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <Search size={18} />
             </button>
             {isMobile && (
               <button onClick={() => setSidebarOpen(false)} style={{
@@ -186,6 +200,13 @@ export default function Layout() {
               {user?.email}
             </p>
           </div>
+          <button onClick={toggle} title={isDark ? 'Light mode' : 'Dark mode'} style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: colors.textMuted, padding: '2px',
+            display: 'flex', alignItems: 'center', flexShrink: 0
+          }}>
+            {isDark ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
           <button onClick={handleLogout} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             color: colors.textMuted, padding: '2px',
@@ -289,6 +310,7 @@ export default function Layout() {
           <Outlet context={{ isDark, colors, isMobile }} />
         </main>
       </div>
+      <GlobalSearch />
     </div>
   )
 }
