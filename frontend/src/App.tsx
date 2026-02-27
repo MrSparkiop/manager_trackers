@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
+import { connectSocket, disconnectSocket } from './lib/socket'
 import Layout from './components/Layout'
 import AdminLayout from './components/AdminLayout'
 import HomePage from './pages/HomePage'
@@ -40,6 +42,16 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const { isAuthenticated } = useAuthStore()
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      connectSocket()
+    } else {
+      disconnectSocket()
+    }
+  }, [isAuthenticated])
+
   return (
     <BrowserRouter>
       <Routes>

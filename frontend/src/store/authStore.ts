@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import api from '../lib/axios'
+import { connectSocket, disconnectSocket } from '../lib/socket'
 
 interface User {
   id: string
@@ -29,6 +30,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const res = await api.post('/auth/login', { email, password })
           set({ user: res.data.user, isAuthenticated: true })
+          connectSocket()
         } catch (error: any) {
           const message = error?.response?.data?.message || 'Invalid email or password'
           throw new Error(message)
@@ -42,6 +44,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         await api.post('/auth/logout')
+        disconnectSocket()
         set({ user: null, isAuthenticated: false })
       },
 

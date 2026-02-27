@@ -17,6 +17,7 @@ model User {
   avatar              String?
   role                Role      @default(USER)
   isSuspended         Boolean   @default(false)
+  lastSeenAt          DateTime?
   refreshToken        String?
   resetPasswordToken  String?
   resetPasswordExpiry DateTime?
@@ -30,6 +31,7 @@ model User {
   calendarEvents      CalendarEvent[]
   ownedTeams          Team[]        @relation("TeamOwner")
   teamMemberships     TeamMember[]
+  notifications       Notification[]
 
   @@map("users")
 }
@@ -289,4 +291,28 @@ enum Role {
 enum TeamRole {
   OWNER
   MEMBER
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_COMMENT
+  TEAM_JOINED
+  TEAM_REMOVED
 }

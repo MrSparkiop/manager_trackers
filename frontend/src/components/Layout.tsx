@@ -7,6 +7,7 @@ import {
   Timer, Calendar, LogOut, User, Sun, Moon, Settings, Menu, X, Tag, Users, Shield
 } from 'lucide-react'
 import AnnouncementBanner from './AnnouncementBanner'
+import NotificationBell from './NotificationBell'
 
 const navItems = [
   { to: '/app/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
@@ -70,7 +71,8 @@ export default function Layout() {
               <p style={{ fontSize: '11px', color: colors.textMuted, margin: 0 }}>Schedule Manager</p>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            {!isMobile && <NotificationBell isDark={isDark} />}
             <button onClick={toggle} style={{
               background: 'none', border: `1px solid ${colors.border}`,
               borderRadius: '8px', padding: '6px', cursor: 'pointer',
@@ -268,14 +270,17 @@ export default function Layout() {
               <span style={{ fontSize: '15px', fontWeight: '700', color: colors.text }}>TrackFlow</span>
             </div>
 
-            <button onClick={toggle} style={{
-              background: 'none', border: `1px solid ${colors.border}`,
-              borderRadius: '8px', padding: '7px', cursor: 'pointer',
-              color: colors.textMuted, display: 'flex', alignItems: 'center',
-              backgroundColor: isDark ? '#1e293b' : '#f1f5f9'
-            }}>
-              {isDark ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <NotificationBell isDark={isDark} />
+              <button onClick={toggle} style={{
+                background: 'none', border: `1px solid ${colors.border}`,
+                borderRadius: '8px', padding: '7px', cursor: 'pointer',
+                color: colors.textMuted, display: 'flex', alignItems: 'center',
+                backgroundColor: isDark ? '#1e293b' : '#f1f5f9'
+              }}>
+                {isDark ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+            </div>
           </div>
         )}
 

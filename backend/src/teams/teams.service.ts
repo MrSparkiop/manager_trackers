@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { NotificationsService } from '../notifications/notifications.service'
 
 @Injectable()
 export class TeamsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   // ── Teams CRUD ───────────────────────────────────────────────────
   async getMyTeams(userId: string) {
@@ -28,7 +32,12 @@ export class TeamsService {
         owner: { select: { id: true, firstName: true, lastName: true, email: true } },
         members: {
           include: {
-            user: { select: { id: true, firstName: true, lastName: true, email: true, role: true } }
+            user: {
+              select: {
+                id: true, firstName: true, lastName: true,
+                email: true, role: true, lastSeenAt: true,
+              }
+            }
           },
           orderBy: { joinedAt: 'asc' }
         },
@@ -233,11 +242,14 @@ export class TeamsService {
     title: string; description?: string; priority?: string;
     dueDate?: string; assigneeId?: string
   }) {
-    const project = await this.prisma.teamProject.findUnique({ where: { id: projectId } })
+    const project = await this.prisma.teamProject.findUnique({
+      where: { id: projectId },
+      include: { team: true }
+    })
     if (!project) throw new NotFoundException('Project not found')
     await this.requireMember(project.teamId, userId)
 
-    return this.prisma.teamTask.create({
+    const task = await this.prisma.teamTask.create({
       data: {
         projectId,
         title: dto.title,
@@ -247,17 +259,34 @@ export class TeamsService {
         assigneeId: dto.assigneeId || null,
       }
     })
+
+    // Notify assignee if different from creator
+    if (dto.assigneeId && dto.assigneeId !== userId) {
+      const creator = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true, lastName: true }
+      })
+      await this.notifications.create({
+        userId: dto.assigneeId,
+        type: 'TASK_ASSIGNED',
+        title: 'New task assigned to you',
+        message: `${creator!.firstName} ${creator!.lastName} assigned you "${dto.title}" in ${project.team.name}`,
+        link: `/app/teams/${project.teamId}/projects/${projectId}`,
+      })
+    }
+
+    return task
   }
 
   async updateTeamTask(taskId: string, userId: string, dto: any) {
     const task = await this.prisma.teamTask.findUnique({
       where: { id: taskId },
-      include: { project: true }
+      include: { project: { include: { team: true } } }
     })
     if (!task) throw new NotFoundException('Task not found')
     await this.requireMember(task.project.teamId, userId)
 
-    return this.prisma.teamTask.update({
+    const updated = await this.prisma.teamTask.update({
       where: { id: taskId },
       data: {
         ...dto,
@@ -265,6 +294,23 @@ export class TeamsService {
         completedAt: dto.status === 'DONE' ? new Date() : dto.status ? null : undefined,
       }
     })
+
+    // Notify new assignee if changed and different from updater
+    if (dto.assigneeId && dto.assigneeId !== task.assigneeId && dto.assigneeId !== userId) {
+      const updater = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true, lastName: true }
+      })
+      await this.notifications.create({
+        userId: dto.assigneeId,
+        type: 'TASK_ASSIGNED',
+        title: 'Task assigned to you',
+        message: `${updater!.firstName} ${updater!.lastName} assigned you "${task.title}" in ${task.project.team.name}`,
+        link: `/app/teams/${task.project.teamId}/projects/${task.projectId}`,
+      })
+    }
+
+    return updated
   }
 
   async deleteTeamTask(taskId: string, userId: string) {
@@ -281,7 +327,7 @@ export class TeamsService {
   async addComment(taskId: string, userId: string, content: string) {
     const task = await this.prisma.teamTask.findUnique({
       where: { id: taskId },
-      include: { project: true }
+      include: { project: { include: { team: true } } }
     })
     if (!task) throw new NotFoundException('Task not found')
     await this.requireMember(task.project.teamId, userId)
@@ -291,7 +337,7 @@ export class TeamsService {
       select: { firstName: true, lastName: true, email: true }
     })
 
-    return this.prisma.teamTaskComment.create({
+    const comment = await this.prisma.teamTaskComment.create({
       data: {
         taskId,
         userId,
@@ -300,6 +346,19 @@ export class TeamsService {
         authorEmail: user!.email,
       }
     })
+
+    // Notify assignee if different from commenter
+    if (task.assigneeId && task.assigneeId !== userId) {
+      await this.notifications.create({
+        userId: task.assigneeId,
+        type: 'TASK_COMMENT',
+        title: 'New comment on your task',
+        message: `${user!.firstName} ${user!.lastName} commented on "${task.title}"`,
+        link: `/app/teams/${task.project.teamId}/projects/${task.projectId}`,
+      })
+    }
+
+    return comment
   }
 
   async deleteComment(commentId: string, userId: string) {

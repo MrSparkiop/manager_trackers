@@ -8,6 +8,17 @@ import { useAuthStore } from '../store/authStore'
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#22c55e', '#14b8a6', '#3b82f6']
 
+const getOnlineStatus = (lastSeenAt: string | null) => {
+  if (!lastSeenAt) return { online: false, label: 'Never' }
+  const diff = Date.now() - new Date(lastSeenAt).getTime()
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 5) return { online: true, label: 'Online' }
+  if (minutes < 60) return { online: false, label: `${minutes}m ago` }
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return { online: false, label: `${hours}h ago` }
+  return { online: false, label: new Date(lastSeenAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }
+}
+
 export default function TeamWorkspacePage() {
   const { id } = useParams()
   const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
@@ -211,7 +222,7 @@ export default function TeamWorkspacePage() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
               {team.projects.map((project: any) => (
-                <div key={project.id} style={{
+                <div key={project.id} onClick={() => navigate(`/app/teams/${id}/projects/${project.id}`)} style={{
                   backgroundColor: colors.card, borderRadius: '14px',
                   border: `1px solid ${colors.border}`, padding: '20px',
                   cursor: 'pointer', transition: 'all 0.2s',
@@ -220,12 +231,12 @@ export default function TeamWorkspacePage() {
                   onMouseLeave={e => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.transform = 'none' }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }} onClick={() => navigate(`/app/teams/${id}/projects/${project.id}`)}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: project.color, flexShrink: 0 }} />
                       <h3 style={{ fontSize: '14px', fontWeight: '700', color: colors.text, margin: 0 }}>{project.name}</h3>
                     </div>
                     {isOwner && (
-                      <button onClick={() => {
+                      <button onClick={e => { e.stopPropagation();
                         toast((t) => (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <p style={{ margin: 0, fontSize: '14px' }}>Delete <strong>{project.name}</strong>?</p>
@@ -289,6 +300,16 @@ export default function TeamWorkspacePage() {
                   )}
                 </div>
                 <p style={{ fontSize: '12px', color: colors.textMuted, margin: '2px 0 0' }}>{member.user.email}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                  <div style={{
+                    width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                    backgroundColor: getOnlineStatus(member.user.lastSeenAt).online ? '#4ade80' : '#64748b',
+                    boxShadow: getOnlineStatus(member.user.lastSeenAt).online ? '0 0 6px #4ade80' : 'none'
+                  }} />
+                  <span style={{ fontSize: '11px', color: getOnlineStatus(member.user.lastSeenAt).online ? '#4ade80' : colors.textMuted }}>
+                    {getOnlineStatus(member.user.lastSeenAt).label}
+                  </span>
+                </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '11px', color: colors.textMuted }}>

@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common'
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
+import { JwtModule } from '@nestjs/jwt'
 import { AuthModule } from './auth/auth.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { ProjectsModule } from './projects/projects.module'
@@ -10,10 +11,13 @@ import { TagsModule } from './tags/tags.module'
 import { AdminModule } from './admin/admin.module'
 import { AnnouncementsModule } from './announcements/announcements.module'
 import { TeamsModule } from './teams/teams.module'
+import { NotificationsModule } from './notifications/notifications.module'
+import { LastSeenMiddleware } from './auth/last-seen.middleware'
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    JwtModule.register({ secret: process.env.JWT_SECRET, global: true }),
     PrismaModule,
     AuthModule,
     ProjectsModule,
@@ -24,6 +28,11 @@ import { TeamsModule } from './teams/teams.module'
     AdminModule,
     AnnouncementsModule,
     TeamsModule,
+    NotificationsModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(LastSeenMiddleware).forRoutes('*')
+  }
+}
