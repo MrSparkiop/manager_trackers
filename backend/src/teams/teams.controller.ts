@@ -126,6 +126,19 @@ export class TeamsController {
     return this.teamsService.deleteTeamTask(taskId, req.user.id)
   }
 
+  // ── Recurring Team Tasks ─────────────────────────────────────────
+  @Post('tasks/:taskId/next-occurrence')
+  @ApiOperation({ summary: 'Create next occurrence of a recurring team task' })
+  createNextTeamOccurrence(@Param('taskId') taskId: string, @Req() req: any) {
+    return this.teamsService.createNextTeamOccurrence(taskId, req.user.id)
+  }
+
+  @Post('tasks/:taskId/skip-occurrence')
+  @ApiOperation({ summary: 'Skip next occurrence of a recurring team task' })
+  skipNextTeamOccurrence(@Param('taskId') taskId: string, @Req() req: any) {
+    return this.teamsService.skipNextTeamOccurrence(taskId, req.user.id)
+  }
+
   // ── Comments ─────────────────────────────────────────────────────
   @Post('tasks/:taskId/comments')
   @ApiOperation({ summary: 'Add comment to task' })

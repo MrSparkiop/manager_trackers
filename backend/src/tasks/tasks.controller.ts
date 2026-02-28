@@ -43,4 +43,14 @@ export class TasksController {
   remove(@Param('id') id: string, @Req() req: any) {
     return this.tasksService.remove(id, req.user.id);
   }
+
+  @Post(':id/next-occurrence')
+  createNextOccurrence(@Param('id') id: string, @Req() req: any) {
+    return this.tasksService.createNextOccurrence(id, req.user.id)
+  }
+
+  @Post(':id/skip-occurrence')
+  skipNextOccurrence(@Param('id') id: string, @Req() req: any) {
+    return this.tasksService.skipNextOccurrence(id, req.user.id)
+  }
 }

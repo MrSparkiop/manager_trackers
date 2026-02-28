@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsEnum, IsDateString, IsInt, IsPositive, IsArray } from 'class-validator';
-import { TaskStatus, Priority } from '@prisma/client';
+import { TaskStatus, Priority, Recurrence } from '@prisma/client';
 
 export class CreateTaskDto {
   @IsString()
@@ -38,4 +38,16 @@ export class CreateTaskDto {
   @IsString({ each: true })
   @IsOptional()
   tagIds?: string[];
+
+  @IsEnum(Recurrence)
+  @IsOptional()
+  recurrence?: Recurrence;
+
+  @IsDateString()
+  @IsOptional()
+  recurrenceEndDate?: string;
+
+  @IsString()
+  @IsOptional()
+  parentTaskId?: string;
 }

@@ -89,23 +89,29 @@ model TeamProject {
 }
 
 model TeamTask {
-  id            String      @id @default(cuid())
-  title         String
-  description   String?
-  status        TaskStatus  @default(TODO)
-  priority      Priority    @default(MEDIUM)
-  dueDate       DateTime?
-  completedAt   DateTime?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id                String      @id @default(cuid())
+  title             String
+  description       String?
+  status            TaskStatus  @default(TODO)
+  priority          Priority    @default(MEDIUM)
+  dueDate           DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  recurrence        Recurrence  @default(NONE)
+  recurrenceEndDate DateTime?
+  parentTaskId      String?
+  parentTask        TeamTask?   @relation("RecurringTeamTask", fields: [parentTaskId], references: [id])
+  childTasks        TeamTask[]  @relation("RecurringTeamTask")
 
-  projectId     String
-  project       TeamProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assigneeId    String?
-  comments      TeamTaskComment[]
+  projectId         String
+  project           TeamProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assigneeId        String?
+  comments          TeamTaskComment[]
 
   @@index([projectId])
   @@index([assigneeId])
+  @@index([parentTaskId])
   @@map("team_tasks")
 }
 
@@ -148,31 +154,37 @@ model Project {
 }
 
 model Task {
-  id            String      @id @default(cuid())
-  title         String
-  description   String?
-  status        TaskStatus  @default(TODO)
-  priority      Priority    @default(MEDIUM)
-  dueDate       DateTime?
-  estimatedTime Int?
-  completedAt   DateTime?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id                String      @id @default(cuid())
+  title             String
+  description       String?
+  status            TaskStatus  @default(TODO)
+  priority          Priority    @default(MEDIUM)
+  dueDate           DateTime?
+  estimatedTime     Int?
+  completedAt       DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  recurrence        Recurrence  @default(NONE)
+  recurrenceEndDate DateTime?
+  parentTaskId      String?
+  parentTask        Task?       @relation("RecurringTask", fields: [parentTaskId], references: [id])
+  childTasks        Task[]      @relation("RecurringTask")
 
-  userId        String
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projectId     String?
-  project       Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  parentId      String?
-  parent        Task?       @relation("SubTasks", fields: [parentId], references: [id])
-  subtasks      Task[]      @relation("SubTasks")
-  timeEntries   TimeEntry[]
-  calendarEvents CalendarEvent[]
-  tags          Tag[]
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId         String?
+  project           Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parentId          String?
+  parent            Task?       @relation("SubTasks", fields: [parentId], references: [id])
+  subtasks          Task[]      @relation("SubTasks")
+  timeEntries       TimeEntry[]
+  calendarEvents    CalendarEvent[]
+  tags              Tag[]
 
   @@index([userId])
   @@index([projectId])
   @@index([parentId])
+  @@index([parentTaskId])
   @@index([userId, status])
   @@index([userId, priority])
   @@index([userId, dueDate])
@@ -246,14 +258,32 @@ model SystemConfig {
 }
 
 model Announcement {
-  id        String           @id @default(cuid())
-  message   String
-  type      AnnouncementType @default(INFO)
-  active    Boolean          @default(true)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id         String           @id @default(cuid())
+  title      String           @default("")
+  message    String
+  type       AnnouncementType @default(INFO)
+  targetRole TargetRole       @default(ALL)
+  isActive   Boolean          @default(true)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   @@map("announcements")
+}
+
+enum TargetRole {
+  ALL
+  USER
+  PRO
+  ADMIN
+}
+
+enum Recurrence {
+  NONE
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  YEARLY
 }
 
 enum AnnouncementType {

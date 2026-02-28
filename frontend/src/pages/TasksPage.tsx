@@ -15,8 +15,9 @@ import api from '../lib/axios'
 import { useOutletContext } from 'react-router-dom'
 import { TaskRowSkeleton } from '../components/Skeleton'
 import EmptyState from '../components/EmptyState'
+import RecurrenceSelector, { RecurrenceBadge } from '../components/RecurrenceSelector'
+import RecurringTaskModal from '../components/RecurringTaskModal'
 import toast from 'react-hot-toast'
-
 
 interface Project { id: string; name: string; color: string }
 interface Task {
@@ -31,6 +32,8 @@ interface Task {
   project?: Project
   parentId?: string
   subtasks?: Task[]
+  recurrence?: string
+  recurrenceEndDate?: string
   tags?: { id: string; name: string; color: string }[]
 }
 
@@ -52,7 +55,7 @@ const statusConfig: Record<string, { color: string; icon: any; label: string }> 
   CANCELLED:   { color: '#f87171', icon: X,            label: 'Cancelled' },
 }
 
-// Sortable Task Row
+// ── Sortable Task Row ─────────────────────────────────────────────────
 function SortableTaskRow({
   task, colors, selected, onSelect, onToggleDone, onEdit, onDelete, onAddSubtask, isDark
 }: any) {
@@ -133,6 +136,10 @@ function SortableTaskRow({
               <span style={{ fontSize: '11px', color: colors.textMuted }}>
                 📅 {new Date(task.dueDate).toLocaleDateString()}
               </span>
+            )}
+            {/* 🔁 Recurrence badge */}
+            {task.recurrence && task.recurrence !== 'NONE' && (
+              <RecurrenceBadge recurrence={task.recurrence} isDark={isDark} />
             )}
             {task.tags && task.tags.length > 0 && (
               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -284,9 +291,9 @@ function SortableTaskRow({
       )}
     </div>
   )
-  
 }
 
+// ── Main Page ─────────────────────────────────────────────────────────
 export default function TasksPage() {
   const queryClient = useQueryClient()
   const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
@@ -299,24 +306,30 @@ export default function TasksPage() {
   const [selected, setSelected]             = useState<Set<string>>(new Set())
   const [activeTask, setActiveTask]         = useState<Task | null>(null)
   const [quickTitle, setQuickTitle]         = useState('')
+
+  // Recurring task confirmation
+  const [recurringTask, setRecurringTask]   = useState<Task | null>(null)
+
   const quickInputRef = useRef<HTMLInputElement>(null)
+
   const [form, setForm] = useState({
     title: '', description: '', status: 'TODO', priority: 'MEDIUM',
-    dueDate: '', estimatedTime: '', projectId: '', tagIds: [] as string[]
+    dueDate: '', estimatedTime: '', projectId: '', tagIds: [] as string[],
+    recurrence: 'NONE', recurrenceEndDate: '',
   })
 
   const colors = {
-    bg: isDark ? '#030712' : '#f1f5f9',
-    card: isDark ? '#0f172a' : '#ffffff',
-    border: isDark ? '#1e293b' : '#e2e8f0',
-    text: isDark ? '#ffffff' : '#0f172a',
+    bg:        isDark ? '#030712' : '#f1f5f9',
+    card:      isDark ? '#0f172a' : '#ffffff',
+    border:    isDark ? '#1e293b' : '#e2e8f0',
+    text:      isDark ? '#ffffff' : '#0f172a',
     textMuted: isDark ? '#64748b' : '#94a3b8',
-    input: isDark ? '#1e293b' : '#f8fafc',
+    input:     isDark ? '#1e293b' : '#f8fafc',
     inputBorder: isDark ? '#334155' : '#e2e8f0',
-    subBg: isDark ? '#0d1117' : '#f1f5f9',
-    modalBg: isDark ? '#0f172a' : '#ffffff',
-    filterBg: isDark ? '#0f172a' : '#ffffff',
-    searchBg: isDark ? '#0f172a' : '#ffffff',
+    subBg:     isDark ? '#0d1117' : '#f1f5f9',
+    modalBg:   isDark ? '#0f172a' : '#ffffff',
+    filterBg:  isDark ? '#0f172a' : '#ffffff',
+    searchBg:  isDark ? '#0f172a' : '#ffffff',
   }
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -373,9 +386,36 @@ export default function TasksPage() {
     onError: () => toast.error('Failed to delete task')
   })
 
+  // Recurring next occurrence mutation
+  const nextOccurrenceMutation = useMutation({
+    mutationFn: (taskId: string) => api.post(`/tasks/${taskId}/next-occurrence`),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      setRecurringTask(null)
+      if (res.data.created) toast.success('Next occurrence scheduled! 🔁')
+      else toast('Recurrence has ended', { icon: '✅' })
+    },
+    onError: () => toast.error('Failed to schedule next occurrence')
+  })
+
+  const skipOccurrenceMutation = useMutation({
+    mutationFn: (taskId: string) => api.post(`/tasks/${taskId}/skip-occurrence`),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      setRecurringTask(null)
+      if (res.data.created) toast.success('Occurrence skipped, next one scheduled!')
+      else toast('Recurrence has ended', { icon: '✅' })
+    },
+    onError: () => toast.error('Failed to skip occurrence')
+  })
+
   const openCreate = () => {
     setEditTask(null)
-    setForm({ title: '', description: '', status: 'TODO', priority: 'MEDIUM', dueDate: '', estimatedTime: '', projectId: '', tagIds: [] })
+    setForm({
+      title: '', description: '', status: 'TODO', priority: 'MEDIUM',
+      dueDate: '', estimatedTime: '', projectId: '', tagIds: [],
+      recurrence: 'NONE', recurrenceEndDate: '',
+    })
     setShowModal(true)
   }
 
@@ -387,7 +427,9 @@ export default function TasksPage() {
       dueDate: t.dueDate ? t.dueDate.split('T')[0] : '',
       estimatedTime: t.estimatedTime ? String(t.estimatedTime) : '',
       projectId: t.projectId || '',
-      tagIds: t.tags?.map((tag: any) => tag.id) || []
+      tagIds: t.tags?.map((tag: any) => tag.id) || [],
+      recurrence: t.recurrence || 'NONE',
+      recurrenceEndDate: t.recurrenceEndDate ? t.recurrenceEndDate.split('T')[0] : '',
     })
     setShowModal(true)
   }
@@ -403,20 +445,28 @@ export default function TasksPage() {
       estimatedTime: form.estimatedTime ? parseInt(form.estimatedTime) : undefined,
       projectId: form.projectId || undefined,
       tagIds: form.tagIds,
+      recurrence: form.recurrence,
+      recurrenceEndDate: form.recurrenceEndDate || undefined,
     }
     if (editTask) updateMutation.mutate({ id: editTask.id, data: payload, closeModal: true })
     else createMutation.mutate(payload)
   }
 
+  // Toggle done — show recurring modal if task is recurring
   const toggleDone = (task: Task) => {
-    updateMutation.mutate({ id: task.id, data: { status: task.status === 'DONE' ? 'TODO' : 'DONE' } })
+    const newStatus = task.status === 'DONE' ? 'TODO' : 'DONE'
+    updateMutation.mutate({ id: task.id, data: { status: newStatus } })
+
+    // If completing a recurring task → show confirmation modal
+    if (newStatus === 'DONE' && task.recurrence && task.recurrence !== 'NONE') {
+      setTimeout(() => setRecurringTask(task), 400)
+    }
   }
 
   const handleAddSubtask = (parentId: string, title: string) => {
     createMutation.mutate({ title, status: 'TODO', priority: 'MEDIUM', parentId })
   }
 
-  // Quick add
   const handleQuickAdd = () => {
     if (!quickTitle.trim()) return
     createMutation.mutate({ title: quickTitle.trim(), status: 'TODO', priority: 'MEDIUM' })
@@ -424,7 +474,6 @@ export default function TasksPage() {
     quickInputRef.current?.focus()
   }
 
-  // Bulk select
   const toggleSelect = (id: string) => {
     setSelected(prev => {
       const next = new Set(prev)
@@ -450,7 +499,6 @@ export default function TasksPage() {
     }
   }
 
-  // Drag & drop
   const handleDragStart = (event: DragStartEvent) => {
     const task = tasks.find(t => t.id === event.active.id)
     setActiveTask(task || null)
@@ -460,28 +508,22 @@ export default function TasksPage() {
     setActiveTask(null)
     const { active, over } = event
     if (!over || active.id === over.id) return
-
     const draggedTask = tasks.find(t => t.id === active.id)
-    const overTask = tasks.find(t => t.id === over.id)
-
+    const overTask    = tasks.find(t => t.id === over.id)
     if (!draggedTask || !overTask) return
-
-    // If dropped on a task with different status → move to that status
     if (draggedTask.status !== overTask.status) {
       updateMutation.mutate({ id: draggedTask.id, data: { status: overTask.status } })
     }
   }
 
-  // Filter & search
   const filteredTasks = tasks.filter(t => {
     if (!t.parentId) {
       if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
       return true
     }
-    return false // subtasks shown inside parent
+    return false
   })
 
-  // Group by status
   const grouped: Record<string, Task[]> = { TODO: [], IN_PROGRESS: [], IN_REVIEW: [], DONE: [], CANCELLED: [] }
   filteredTasks.forEach(t => { if (grouped[t.status]) grouped[t.status].push(t) })
 
@@ -491,7 +533,7 @@ export default function TasksPage() {
     fontSize: '14px', outline: 'none', boxSizing: 'border-box' as const
   }
 
-  const labelStyle = { display: 'block', fontSize: '13px', color: colors.textMuted, marginBottom: '6px' }
+  const labelStyle = { display: 'block' as const, fontSize: '13px', color: colors.textMuted, marginBottom: '6px' }
 
   return (
     <div style={{ padding: isMobile ? '16px' : '32px', fontFamily: 'Inter, sans-serif', minHeight: '100vh', backgroundColor: colors.bg }}>
@@ -526,35 +568,27 @@ export default function TasksPage() {
           onKeyDown={e => e.key === 'Enter' && handleQuickAdd()}
           style={{
             flex: 1, background: 'none', border: 'none',
-            color: colors.text, fontSize: '14px', outline: 'none',
-            padding: '4px 8px'
+            color: colors.text, fontSize: '14px', outline: 'none', padding: '4px 8px'
           }}
         />
         {quickTitle && (
           <button onClick={handleQuickAdd} style={{
             backgroundColor: '#6366f1', border: 'none', borderRadius: '8px',
             padding: '6px 14px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600'
-          }}>
-            Add
-          </button>
+          }}>Add</button>
         )}
       </div>
 
       {/* Search + Filters */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
-        {/* Search */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '8px',
           backgroundColor: colors.searchBg, border: `1px solid ${colors.border}`,
           borderRadius: '8px', padding: '7px 12px', flex: 1, minWidth: '180px'
         }}>
           <Search size={14} color={colors.textMuted} />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search tasks..."
-            style={{ background: 'none', border: 'none', color: colors.text, fontSize: '13px', outline: 'none', width: '100%' }}
-          />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tasks..."
+            style={{ background: 'none', border: 'none', color: colors.text, fontSize: '13px', outline: 'none', width: '100%' }} />
           {search && (
             <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, padding: 0, display: 'flex' }}>
               <X size={13} />
@@ -565,8 +599,7 @@ export default function TasksPage() {
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{
           backgroundColor: colors.filterBg, border: `1px solid ${colors.border}`,
           borderRadius: '8px', padding: '8px 12px', color: filterStatus ? colors.text : colors.textMuted,
-          fontSize: '13px', outline: 'none', cursor: 'pointer',
-          width: isMobile ? '100%' : 'auto'
+          fontSize: '13px', outline: 'none', cursor: 'pointer', width: isMobile ? '100%' : 'auto'
         }}>
           <option value="">All Statuses</option>
           {STATUSES.map(o => <option key={o} value={o}>{o.replace('_', ' ')}</option>)}
@@ -575,8 +608,7 @@ export default function TasksPage() {
         <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} style={{
           backgroundColor: colors.filterBg, border: `1px solid ${colors.border}`,
           borderRadius: '8px', padding: '8px 12px', color: filterPriority ? colors.text : colors.textMuted,
-          fontSize: '13px', outline: 'none', cursor: 'pointer',
-          width: isMobile ? '100%' : 'auto'
+          fontSize: '13px', outline: 'none', cursor: 'pointer', width: isMobile ? '100%' : 'auto'
         }}>
           <option value="">All Priorities</option>
           {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
@@ -585,8 +617,7 @@ export default function TasksPage() {
         <select value={filterProject} onChange={e => setFilterProject(e.target.value)} style={{
           backgroundColor: colors.filterBg, border: `1px solid ${colors.border}`,
           borderRadius: '8px', padding: '8px 12px', color: filterProject ? colors.text : colors.textMuted,
-          fontSize: '13px', outline: 'none', cursor: 'pointer',
-          width: isMobile ? '100%' : 'auto'
+          fontSize: '13px', outline: 'none', cursor: 'pointer', width: isMobile ? '100%' : 'auto'
         }}>
           <option value="">All Projects</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -596,9 +627,7 @@ export default function TasksPage() {
           <button onClick={() => { setFilterStatus(''); setFilterPriority(''); setFilterProject(''); setSearch('') }} style={{
             backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
             borderRadius: '8px', padding: '8px 12px', color: '#f87171', fontSize: '13px', cursor: 'pointer'
-          }}>
-            Clear
-          </button>
+          }}>Clear</button>
         )}
       </div>
 
@@ -612,10 +641,7 @@ export default function TasksPage() {
           <span style={{ fontSize: '13px', fontWeight: '600', color: '#818cf8' }}>
             {selected.size} task{selected.size > 1 ? 's' : ''} selected
           </span>
-          <button onClick={selectAll} style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: '#818cf8', fontSize: '13px', fontWeight: '500'
-          }}>
+          <button onClick={selectAll} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#818cf8', fontSize: '13px', fontWeight: '500' }}>
             {selected.size === filteredTasks.length ? 'Deselect all' : 'Select all'}
           </button>
           <div style={{ flex: 1 }} />
@@ -627,9 +653,7 @@ export default function TasksPage() {
           }}>
             <Trash2 size={13} /> Delete selected
           </button>
-          <button onClick={() => setSelected(new Set())} style={{
-            background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted
-          }}>
+          <button onClick={() => setSelected(new Set())} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted }}>
             <X size={16} />
           </button>
         </div>
@@ -658,30 +682,22 @@ export default function TasksPage() {
               const Icon = cfg.icon
               return (
                 <div key={status}>
-                  {/* Group header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                     <Icon size={14} color={cfg.color} />
                     <span style={{ fontSize: '13px', fontWeight: '600', color: cfg.color }}>{cfg.label}</span>
                     <span style={{
                       fontSize: '11px', backgroundColor: colors.subBg, color: colors.textMuted,
-                      borderRadius: '999px', padding: '1px 8px', fontWeight: '500',
-                      border: `1px solid ${colors.border}`
+                      borderRadius: '999px', padding: '1px 8px', fontWeight: '500', border: `1px solid ${colors.border}`
                     }}>{statusTasks.length}</span>
                   </div>
-
                   <SortableContext items={statusTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       {statusTasks.map(task => (
                         <SortableTaskRow
-                          key={task.id}
-                          task={task}
-                          colors={colors}
-                          selected={selected.has(task.id)}
-                          isDark={isDark}
-                          onSelect={toggleSelect}
-                          onToggleDone={toggleDone}
-                          onEdit={openEdit}
-                          onDelete={(id: string) => deleteMutation.mutate(id)}
+                          key={task.id} task={task} colors={colors}
+                          selected={selected.has(task.id)} isDark={isDark}
+                          onSelect={toggleSelect} onToggleDone={toggleDone}
+                          onEdit={openEdit} onDelete={(id: string) => deleteMutation.mutate(id)}
                           onAddSubtask={handleAddSubtask}
                         />
                       ))}
@@ -708,7 +724,7 @@ export default function TasksPage() {
         </DndContext>
       )}
 
-      {/* Modal */}
+      {/* ── Create/Edit Modal ────────────────────────────────────── */}
       {showModal && (
         <div style={{
           position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)',
@@ -777,28 +793,38 @@ export default function TasksPage() {
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
+
+              {/* 🔁 Recurrence */}
+              <RecurrenceSelector
+                value={form.recurrence}
+                onChange={v => setForm({ ...form, recurrence: v })}
+                endDate={form.recurrenceEndDate}
+                onEndDateChange={v => setForm({ ...form, recurrenceEndDate: v })}
+                isDark={isDark}
+              />
+
               <div>
                 <label style={labelStyle}>Tags</label>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {tags.map((tag: any) => {
-                    const selected = form.tagIds.includes(tag.id)
+                    const isSelected = form.tagIds.includes(tag.id)
                     return (
                       <button key={tag.id} type="button" onClick={() => {
                         setForm(prev => ({
                           ...prev,
-                          tagIds: selected
+                          tagIds: isSelected
                             ? prev.tagIds.filter(id => id !== tag.id)
                             : [...prev.tagIds, tag.id]
                         }))
                       }} style={{
                         padding: '4px 12px', borderRadius: '999px', fontSize: '12px', fontWeight: '600',
-                        border: `1px solid ${selected ? tag.color : colors.inputBorder}`,
-                        backgroundColor: selected ? tag.color + '20' : 'transparent',
-                        color: selected ? tag.color : colors.textMuted,
+                        border: `1px solid ${isSelected ? tag.color : colors.inputBorder}`,
+                        backgroundColor: isSelected ? tag.color + '20' : 'transparent',
+                        color: isSelected ? tag.color : colors.textMuted,
                         cursor: 'pointer', transition: 'all 0.15s',
                         display: 'flex', alignItems: 'center', gap: '5px'
                       }}>
-                        {selected && <Check size={10} />}
+                        {isSelected && <Check size={10} />}
                         {tag.name}
                       </button>
                     )
@@ -810,16 +836,18 @@ export default function TasksPage() {
                   )}
                 </div>
               </div>
+
               <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
                 <button type="button" onClick={closeModal} style={{
                   flex: 1, padding: '11px', borderRadius: '10px',
                   backgroundColor: colors.input, border: `1px solid ${colors.inputBorder}`,
                   color: colors.textMuted, cursor: 'pointer', fontSize: '14px', fontWeight: '500'
                 }}>Cancel</button>
-                <button type="submit" style={{
+                <button type="submit" disabled={createMutation.isPending || updateMutation.isPending} style={{
                   flex: 1, padding: '11px', borderRadius: '10px',
                   backgroundColor: '#6366f1', border: 'none',
-                  color: '#ffffff', cursor: 'pointer', fontSize: '14px', fontWeight: '600'
+                  color: '#ffffff', cursor: 'pointer', fontSize: '14px', fontWeight: '600',
+                  opacity: createMutation.isPending || updateMutation.isPending ? 0.7 : 1
                 }}>
                   {editTask ? 'Save Changes' : 'Create Task'}
                 </button>
@@ -827,6 +855,18 @@ export default function TasksPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* 🔁 Recurring Task Confirmation Modal */}
+      {recurringTask && (
+        <RecurringTaskModal
+          task={recurringTask}
+          isDark={isDark}
+          isLoading={nextOccurrenceMutation.isPending || skipOccurrenceMutation.isPending}
+          onConfirm={() => nextOccurrenceMutation.mutate(recurringTask.id)}
+          onSkip={() => skipOccurrenceMutation.mutate(recurringTask.id)}
+          onDismiss={() => setRecurringTask(null)}
+        />
       )}
     </div>
   )

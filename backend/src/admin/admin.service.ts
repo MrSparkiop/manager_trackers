@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 
 @Injectable()
@@ -52,29 +52,43 @@ export class AdminService {
     })
   }
 
-  async getActiveAnnouncements() {
+  async getActiveAnnouncements(userRole: string) {
     return this.prisma.announcement.findMany({
-      where: { active: true },
-      orderBy: { createdAt: 'desc' }
+      where: {
+        isActive: true,
+        OR: [
+          { targetRole: 'ALL' },
+          { targetRole: userRole as any },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
     })
   }
 
-  async createAnnouncement(dto: { message: string; type: string }) {
+  async createAnnouncement(dto: any) {
     return this.prisma.announcement.create({
       data: {
-        message: dto.message,
-        type: dto.type as any,
-        active: true,
-      }
+        title:      dto.title || '',
+        message:    dto.message,
+        type:       dto.type || 'INFO',
+        targetRole: dto.targetRole || 'ALL',
+        isActive:   dto.isActive ?? true,
+      },
     })
   }
 
-  async updateAnnouncement(id: string, dto: { message?: string; type?: string; active?: boolean }) {
+  async updateAnnouncement(id: string, dto: any) {
     const announcement = await this.prisma.announcement.findUnique({ where: { id } })
     if (!announcement) throw new NotFoundException('Announcement not found')
     return this.prisma.announcement.update({
       where: { id },
-      data: dto as any,
+      data: {
+        title:      dto.title,
+        message:    dto.message,
+        type:       dto.type,
+        targetRole: dto.targetRole,
+        isActive:   dto.isActive,
+      },
     })
   }
 
@@ -166,23 +180,41 @@ export class AdminService {
     return user
   }
 
-  async toggleSuspend(userId: string, isSuspended: boolean) {
+  async updateUser(adminId: string, userId: string, dto: any) {
+    // Prevent admin from changing their own role
+    if (adminId === userId && dto.role && dto.role !== 'ADMIN') {
+      throw new ForbiddenException('You cannot change your own admin role')
+    }
     return this.prisma.user.update({
       where: { id: userId },
-      data: { isSuspended, refreshToken: isSuspended ? null : undefined },
-      select: { id: true, email: true, firstName: true, lastName: true, role: true, isSuspended: true }
+      data: dto,
+      select: {
+        id: true, email: true, firstName: true,
+        lastName: true, role: true, isSuspended: true, createdAt: true,
+      },
     })
   }
 
-  async updateUserRole(userId: string, role: 'USER' | 'PRO' | 'ADMIN') {
+  async suspendUser(adminId: string, userId: string, suspend: boolean) {
+    // Prevent admin from suspending themselves
+    if (adminId === userId) {
+      throw new ForbiddenException('You cannot suspend your own account')
+    }
     return this.prisma.user.update({
       where: { id: userId },
-      data: { role },
-      select: { id: true, email: true, firstName: true, lastName: true, role: true }
+      data: { isSuspended: suspend, refreshToken: suspend ? null : undefined },
+      select: {
+        id: true, email: true, firstName: true,
+        lastName: true, role: true, isSuspended: true,
+      },
     })
   }
 
-  async deleteUser(userId: string) {
+  async deleteUser(adminId: string, userId: string) {
+    // Prevent admin from deleting themselves
+    if (adminId === userId) {
+      throw new ForbiddenException('You cannot delete your own account')
+    }
     return this.prisma.user.delete({ where: { id: userId } })
   }
 

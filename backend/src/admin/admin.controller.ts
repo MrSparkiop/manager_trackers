@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Req } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
 import { AdminGuard } from './admin.guard'
 import { AdminService } from './admin.service'
@@ -30,21 +30,23 @@ export class AdminController {
   @ApiOperation({ summary: 'Get user details' })
   getUserDetails(@Param('id') id: string) { return this.adminService.getUserDetails(id) }
 
-  @Put('users/:id/role')
-  @ApiOperation({ summary: 'Update user role' })
-  updateUserRole(@Param('id') id: string, @Body() body: { role: 'USER' | 'PRO' | 'ADMIN' }) {
-    return this.adminService.updateUserRole(id, body.role)
+  @Put('users/:id')
+  @ApiOperation({ summary: 'Update a user (role, name, etc.)' })
+  updateUser(@Req() req: any, @Param('id') id: string, @Body() dto: any) {
+    return this.adminService.updateUser(req.user.id, id, dto)
   }
 
   @Put('users/:id/suspend')
   @ApiOperation({ summary: 'Suspend or unsuspend a user' })
-  toggleSuspend(@Param('id') id: string, @Body() body: { isSuspended: boolean }) {
-    return this.adminService.toggleSuspend(id, body.isSuspended)
+  suspendUser(@Req() req: any, @Param('id') id: string, @Body() dto: any) {
+    return this.adminService.suspendUser(req.user.id, id, dto.suspend)
   }
 
   @Delete('users/:id')
   @ApiOperation({ summary: 'Delete a user' })
-  deleteUser(@Param('id') id: string) { return this.adminService.deleteUser(id) }
+  deleteUser(@Req() req: any, @Param('id') id: string) {
+    return this.adminService.deleteUser(req.user.id, id)
+  }
 
   @Get('activity')
   @ApiOperation({ summary: 'Get platform activity log' })
@@ -70,21 +72,22 @@ export class AdminController {
 
   // ── Announcements ────────────────────────────────────────────────
   @Get('announcements')
-  @ApiOperation({ summary: 'Get all announcements' })
-  getAnnouncements() { return this.adminService.getAnnouncements() }
+  @ApiOperation({ summary: 'Get all announcements (admin management list)' })
+  getAnnouncements() {
+    return this.adminService.getAnnouncements()
+  }
 
   @Post('announcements')
   @ApiOperation({ summary: 'Create announcement' })
-  createAnnouncement(@Body() body: { message: string; type: string }) {
-    return this.adminService.createAnnouncement(body)
+  createAnnouncement(@Body() dto: any) {
+    return this.adminService.createAnnouncement(dto)
   }
 
   @Put('announcements/:id')
   @ApiOperation({ summary: 'Update announcement' })
-  updateAnnouncement(
-    @Param('id') id: string,
-    @Body() body: { message?: string; type?: string; active?: boolean }
-  ) { return this.adminService.updateAnnouncement(id, body) }
+  updateAnnouncement(@Param('id') id: string, @Body() dto: any) {
+    return this.adminService.updateAnnouncement(id, dto)
+  }
 
   @Delete('announcements/:id')
   @ApiOperation({ summary: 'Delete announcement' })

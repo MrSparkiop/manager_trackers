@@ -368,6 +368,85 @@ export class TeamsService {
     return this.prisma.teamTaskComment.delete({ where: { id: commentId } })
   }
 
+  // ── Recurring Team Tasks ─────────────────────────────────────────
+  async createNextTeamOccurrence(taskId: string, userId: string) {
+    const task = await this.prisma.teamTask.findUnique({
+      where: { id: taskId },
+      include: { project: { include: { team: true } } },
+    })
+    if (!task) throw new NotFoundException('Task not found')
+    await this.requireMember(task.project.teamId, userId)
+    if (task.recurrence === 'NONE') throw new NotFoundException('Task is not recurring')
+
+    const nextDueDate = this.getNextDueDate(task.dueDate, task.recurrence)
+
+    if (task.recurrenceEndDate && nextDueDate > task.recurrenceEndDate) {
+      return { message: 'Recurrence has ended', created: false }
+    }
+
+    const nextTask = await this.prisma.teamTask.create({
+      data: {
+        projectId: task.projectId,
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        status: 'TODO',
+        assigneeId: task.assigneeId,
+        recurrence: task.recurrence,
+        recurrenceEndDate: task.recurrenceEndDate,
+        parentTaskId: task.parentTaskId || task.id,
+        dueDate: nextDueDate,
+      },
+    })
+
+    return { message: 'Next occurrence created', created: true, task: nextTask }
+  }
+
+  async skipNextTeamOccurrence(taskId: string, userId: string) {
+    const task = await this.prisma.teamTask.findUnique({
+      where: { id: taskId },
+      include: { project: { include: { team: true } } },
+    })
+    if (!task) throw new NotFoundException('Task not found')
+    await this.requireMember(task.project.teamId, userId)
+
+    const skippedDate = this.getNextDueDate(task.dueDate, task.recurrence)
+    const nextDueDate = this.getNextDueDate(skippedDate, task.recurrence)
+
+    if (task.recurrenceEndDate && nextDueDate > task.recurrenceEndDate) {
+      return { message: 'Recurrence has ended', created: false }
+    }
+
+    const nextTask = await this.prisma.teamTask.create({
+      data: {
+        projectId: task.projectId,
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        status: 'TODO',
+        assigneeId: task.assigneeId,
+        recurrence: task.recurrence,
+        recurrenceEndDate: task.recurrenceEndDate,
+        parentTaskId: task.parentTaskId || task.id,
+        dueDate: nextDueDate,
+      },
+    })
+
+    return { message: 'Occurrence skipped', created: true, task: nextTask }
+  }
+
+  private getNextDueDate(currentDue: Date | null, recurrence: string): Date {
+    const base = currentDue ? new Date(currentDue) : new Date()
+    switch (recurrence) {
+      case 'DAILY':    base.setDate(base.getDate() + 1);         break
+      case 'WEEKLY':   base.setDate(base.getDate() + 7);         break
+      case 'BIWEEKLY': base.setDate(base.getDate() + 14);        break
+      case 'MONTHLY':  base.setMonth(base.getMonth() + 1);       break
+      case 'YEARLY':   base.setFullYear(base.getFullYear() + 1); break
+    }
+    return base
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────
   private async requireMember(teamId: string, userId: string) {
     const member = await this.prisma.teamMember.findUnique({
