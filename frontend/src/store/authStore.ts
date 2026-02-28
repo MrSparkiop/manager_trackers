@@ -27,14 +27,9 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
 
       login: async (email, password) => {
-        try {
-          const res = await api.post('/auth/login', { email, password })
-          set({ user: res.data.user, isAuthenticated: true })
-          connectSocket()
-        } catch (error: any) {
-          const message = error?.response?.data?.message || 'Invalid email or password'
-          throw new Error(message)
-        }
+        const res = await api.post('/auth/login', { email, password })
+        set({ user: res.data.user, isAuthenticated: true })
+        connectSocket()
       },
 
       register: async (email, password, firstName, lastName) => {
@@ -43,9 +38,15 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
-        await api.post('/auth/logout')
-        disconnectSocket()
-        set({ user: null, isAuthenticated: false })
+        try {
+          await api.post('/auth/logout')
+        } catch (error) {
+          console.warn('Server logout failed, clearing local state anyway', error)
+        } finally {
+          // Disconnect socket and wipe local auth state reliably
+          disconnectSocket()
+          set({ user: null, isAuthenticated: false })
+        }
       },
 
       fetchMe: async () => {

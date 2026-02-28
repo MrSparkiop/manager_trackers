@@ -9,7 +9,8 @@ export class ProjectsService {
 
   async findAll(userId: string) {
     return this.prisma.project.findMany({
-      where: { userId },
+      // Filter out soft-deleted projects
+      where: { userId, deletedAt: null },
       include: {
         _count: { select: { tasks: true } },
         tasks: {
@@ -22,7 +23,8 @@ export class ProjectsService {
 
   async findOne(id: string, userId: string) {
     const project = await this.prisma.project.findFirst({
-      where: { id, userId },
+      // Filter out soft-deleted projects
+      where: { id, userId, deletedAt: null },
       include: {
         tasks: {
           include: { timeEntries: true },
@@ -46,6 +48,7 @@ export class ProjectsService {
   }
 
   async update(id: string, userId: string, dto: UpdateProjectDto) {
+    // findOne already checks if the project exists and is not deleted
     await this.findOne(id, userId);
     return this.prisma.project.update({
       where: { id },
@@ -58,13 +61,19 @@ export class ProjectsService {
   }
 
   async remove(id: string, userId: string) {
+    // Ensure the project belongs to the user and hasn't already been deleted
     await this.findOne(id, userId);
-    return this.prisma.project.delete({ where: { id } });
+    
+    return this.prisma.project.update({
+      where: { id },
+      data: { deletedAt: new Date() }, // Soft delete!
+    });
   }
 
   async getStats(userId: string) {
     const projects = await this.prisma.project.findMany({
-      where: { userId },
+      // Filter out soft-deleted projects from statistics
+      where: { userId, deletedAt: null },
       include: { tasks: { select: { status: true } } },
     });
 

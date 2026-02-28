@@ -41,7 +41,10 @@ services:
         condition: service_healthy
     command: sh -c "npx prisma migrate deploy && npm run start:dev"
     volumes:
-      - ./backend/src:/app/src
+      # Mount the entire backend folder for config/schema hot-reloading
+      - ./backend:/app
+      # Create an anonymous volume to keep Linux node_modules isolated
+      - /app/node_modules
 
   frontend:
     build:
@@ -56,7 +59,10 @@ services:
     depends_on:
       - backend
     volumes:
-      - ./frontend/src:/app/src
+      # Mount the entire frontend folder for config hot-reloading
+      - ./frontend:/app
+      # Create an anonymous volume to keep Linux node_modules isolated
+      - /app/node_modules
 
 volumes:
   postgres_data:

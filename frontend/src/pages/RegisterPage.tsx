@@ -26,7 +26,15 @@ export default function RegisterPage() {
       await register(form.email, form.password, form.firstName, form.lastName)
       navigate('/app/dashboard')
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.')
+      const status = err?.response?.status
+      const message = err?.response?.data?.message
+      if (status === 429) {
+        setError('Too many attempts. Please wait a minute and try again.')
+      } else if (Array.isArray(message)) {
+        setError(message[0])
+      } else {
+        setError(message || 'Registration failed')
+      }
     } finally {
       setLoading(false)
     }

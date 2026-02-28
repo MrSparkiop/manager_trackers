@@ -27,7 +27,15 @@ export default function LoginPage() {
       await login(email, password)
       navigate('/app/dashboard')
     } catch (err: any) {
-      setError(err?.message || 'Invalid email or password')
+      const status = err?.response?.status
+      const message = err?.response?.data?.message
+      if (status === 429) {
+        setError('Too many login attempts. Please wait a minute and try again.')
+      } else if (Array.isArray(message)) {
+        setError(message[0])
+      } else {
+        setError(message || 'Invalid email or password')
+      }
     } finally {
       setLoading(false)
     }

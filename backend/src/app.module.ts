@@ -14,10 +14,24 @@ import { TeamsModule } from './teams/teams.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { LastSeenMiddleware } from './auth/last-seen.middleware'
 import { SearchModule } from './search/search.module'
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
+import { APP_GUARD } from '@nestjs/core'
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 60000,
+        limit: 10,
+      },
+      {
+        name: 'medium',
+        ttl: 60000,
+        limit: 60,
+      },
+    ]),
     JwtModule.register({ secret: process.env.JWT_SECRET, global: true }),
     PrismaModule,
     AuthModule,
@@ -31,6 +45,12 @@ import { SearchModule } from './search/search.module'
     TeamsModule,
     NotificationsModule,
     SearchModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule implements NestModule {

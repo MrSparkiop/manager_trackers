@@ -17,18 +17,6 @@ const processQueue = (error: any) => {
   failedQueue = []
 }
 
-const clearAuthState = () => {
-  try {
-    const raw = localStorage.getItem('auth-storage')
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      parsed.state = { user: null, isAuthenticated: false }
-      localStorage.setItem('auth-storage', JSON.stringify(parsed))
-    }
-  } catch {}
-  window.location.href = '/login'
-}
-
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -68,7 +56,12 @@ api.interceptors.response.use(
     } catch (refreshError) {
       // Refresh failed — log out user
       processQueue(refreshError)
-      clearAuthState()
+      
+      // Dynamically import store to avoid circular dependency
+      // Call the robust logout function we updated in the store
+      const { useAuthStore } = await import('../store/authStore')
+      await useAuthStore.getState().logout()
+      
       return Promise.reject(refreshError)
     } finally {
       isRefreshing = false

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { connectSocket, disconnectSocket } from './lib/socket'
+import GlobalSearch from './components/GlobalSearch'
 import Layout from './components/Layout'
 import AdminLayout from './components/AdminLayout'
 import HomePage from './pages/HomePage'
@@ -28,7 +29,6 @@ import AdminUserDetailPage from './pages/admin/AdminUserDetailPage'
 import AdminSettingsPage from './pages/admin/AdminSettingsPage'
 import TeamSettingsPage from './pages/TeamSettingsPage'
 
-
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />
@@ -42,10 +42,11 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, fetchMe } = useAuthStore()
 
   useEffect(() => {
     if (isAuthenticated) {
+      fetchMe()      // always get fresh user data (role, suspension, etc.)
       connectSocket()
     } else {
       disconnectSocket()
@@ -54,6 +55,9 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      {/* Global search available everywhere when authenticated */}
+      {isAuthenticated && <GlobalSearch />}
+
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<HomePage />} />
