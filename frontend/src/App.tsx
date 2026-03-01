@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import * as Sentry from '@sentry/react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { connectSocket, disconnectSocket } from './lib/socket'
@@ -54,49 +55,68 @@ export default function App() {
   }, [isAuthenticated])
 
   return (
-    <BrowserRouter>
-      {/* Global search available everywhere when authenticated */}
-      {isAuthenticated && <GlobalSearch />}
+    <Sentry.ErrorBoundary fallback={
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', gap: '12px', color: '#e2e8f0', background: '#0f172a',
+      }}>
+        <p style={{ fontSize: '18px', fontWeight: 600 }}>Something went wrong.</p>
+        <p style={{ fontSize: '14px', color: '#94a3b8' }}>Our team has been notified. Please refresh the page to try again.</p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            marginTop: '8px', padding: '8px 20px', borderRadius: '8px',
+            background: '#3b82f6', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '14px',
+          }}
+        >
+          Refresh
+        </button>
+      </div>
+    }>
+      <BrowserRouter>
+        {/* Global search available everywhere when authenticated */}
+        {isAuthenticated && <GlobalSearch />}
 
-      <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Routes>
+          {/* Public routes */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-        {/* Protected app routes */}
-        <Route path="/app" element={<PrivateRoute><Layout /></PrivateRoute>}>
-          <Route index element={<Navigate to="/app/dashboard" />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="projects" element={<ProjectsPage />} />
-          <Route path="tasks" element={<TasksPage />} />
-          <Route path="time-tracker" element={<TimeTrackerPage />} />
-          <Route path="calendar" element={<CalendarPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="tags" element={<TagsPage />} />
-          <Route path="teams" element={<TeamsPage />} />
-          <Route path="teams/:id" element={<TeamWorkspacePage />} />
-          <Route path="teams/:id/settings" element={<TeamSettingsPage />} />
-          <Route path="teams/:id/projects/:projectId" element={<TeamProjectPage />} />
-          <Route path="join" element={<JoinTeamPage />} />
-        </Route>
+          {/* Protected app routes */}
+          <Route path="/app" element={<PrivateRoute><Layout /></PrivateRoute>}>
+            <Route index element={<Navigate to="/app/dashboard" />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="projects" element={<ProjectsPage />} />
+            <Route path="tasks" element={<TasksPage />} />
+            <Route path="time-tracker" element={<TimeTrackerPage />} />
+            <Route path="calendar" element={<CalendarPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="tags" element={<TagsPage />} />
+            <Route path="teams" element={<TeamsPage />} />
+            <Route path="teams/:id" element={<TeamWorkspacePage />} />
+            <Route path="teams/:id/settings" element={<TeamSettingsPage />} />
+            <Route path="teams/:id/projects/:projectId" element={<TeamProjectPage />} />
+            <Route path="join" element={<JoinTeamPage />} />
+          </Route>
 
-        {/* Admin routes */}
-        <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-          <Route index element={<Navigate to="/admin/dashboard" />} />
-          <Route path="dashboard" element={<AdminDashboardPage />} />
-          <Route path="users" element={<AdminUsersPage />} />
-          <Route path="users/:id" element={<AdminUserDetailPage />} />
-          <Route path="activity" element={<AdminActivityPage />} />
-          <Route path="search" element={<AdminSearchPage />} />
-          <Route path="settings" element={<AdminSettingsPage />} />
-        </Route>
+          {/* Admin routes */}
+          <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
+            <Route index element={<Navigate to="/admin/dashboard" />} />
+            <Route path="dashboard" element={<AdminDashboardPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="users/:id" element={<AdminUserDetailPage />} />
+            <Route path="activity" element={<AdminActivityPage />} />
+            <Route path="search" element={<AdminSearchPage />} />
+            <Route path="settings" element={<AdminSettingsPage />} />
+          </Route>
 
-        {/* Catch all */}
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </BrowserRouter>
+          {/* Catch all */}
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </BrowserRouter>
+    </Sentry.ErrorBoundary>
   )
 }

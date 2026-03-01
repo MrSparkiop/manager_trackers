@@ -1,12 +1,18 @@
-import { NestFactory } from '@nestjs/core'
+import './instrument'
+import { NestFactory, HttpAdapterHost } from '@nestjs/core'
 import { AppModule } from './app.module'
 import { ValidationPipe } from '@nestjs/common'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
+import { SentryExceptionFilter } from './sentry.filter'
 
 const cookieParser = require('cookie-parser')
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule)
+
+  // Register Sentry global exception filter (captures 5xx errors)
+  const { httpAdapter } = app.get(HttpAdapterHost)
+  app.useGlobalFilters(new SentryExceptionFilter(httpAdapter))
 
   app.use(cookieParser())
 
