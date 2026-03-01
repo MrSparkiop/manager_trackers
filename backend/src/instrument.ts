@@ -3,7 +3,7 @@ import { nodeProfilingIntegration } from '@sentry/profiling-node'
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
-  integrations: [nodeProfilingIntegration()],
+  integrations: [nodeProfilingIntegration(), Sentry.prismaIntegration()],
   tracesSampleRate: 1.0,
   profilesSampleRate: 1.0,
   sendDefaultPii: true,

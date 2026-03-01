@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import * as Sentry from '@sentry/react'
 import api from '../lib/axios'
 import { connectSocket, disconnectSocket } from '../lib/socket'
 
@@ -29,12 +30,14 @@ export const useAuthStore = create<AuthState>()(
       login: async (email, password) => {
         const res = await api.post('/auth/login', { email, password })
         set({ user: res.data.user, isAuthenticated: true })
+        Sentry.setUser({ id: res.data.user.id, email: res.data.user.email, username: `${res.data.user.firstName} ${res.data.user.lastName}` })
         connectSocket()
       },
 
       register: async (email, password, firstName, lastName) => {
         const res = await api.post('/auth/register', { email, password, firstName, lastName })
         set({ user: res.data.user, isAuthenticated: true })
+        Sentry.setUser({ id: res.data.user.id, email: res.data.user.email, username: `${res.data.user.firstName} ${res.data.user.lastName}` })
       },
 
       logout: async () => {
@@ -45,6 +48,7 @@ export const useAuthStore = create<AuthState>()(
         } finally {
           // Disconnect socket and wipe local auth state reliably
           disconnectSocket()
+          Sentry.setUser(null)
           set({ user: null, isAuthenticated: false })
         }
       },
@@ -53,7 +57,9 @@ export const useAuthStore = create<AuthState>()(
         try {
           const res = await api.get('/auth/me')
           set({ user: res.data, isAuthenticated: true })
+          Sentry.setUser({ id: res.data.id, email: res.data.email, username: `${res.data.firstName} ${res.data.lastName}` })
         } catch {
+          Sentry.setUser(null)
           set({ user: null, isAuthenticated: false })
         }
       },
