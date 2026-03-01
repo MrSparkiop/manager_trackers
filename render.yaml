@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: trackflow-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && node dist/main
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: trackflow-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: ALLOWED_ORIGINS
+        value: https://your-app.vercel.app
+      - key: FRONTEND_URL
+        value: https://your-app.vercel.app
+      - key: SENTRY_DSN
+        value: https://94769800094c89bd68eef8b19bc3438a@o4510969166823424.ingest.de.sentry.io/4510969200181328
+
+databases:
+  - name: trackflow-db
+    databaseName: trackflow
+    user: trackflow
