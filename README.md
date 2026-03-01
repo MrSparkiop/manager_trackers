@@ -120,7 +120,7 @@ docker-compose exec postgres psql -U postgres -d client_tracker \
 - HttpOnly cookies — XSS protection
 - Refresh token rotation with bcrypt hashing
 - Rate limiting on auth endpoints (5 login / 3 register per minute)
-- CORS configured via environment variables
+- CORS configured via environment variables 
 - Admin self-protection — cannot delete or suspend own account
 
 ---

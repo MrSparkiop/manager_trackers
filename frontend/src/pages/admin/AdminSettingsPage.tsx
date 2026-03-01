@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext } from 'react-router-dom'
-import { Settings, Save, Plus, Trash2, ToggleLeft, ToggleRight, Megaphone, Users, Crown, Shield, Globe } from 'lucide-react'
+import { Settings, Save, Plus, Trash2, ToggleLeft, ToggleRight, Megaphone, Users, Crown, Shield, Globe, Calendar, Clock } from 'lucide-react'
 import api from '../../lib/axios'
 import toast from 'react-hot-toast'
 
@@ -58,6 +58,52 @@ export default function AdminSettingsPage() {
     setLocalConfig(c => ({ ...c, [key]: c[key] === 'true' ? 'false' : 'true' }))
 
   const handleSaveConfig = () => configMutation.mutate(localConfig)
+
+  // ── Maintenance Windows ─────────────────────────────────────────────
+  const [maintenanceForm, setMaintenanceForm] = useState({
+    title: 'Scheduled Maintenance',
+    message: '',
+    startTime: '',
+    endTime: '',
+  })
+
+  const { data: maintenanceWindows = [] } = useQuery({
+    queryKey: ['admin-maintenance'],
+    queryFn: () => api.get('/admin/maintenance').then(r => r.data),
+  })
+
+  const createMaintenanceMutation = useMutation({
+    mutationFn: () => api.post('/admin/maintenance', {
+      ...maintenanceForm,
+      startTime: new Date(maintenanceForm.startTime).toISOString(),
+      endTime: new Date(maintenanceForm.endTime).toISOString(),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-maintenance'] })
+      queryClient.invalidateQueries({ queryKey: ['maintenance-upcoming'] })
+      setMaintenanceForm({ title: 'Scheduled Maintenance', message: '', startTime: '', endTime: '' })
+      toast.success('Maintenance window scheduled!')
+    },
+    onError: () => toast.error('Failed to schedule maintenance'),
+  })
+
+  const deleteMaintenanceMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/admin/maintenance/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-maintenance'] })
+      queryClient.invalidateQueries({ queryKey: ['maintenance-upcoming'] })
+      toast.success('Maintenance window deleted')
+    },
+  })
+
+  const toggleMaintenanceMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      api.put(`/admin/maintenance/${id}`, { isActive }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-maintenance'] })
+      queryClient.invalidateQueries({ queryKey: ['maintenance-upcoming'] })
+    },
+  })
 
   // ── Announcements ──────────────────────────────────────────────────
   const { data: announcements = [] } = useQuery({
@@ -220,6 +266,183 @@ export default function AdminSettingsPage() {
         </>,
         'System Configuration',
         <Settings size={16} color="#f87171" />
+      )}
+
+      {/* Announcements */}
+      {/* Maintenance Windows */}
+      {card(
+        <>
+          {/* Schedule form */}
+          <div style={{
+            padding: '16px', borderRadius: '12px',
+            backgroundColor: colors.subBg, border: `1px solid ${colors.border}`,
+            marginBottom: '20px'
+          }}>
+            <p style={{ fontSize: '13px', fontWeight: '600', color: colors.text, margin: '0 0 12px' }}>
+              Schedule Maintenance Window
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <input
+                value={maintenanceForm.title}
+                onChange={e => setMaintenanceForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="Title (e.g. Database Upgrade)"
+                style={{
+                  width: '100%', padding: '9px 12px',
+                  backgroundColor: colors.input, border: `1px solid ${colors.inputBorder}`,
+                  borderRadius: '10px', color: colors.text, fontSize: '13px',
+                  outline: 'none', boxSizing: 'border-box' as const,
+                }}
+              />
+              <textarea
+                value={maintenanceForm.message}
+                onChange={e => setMaintenanceForm(f => ({ ...f, message: e.target.value }))}
+                placeholder="Describe what will happen during maintenance..."
+                rows={2}
+                style={{
+                  width: '100%', padding: '9px 12px',
+                  backgroundColor: colors.input, border: `1px solid ${colors.inputBorder}`,
+                  borderRadius: '10px', color: colors.text, fontSize: '13px',
+                  outline: 'none', resize: 'vertical', boxSizing: 'border-box' as const,
+                  fontFamily: 'Inter, sans-serif'
+                }}
+              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: colors.textMuted, marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Start Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={maintenanceForm.startTime}
+                    onChange={e => setMaintenanceForm(f => ({ ...f, startTime: e.target.value }))}
+                    style={{
+                      width: '100%', padding: '9px 12px',
+                      backgroundColor: colors.input, border: `1px solid ${colors.inputBorder}`,
+                      borderRadius: '10px', color: colors.text, fontSize: '13px',
+                      outline: 'none', boxSizing: 'border-box' as const,
+                      colorScheme: isDark ? 'dark' : 'light',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: colors.textMuted, marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    End Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={maintenanceForm.endTime}
+                    onChange={e => setMaintenanceForm(f => ({ ...f, endTime: e.target.value }))}
+                    style={{
+                      width: '100%', padding: '9px 12px',
+                      backgroundColor: colors.input, border: `1px solid ${colors.inputBorder}`,
+                      borderRadius: '10px', color: colors.text, fontSize: '13px',
+                      outline: 'none', boxSizing: 'border-box' as const,
+                      colorScheme: isDark ? 'dark' : 'light',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Duration preview */}
+              {maintenanceForm.startTime && maintenanceForm.endTime && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '7px',
+                  padding: '8px 12px', borderRadius: '8px',
+                  backgroundColor: 'rgba(245,158,11,0.1)',
+                  border: '1px solid rgba(245,158,11,0.2)',
+                }}>
+                  <Clock size={12} color="#f59e0b" />
+                  <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: '600' }}>
+                    Duration:{' '}
+                    {(() => {
+                      const diff = new Date(maintenanceForm.endTime).getTime() - new Date(maintenanceForm.startTime).getTime()
+                      if (diff <= 0) return 'Invalid — end must be after start'
+                      const hours = Math.floor(diff / 3600000)
+                      const mins  = Math.floor((diff % 3600000) / 60000)
+                      return hours > 0 ? `${hours}h ${mins}m` : `${mins} minutes`
+                    })()}
+                  </span>
+                </div>
+              )}
+
+              <button
+                onClick={() => createMaintenanceMutation.mutate()}
+                disabled={!maintenanceForm.message.trim() || !maintenanceForm.startTime || !maintenanceForm.endTime || createMaintenanceMutation.isPending}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '9px 18px', backgroundColor: '#f59e0b', border: 'none',
+                  borderRadius: '10px', color: '#000', fontSize: '13px',
+                  fontWeight: '700', cursor: 'pointer',
+                  opacity: (!maintenanceForm.message.trim() || !maintenanceForm.startTime || !maintenanceForm.endTime) ? 0.5 : 1,
+                  width: 'fit-content',
+                }}
+              >
+                <Calendar size={13} />
+                {createMaintenanceMutation.isPending ? 'Scheduling...' : 'Schedule Maintenance'}
+              </button>
+            </div>
+          </div>
+
+          {/* Scheduled windows list */}
+          {maintenanceWindows.length === 0 ? (
+            <p style={{ color: colors.textMuted, fontSize: '13px', textAlign: 'center', padding: '24px 0' }}>
+              No maintenance windows scheduled
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {maintenanceWindows.map((w: any) => {
+                const now = new Date()
+                const start = new Date(w.startTime)
+                const end   = new Date(w.endTime)
+                const isActive   = w.isActive && now >= start && now < end
+                const isUpcoming = w.isActive && now < start
+                const isPast     = now >= end
+
+                const statusColor = isActive ? '#f87171' : isUpcoming ? '#fbbf24' : '#64748b'
+                const statusLabel = isActive ? '🔴 Active' : isUpcoming ? '🟡 Upcoming' : '⚫ Past'
+
+                return (
+                  <div key={w.id} style={{
+                    padding: '12px 14px', borderRadius: '10px',
+                    backgroundColor: colors.subBg,
+                    border: `1px solid ${isActive ? 'rgba(239,68,68,0.3)' : isUpcoming ? 'rgba(245,158,11,0.3)' : colors.border}`,
+                    opacity: isPast || !w.isActive ? 0.5 : 1,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: statusColor }}>{statusLabel}</span>
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: colors.text }}>{w.title}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <ToggleSwitch
+                          value={w.isActive}
+                          onChange={() => toggleMaintenanceMutation.mutate({ id: w.id, isActive: !w.isActive })}
+                        />
+                        <button
+                          onClick={() => deleteMaintenanceMutation.mutate(w.id)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, padding: '2px', display: 'flex' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#f87171')}
+                          onMouseLeave={e => (e.currentTarget.style.color = colors.textMuted)}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                    <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 6px' }}>{w.message}</p>
+                    <p style={{ fontSize: '11px', color: colors.textMuted, margin: 0 }}>
+                      {new Date(w.startTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {' → '}
+                      {new Date(w.endTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>,
+        'Maintenance Windows',
+        <Calendar size={16} color="#f59e0b" />
       )}
 
       {/* Announcements */}

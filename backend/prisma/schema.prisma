@@ -270,6 +270,19 @@ model Announcement {
   @@map("announcements")
 }
 
+model MaintenanceWindow {
+  id        String   @id @default(cuid())
+  title     String   @default("Scheduled Maintenance")
+  message   String
+  startTime DateTime
+  endTime   DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("maintenance_windows")
+}
+
 enum TargetRole {
   ALL
   USER

@@ -7,6 +7,7 @@ import {
   Timer, Calendar, LogOut, User, Sun, Moon, Settings, Menu, X, Tag, Users, Shield
 } from 'lucide-react'
 import AnnouncementBanner from './AnnouncementBanner'
+import MaintenanceBanner from './MaintenanceBanner'
 import NotificationBell from './NotificationBell'
 import GlobalSearch from './GlobalSearch'
 import { Search } from 'lucide-react'
@@ -305,6 +306,7 @@ export default function Layout() {
           </div>
         )}
 
+        <MaintenanceBanner />
         <AnnouncementBanner />
         <main style={{ flex: 1, overflow: 'auto', backgroundColor: colors.main }}>
           <Outlet context={{ isDark, colors, isMobile }} />

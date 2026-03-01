@@ -22,14 +22,9 @@ import { APP_GUARD } from '@nestjs/core'
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([
       {
-        name: 'short',
-        ttl: 60000,
-        limit: 10,
-      },
-      {
         name: 'medium',
         ttl: 60000,
-        limit: 60,
+        limit: 200, // generous for normal API polling; auth endpoints override this
       },
     ]),
     JwtModule.register({ secret: process.env.JWT_SECRET, global: true }),

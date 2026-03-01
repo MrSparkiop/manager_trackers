@@ -2,13 +2,17 @@ import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Req 
 import { AuthGuard } from '@nestjs/passport'
 import { AdminGuard } from './admin.guard'
 import { AdminService } from './admin.service'
+import { MaintenanceService } from './maintenance.service'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 
 @ApiTags('Admin')
 @UseGuards(AuthGuard('jwt'), AdminGuard)
 @Controller('admin')
 export class AdminController {
-  constructor(private adminService: AdminService) {}
+  constructor(
+    private adminService: AdminService,
+    private maintenanceService: MaintenanceService,
+  ) {}
 
   @Get('stats')
   @ApiOperation({ summary: 'Get platform stats' })
@@ -93,5 +97,36 @@ export class AdminController {
   @ApiOperation({ summary: 'Delete announcement' })
   deleteAnnouncement(@Param('id') id: string) {
     return this.adminService.deleteAnnouncement(id)
+  }
+
+  // ── Maintenance Windows ──────────────────────────────────────────
+  @Get('maintenance/upcoming')
+  @ApiOperation({ summary: 'Get upcoming/active maintenance window (public)' })
+  getUpcomingMaintenance() {
+    return this.maintenanceService.getUpcoming()
+  }
+
+  @Get('maintenance')
+  @ApiOperation({ summary: 'Get all maintenance windows' })
+  getAllMaintenance() {
+    return this.maintenanceService.getAll()
+  }
+
+  @Post('maintenance')
+  @ApiOperation({ summary: 'Schedule a maintenance window' })
+  createMaintenance(@Body() dto: any) {
+    return this.maintenanceService.create(dto)
+  }
+
+  @Put('maintenance/:id')
+  @ApiOperation({ summary: 'Update a maintenance window' })
+  updateMaintenance(@Param('id') id: string, @Body() dto: any) {
+    return this.maintenanceService.update(id, dto)
+  }
+
+  @Delete('maintenance/:id')
+  @ApiOperation({ summary: 'Delete a maintenance window' })
+  deleteMaintenance(@Param('id') id: string) {
+    return this.maintenanceService.delete(id)
   }
 }

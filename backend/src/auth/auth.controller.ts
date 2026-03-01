@@ -10,14 +10,14 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   // 3 register attempts per minute
-  @Throttle({ short: { ttl: 60000, limit: 3 } })
+  @Throttle({ medium: { ttl: 60000, limit: 3 } })
   @Post('register')
   register(@Body() dto: any, @Res({ passthrough: true }) res: Response) {
     return this.authService.register(dto, res)
   }
 
   // 5 login attempts per minute
-  @Throttle({ short: { ttl: 60000, limit: 5 } })
+  @Throttle({ medium: { ttl: 60000, limit: 5 } })
   @Post('login')
   login(@Body() dto: any, @Res({ passthrough: true }) res: Response) {
     return this.authService.login(dto, res)
@@ -46,7 +46,7 @@ export class AuthController {
   }
 
   // 3 forgot password attempts per minute
-  @Throttle({ short: { ttl: 60000, limit: 3 } })
+  @Throttle({ medium: { ttl: 60000, limit: 3 } })
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request a password reset email' })
   forgotPassword(@Body() body: any) {
