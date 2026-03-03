@@ -11,7 +11,7 @@ export const connectSocket = (): Socket => {
     .find(row => row.startsWith('accessToken='))
     ?.split('=')[1]
 
-  socket = io(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/notifications`, {
+  socket = io(`${import.meta.env.VITE_SOCKET_URL ?? 'http://localhost:3000'}/notifications`, {
     auth: { token },
     transports: ['websocket'],
     withCredentials: true,
