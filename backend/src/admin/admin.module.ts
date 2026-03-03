@@ -3,11 +3,12 @@ import { AdminController } from './admin.controller'
 import { AdminService } from './admin.service'
 import { AdminGuard } from './admin.guard'
 import { MaintenanceService } from './maintenance.service'
+import { MaintenancePublicController } from './maintenance.public.controller'
 import { PrismaModule } from '../../prisma/prisma.module'
 
 @Module({
   imports: [PrismaModule],
-  controllers: [AdminController],
+  controllers: [AdminController, MaintenancePublicController],
   providers: [AdminService, AdminGuard, MaintenanceService],
   exports: [AdminService, MaintenanceService],
 })

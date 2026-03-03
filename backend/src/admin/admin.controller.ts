@@ -100,12 +100,6 @@ export class AdminController {
   }
 
   // ── Maintenance Windows ──────────────────────────────────────────
-  @Get('maintenance/upcoming')
-  @ApiOperation({ summary: 'Get upcoming/active maintenance window (public)' })
-  getUpcomingMaintenance() {
-    return this.maintenanceService.getUpcoming()
-  }
-
   @Get('maintenance')
   @ApiOperation({ summary: 'Get all maintenance windows' })
   getAllMaintenance() {

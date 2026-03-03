@@ -58,7 +58,7 @@ export default function MaintenanceBanner() {
 
   const { data: maintenance } = useQuery({
     queryKey: ['maintenance-upcoming'],
-    queryFn: () => api.get('/admin/maintenance/upcoming').then(r => r.data).catch(() => null),
+    queryFn: () => api.get('/maintenance/upcoming').then(r => r.data).catch(() => null),
     refetchInterval: 60000,
   })
 
