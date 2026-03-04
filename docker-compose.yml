@@ -7,7 +7,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
       POSTGRES_DB: client_tracker
     ports:
       - '5432:5432'
@@ -28,15 +28,15 @@ services:
     ports:
       - '3000:3000'
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/client_tracker
-      JWT_SECRET: super-secret-jwt-key-change-in-production
-      JWT_REFRESH_SECRET: super-secret-refresh-key-change-in-production
+      DATABASE_URL: "${DATABASE_URL}"
+      JWT_SECRET: "${JWT_SECRET}"
+      JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET}"
       JWT_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
       PORT: 3000
       ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3000,http://184.174.39.140,http://184.174.39.140:5173
       NODE_ENV: development
-      SENTRY_DSN: https://94769800094c89bd68eef8b19bc3438a@o4510969166823424.ingest.de.sentry.io/4510969200181328
+      SENTRY_DSN: "${SENTRY_DSN_BACKEND}"
     depends_on:
       postgres:
         condition: service_healthy
