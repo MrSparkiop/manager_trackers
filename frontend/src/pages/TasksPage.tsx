@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Plus, X, CheckCircle2, Circle, Clock, Trash2, Edit2,
+  Plus, X, CheckCircle2, Circle, Clock, Trash2, Edit2, Play,
   ChevronDown, ChevronRight, Search, Square, CheckSquare2, Check, CheckSquare
 } from 'lucide-react'
 import {
@@ -35,6 +35,7 @@ interface Task {
   recurrence?: string
   recurrenceEndDate?: string
   tags?: { id: string; name: string; color: string }[]
+  timeEntries?: { duration: number | null }[]
 }
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
@@ -55,9 +56,20 @@ const statusConfig: Record<string, { color: string; icon: any; label: string }> 
   CANCELLED:   { color: '#f87171', icon: X,            label: 'Cancelled' },
 }
 
+function formatDurationShort(seconds: number): string {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  if (h > 0 && m > 0) return `${h}h ${m}m`
+  if (h > 0) return `${h}h`
+  if (m > 0) return `${m}m`
+  if (seconds > 0) return `${seconds}s`
+  return '0m'
+}
+
 // ── Sortable Task Row ─────────────────────────────────────────────────
 function SortableTaskRow({
-  task, colors, selected, onSelect, onToggleDone, onEdit, onDelete, onAddSubtask, isDark
+  task, colors, selected, onSelect, onToggleDone, onEdit, onDelete, onAddSubtask, isDark,
+  running, onStartTimer, onStopTimer
 }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
   const [expanded, setExpanded] = useState(false)
@@ -66,6 +78,12 @@ function SortableTaskRow({
   const pc = priorityColors[task.priority] || priorityColors.MEDIUM
   const isDone = task.status === 'DONE'
   const hasSubtasks = task.subtasks && task.subtasks.length > 0
+
+  const totalLoggedSeconds = (task.timeEntries || []).reduce((sum: number, e: any) => sum + (e.duration || 0), 0)
+  const estimatedSeconds = (task.estimatedTime || 0) * 60
+  const isTimerRunning = running?.taskId === task.id
+  const progress = estimatedSeconds > 0 ? Math.min(totalLoggedSeconds / estimatedSeconds * 100, 100) : 0
+  const isOverBudget = estimatedSeconds > 0 && totalLoggedSeconds > estimatedSeconds
 
   return (
     <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 }}>
@@ -158,7 +176,35 @@ function SortableTaskRow({
                 📋 {task.subtasks.filter((s: Task) => s.status === 'DONE').length}/{task.subtasks.length} subtasks
               </span>
             )}
+            {(totalLoggedSeconds > 0 || task.estimatedTime) && (
+              <span style={{
+                fontSize: '11px', color: isOverBudget ? '#f87171' : colors.textMuted,
+                display: 'flex', alignItems: 'center', gap: '3px'
+              }}>
+                <Clock size={10} />
+                {formatDurationShort(totalLoggedSeconds)}
+                {task.estimatedTime ? ` / ${formatDurationShort(estimatedSeconds)}` : ''}
+              </span>
+            )}
+            {isTimerRunning && (
+              <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: '600' }}>
+                ● recording
+              </span>
+            )}
           </div>
+          {task.estimatedTime != null && totalLoggedSeconds > 0 && (
+            <div style={{
+              marginTop: '5px', height: '3px',
+              backgroundColor: isDark ? '#1e293b' : '#e2e8f0',
+              borderRadius: '999px', overflow: 'hidden'
+            }}>
+              <div style={{
+                height: '100%', width: `${progress}%`,
+                backgroundColor: isOverBudget ? '#ef4444' : isTimerRunning ? '#f59e0b' : '#6366f1',
+                borderRadius: '999px', transition: 'width 0.5s ease'
+              }} />
+            </div>
+          )}
         </div>
 
         {/* Priority */}
@@ -171,6 +217,21 @@ function SortableTaskRow({
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }}>
+          {!isDone && (
+            <button
+              onClick={() => isTimerRunning ? onStopTimer() : onStartTimer(task)}
+              title={isTimerRunning ? 'Stop timer' : 'Start timer for this task'}
+              style={{
+                background: isTimerRunning ? 'rgba(239,68,68,0.1)' : 'none',
+                border: 'none', cursor: 'pointer',
+                color: isTimerRunning ? '#ef4444' : colors.textMuted,
+                padding: '4px', borderRadius: '6px',
+                display: 'flex', alignItems: 'center', transition: 'all 0.15s'
+              }}
+            >
+              {isTimerRunning ? <Square size={13} fill="#ef4444" color="#ef4444" /> : <Play size={13} />}
+            </button>
+          )}
           <button onClick={() => setShowSubtaskInput(!showSubtaskInput)} title="Add subtask" style={{
             background: 'none', border: 'none', cursor: 'pointer',
             color: colors.textMuted, padding: '4px', borderRadius: '6px',
@@ -333,6 +394,45 @@ export default function TasksPage() {
   }
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  const { data: running } = useQuery<{ id: string; taskId?: string; startTime: string; task?: any } | null>({
+    queryKey: ['time-running'],
+    queryFn: () => api.get('/time-tracker/running').then(r => r.data),
+    refetchInterval: 10000,
+  })
+
+  const startTimerMutation = useMutation({
+    mutationFn: async (task: Task) => {
+      if (running?.id) {
+        await api.post(`/time-tracker/stop/${running.id}`)
+      }
+      return api.post('/time-tracker/start', {
+        startTime: new Date().toISOString(),
+        description: task.title,
+        taskId: task.id,
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['time-running'] })
+      queryClient.invalidateQueries({ queryKey: ['time-entries'] })
+      queryClient.invalidateQueries({ queryKey: ['time-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      toast.success('Timer started!')
+    },
+    onError: () => toast.error('Failed to start timer'),
+  })
+
+  const stopTimerMutation = useMutation({
+    mutationFn: () => api.post(`/time-tracker/stop/${running?.id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['time-running'] })
+      queryClient.invalidateQueries({ queryKey: ['time-entries'] })
+      queryClient.invalidateQueries({ queryKey: ['time-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      toast.success('Timer stopped!')
+    },
+    onError: () => toast.error('Failed to stop timer'),
+  })
 
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
     queryKey: ['tasks', filterStatus, filterPriority, filterProject],
@@ -699,6 +799,9 @@ export default function TasksPage() {
                           onSelect={toggleSelect} onToggleDone={toggleDone}
                           onEdit={openEdit} onDelete={(id: string) => deleteMutation.mutate(id)}
                           onAddSubtask={handleAddSubtask}
+                          running={running}
+                          onStartTimer={(t: Task) => startTimerMutation.mutate(t)}
+                          onStopTimer={() => stopTimerMutation.mutate()}
                         />
                       ))}
                     </div>

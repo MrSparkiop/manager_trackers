@@ -262,6 +262,44 @@ export default function TimeTrackerPage() {
         )}
       </div>
 
+      {/* By Task Breakdown */}
+      {(() => {
+        const byTask: Record<string, { title: string; seconds: number }> = {}
+        entries.filter(e => e.endTime && e.task?.id).forEach(e => {
+          const key = e.task?.id || ''
+          if (!byTask[key]) byTask[key] = { title: e.task?.title || 'Unknown task', seconds: 0 }
+          byTask[key].seconds += e.duration || 0
+        })
+        const sorted = Object.values(byTask).sort((a, b) => b.seconds - a.seconds).slice(0, 5)
+        if (sorted.length === 0) return null
+        const maxSeconds = sorted[0].seconds
+        return (
+          <div style={{ marginBottom: '28px' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: '600', color: colors.text, margin: '0 0 16px' }}>Time by Task</h2>
+            <div style={{
+              backgroundColor: colors.card, border: `1px solid ${colors.border}`,
+              borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px'
+            }}>
+              {sorted.map(({ title, seconds }) => (
+                <div key={title}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '13px', color: colors.text, fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{title}</span>
+                    <span style={{ fontSize: '13px', color: '#818cf8', fontWeight: '600', flexShrink: 0 }}>{formatDurationShort(seconds)}</span>
+                  </div>
+                  <div style={{ height: '4px', backgroundColor: isDark ? '#1e293b' : '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', width: `${(seconds / maxSeconds) * 100}%`,
+                      background: 'linear-gradient(90deg, #6366f1, #818cf8)',
+                      borderRadius: '999px', transition: 'width 0.6s ease'
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* History */}
       <div>
         <h2 style={{ fontSize: '16px', fontWeight: '600', color: colors.text, margin: '0 0 16px' }}>History</h2>

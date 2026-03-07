@@ -34,7 +34,7 @@ services:
       JWT_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
       PORT: 3000
-      ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3000,http://184.174.39.140,http://184.174.39.140:5173
+      ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://184.174.39.140,http://184.174.39.140:5173
       NODE_ENV: development
       SENTRY_DSN: "${SENTRY_DSN_BACKEND}"
     depends_on:
