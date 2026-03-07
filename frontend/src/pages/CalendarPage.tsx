@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Plus, X, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X, Trash2, CheckCircle2, Clock, RefreshCw } from 'lucide-react'
 import api from '../lib/axios'
 import { useOutletContext } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -18,7 +18,14 @@ interface CalendarEvent {
   task?: { id: string; title: string }
 }
 
-interface Task { id: string; title: string }
+interface Task {
+  id: string
+  title: string
+  dueDate?: string
+  status?: string
+  priority?: string
+  recurrence?: string
+}
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6']
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -137,18 +144,21 @@ export default function CalendarPage() {
   for (let i = 1; i <= remaining; i++)
     cells.push({ date: new Date(year, month + 1, i), isCurrentMonth: false })
 
-  const getEventsForDay = (date: Date) =>
-    events.filter(e => {
-      const d = new Date(e.startTime)
-      return d.getFullYear() === date.getFullYear() &&
-             d.getMonth()    === date.getMonth() &&
-             d.getDate()     === date.getDate()
-    })
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth()    === b.getMonth() &&
+    a.getDate()     === b.getDate()
 
-  const isToday = (date: Date) =>
-    date.getFullYear() === today.getFullYear() &&
-    date.getMonth()    === today.getMonth() &&
-    date.getDate()     === today.getDate()
+  const getEventsForDay = (date: Date) =>
+    events.filter(e => sameDay(new Date(e.startTime), date))
+
+  const getTasksForDay = (date: Date) =>
+    (tasks as Task[]).filter(t =>
+      t.dueDate && t.status !== 'DONE' && t.status !== 'CANCELLED' &&
+      sameDay(new Date(t.dueDate), date)
+    )
+
+  const isToday = (date: Date) => sameDay(date, today)
 
   const formatEventTime = (e: CalendarEvent) => {
     if (e.allDay) return 'All day'
@@ -156,6 +166,24 @@ export default function CalendarPage() {
   }
 
   const selectedDayEvents = selectedDay ? getEventsForDay(selectedDay) : []
+  const selectedDayTasks  = selectedDay ? getTasksForDay(selectedDay) : []
+
+  // Upcoming: next 14 days of events + task deadlines
+  const upcomingItems = (() => {
+    const items: { date: Date; label: string; color: string; type: 'event' | 'task'; isRecurring?: boolean }[] = []
+    const start = new Date(today); start.setHours(0, 0, 0, 0)
+    const end   = new Date(today); end.setDate(end.getDate() + 14)
+    events.forEach(e => {
+      const d = new Date(e.startTime)
+      if (d >= start && d <= end) items.push({ date: d, label: e.title, color: e.color, type: 'event' })
+    });
+    (tasks as Task[]).forEach(t => {
+      if (!t.dueDate || t.status === 'DONE' || t.status === 'CANCELLED') return
+      const d = new Date(t.dueDate); d.setHours(0, 0, 0, 0)
+      if (d >= start && d <= end) items.push({ date: d, label: t.title, color: '#22c55e', type: 'task', isRecurring: t.recurrence !== 'NONE' && !!t.recurrence })
+    })
+    return items.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 10)
+  })()
 
   const inputStyle = {
     width: '100%', backgroundColor: colors.input,
@@ -241,8 +269,14 @@ export default function CalendarPage() {
           }}>
             {cells.map(({ date, isCurrentMonth }, idx) => {
               const dayEvents    = getEventsForDay(date)
+              const dayTasks     = getTasksForDay(date)
               const todayCell    = isToday(date)
               const isSelected   = selectedDay?.toDateString() === date.toDateString()
+              const maxSlots     = isMobile ? 1 : 2
+              const allItems     = [
+                ...dayEvents.map(e => ({ key: e.id, label: e.title, color: e.color, isTask: false })),
+                ...dayTasks.map(t => ({ key: t.id, label: t.title, color: '#22c55e', isTask: true })),
+              ]
 
               return (
                 <div
@@ -272,23 +306,25 @@ export default function CalendarPage() {
                     {date.getDate()}
                   </div>
 
-                  {/* Events */}
+                  {/* Events + Task deadlines */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    {dayEvents.slice(0, isMobile ? 1 : 3).map(event => (
-                      <div key={event.id} style={{
+                    {allItems.slice(0, maxSlots).map(item => (
+                      <div key={item.key} style={{
                         fontSize: '11px', fontWeight: '500',
-                        backgroundColor: event.color + '30',
-                        color: event.color,
-                        borderLeft: `2px solid ${event.color}`,
+                        backgroundColor: item.color + '25',
+                        color: item.color,
+                        borderLeft: `2px solid ${item.color}`,
                         borderRadius: '3px', padding: '1px 5px',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        display: 'flex', alignItems: 'center', gap: '3px'
                       }}>
-                        {event.title}
+                        {item.isTask && <span style={{ fontSize: '9px', opacity: 0.8 }}>✓</span>}
+                        {item.label}
                       </div>
                     ))}
-                    {dayEvents.length > (isMobile ? 1 : 3) && (
+                    {allItems.length > maxSlots && (
                       <div style={{ fontSize: '10px', color: colors.textMuted, paddingLeft: '4px' }}>
-                        +{dayEvents.length - (isMobile ? 1 : 3)} more
+                        +{allItems.length - maxSlots} more
                       </div>
                     )}
                   </div>
@@ -312,17 +348,110 @@ export default function CalendarPage() {
                 <h3 style={{ fontSize: '14px', fontWeight: '600', color: colors.text, margin: 0 }}>
                   {selectedDay.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
                 </h3>
-                <button onClick={() => openCreate(selectedDay)} style={{
-                  background: 'none', border: 'none', cursor: 'pointer', color: '#6366f1',
-                  display: 'flex', alignItems: 'center'
-                }}>
-                  <Plus size={16} />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button onClick={() => setSelectedDay(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, display: 'flex', alignItems: 'center' }}>
+                    <X size={14} />
+                  </button>
+                  <button onClick={() => openCreate(selectedDay)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer', color: '#6366f1',
+                    display: 'flex', alignItems: 'center'
+                  }}>
+                    <Plus size={16} />
+                  </button>
+                </div>
               </div>
 
-              {selectedDayEvents.length === 0 ? (
+              {/* Events */}
+              {selectedDayEvents.length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <p style={{ fontSize: '11px', fontWeight: '600', color: colors.textMuted, margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Events</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {selectedDayEvents.map(event => (
+                      <div key={event.id} style={{
+                        padding: '10px 12px', borderRadius: '10px',
+                        backgroundColor: event.color + '12',
+                        border: `1px solid ${event.color}30`,
+                        borderLeft: `3px solid ${event.color}`,
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: '13px', fontWeight: '600', color: colors.text, margin: 0 }}>
+                              {event.title}
+                            </p>
+                            <p style={{ fontSize: '11px', color: event.color, margin: '3px 0 0' }}>
+                              {formatEventTime(event)}
+                            </p>
+                            {event.description && (
+                              <p style={{ fontSize: '11px', color: colors.textMuted, margin: '4px 0 0' }}>
+                                {event.description}
+                              </p>
+                            )}
+                            {event.task && (
+                              <p style={{ fontSize: '11px', color: '#818cf8', margin: '4px 0 0' }}>
+                                🔗 {event.task.title}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => {
+                              toast((t) => (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <span style={{ fontSize: '14px' }}>Delete this event?</span>
+                                  <button onClick={() => { deleteMutation.mutate(event.id); toast.dismiss(t.id) }} style={{
+                                    backgroundColor: '#ef4444', border: 'none', borderRadius: '6px',
+                                    padding: '4px 10px', color: '#fff', cursor: 'pointer', fontSize: '13px'
+                                  }}>Delete</button>
+                                  <button onClick={() => toast.dismiss(t.id)} style={{
+                                    backgroundColor: '#334155', border: 'none', borderRadius: '6px',
+                                    padding: '4px 10px', color: '#fff', cursor: 'pointer', fontSize: '13px'
+                                  }}>Cancel</button>
+                                </div>
+                              ), { duration: 5000 })
+                            }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, padding: '2px', flexShrink: 0 }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Task deadlines */}
+              {selectedDayTasks.length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <p style={{ fontSize: '11px', fontWeight: '600', color: colors.textMuted, margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Due Tasks</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {selectedDayTasks.map(task => (
+                      <div key={task.id} style={{
+                        padding: '9px 12px', borderRadius: '10px',
+                        backgroundColor: 'rgba(34,197,94,0.08)',
+                        border: '1px solid rgba(34,197,94,0.2)',
+                        borderLeft: '3px solid #22c55e',
+                        display: 'flex', alignItems: 'center', gap: '8px'
+                      }}>
+                        <CheckCircle2 size={13} color="#22c55e" />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: '12px', fontWeight: '500', color: colors.text, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {task.title}
+                          </p>
+                          {task.recurrence && task.recurrence !== 'NONE' && (
+                            <p style={{ fontSize: '10px', color: '#818cf8', margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <RefreshCw size={9} /> {task.recurrence.toLowerCase()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedDayEvents.length === 0 && selectedDayTasks.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '28px 0' }}>
-                  <p style={{ color: colors.textMuted, fontSize: '13px' }}>No events</p>
+                  <p style={{ color: colors.textMuted, fontSize: '13px' }}>Nothing scheduled</p>
                   <button onClick={() => openCreate(selectedDay)} style={{
                     marginTop: '8px', backgroundColor: 'rgba(99,102,241,0.1)',
                     border: '1px solid rgba(99,102,241,0.2)', borderRadius: '8px',
@@ -332,74 +461,66 @@ export default function CalendarPage() {
                     + Add event
                   </button>
                 </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {selectedDayEvents.map(event => (
-                    <div key={event.id} style={{
-                      padding: '10px 12px', borderRadius: '10px',
-                      backgroundColor: event.color + '12',
-                      border: `1px solid ${event.color}30`,
-                      borderLeft: `3px solid ${event.color}`,
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: '13px', fontWeight: '600', color: colors.text, margin: 0 }}>
-                            {event.title}
-                          </p>
-                          <p style={{ fontSize: '11px', color: event.color, margin: '3px 0 0' }}>
-                            {formatEventTime(event)}
-                          </p>
-                          {event.description && (
-                            <p style={{ fontSize: '11px', color: colors.textMuted, margin: '4px 0 0' }}>
-                              {event.description}
-                            </p>
-                          )}
-                          {event.task && (
-                            <p style={{ fontSize: '11px', color: '#818cf8', margin: '4px 0 0' }}>
-                              🔗 {event.task.title}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => {
-                            toast((t) => (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <span style={{ fontSize: '14px' }}>Delete this event?</span>
-                                <button onClick={() => { deleteMutation.mutate(event.id); toast.dismiss(t.id) }} style={{
-                                  backgroundColor: '#ef4444', border: 'none', borderRadius: '6px',
-                                  padding: '4px 10px', color: '#fff', cursor: 'pointer', fontSize: '13px'
-                                }}>Delete</button>
-                                <button onClick={() => toast.dismiss(t.id)} style={{
-                                  backgroundColor: '#334155', border: 'none', borderRadius: '6px',
-                                  padding: '4px 10px', color: '#fff', cursor: 'pointer', fontSize: '13px'
-                                }}>Cancel</button>
-                              </div>
-                            ), { duration: 5000 })
-                          }}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, padding: '2px', flexShrink: 0 }}
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               )}
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              <div style={{
-                width: '48px', height: '48px', backgroundColor: 'rgba(99,102,241,0.1)',
-                borderRadius: '12px', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', margin: '0 auto 12px'
-              }}>
-                <ChevronLeft size={20} color="#818cf8" />
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', color: colors.text, margin: 0 }}>Upcoming</h3>
+                <span style={{ fontSize: '11px', color: colors.textMuted }}>14 days</span>
               </div>
-              <p style={{ color: colors.textMuted, fontSize: '13px', fontWeight: '500' }}>Click a day</p>
-              <p style={{ color: colors.textMuted, fontSize: '12px', marginTop: '4px', opacity: 0.7 }}>
-                Double-click to add event
-              </p>
-            </div>
+
+              {upcomingItems.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                  <div style={{
+                    width: '48px', height: '48px', backgroundColor: 'rgba(99,102,241,0.1)',
+                    borderRadius: '12px', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', margin: '0 auto 12px'
+                  }}>
+                    <Clock size={20} color="#818cf8" />
+                  </div>
+                  <p style={{ color: colors.textMuted, fontSize: '13px', fontWeight: '500' }}>Nothing upcoming</p>
+                  <p style={{ color: colors.textMuted, fontSize: '12px', marginTop: '4px', opacity: 0.7 }}>
+                    Click a day to view details
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {upcomingItems.map((item, i) => {
+                    const isItemToday = sameDay(item.date, today)
+                    const isTomorrow  = sameDay(item.date, new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1))
+                    const dayLabel    = isItemToday ? 'Today' : isTomorrow ? 'Tomorrow' : item.date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+                    return (
+                      <div key={i} style={{
+                        padding: '9px 12px', borderRadius: '10px',
+                        backgroundColor: item.color + '10',
+                        border: `1px solid ${item.color}25`,
+                        borderLeft: `3px solid ${item.color}`,
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => setSelectedDay(item.date)}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
+                          <p style={{ fontSize: '12px', fontWeight: '500', color: colors.text, margin: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.label}
+                          </p>
+                          <span style={{ fontSize: '10px', color: item.color, fontWeight: '600', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            {dayLabel}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '10px', color: colors.textMuted, margin: '3px 0 0', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          {item.type === 'task' ? (
+                            <><CheckCircle2 size={9} /> deadline{item.isRecurring ? ' · recurring' : ''}</>
+                          ) : (
+                            <><Clock size={9} /> event</>
+                          )}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

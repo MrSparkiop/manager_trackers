@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, X, CheckCircle2, Circle, Clock, Trash2, Edit2, Play,
-  ChevronDown, ChevronRight, Search, Square, CheckSquare2, Check, CheckSquare
+  ChevronDown, ChevronRight, Search, Square, CheckSquare2, Check, CheckSquare, RefreshCw
 } from 'lucide-react'
 import {
   DndContext, PointerSensor, useSensor, useSensors,
@@ -151,8 +151,14 @@ function SortableTaskRow({
               </span>
             )}
             {task.dueDate && (
-              <span style={{ fontSize: '11px', color: colors.textMuted }}>
-                📅 {new Date(task.dueDate).toLocaleDateString()}
+              <span style={{
+                fontSize: '11px',
+                color: task.recurrence && task.recurrence !== 'NONE'
+                  ? '#818cf8'
+                  : colors.textMuted
+              }}>
+                {task.recurrence && task.recurrence !== 'NONE' ? '🔁 Next: ' : '📅 '}
+                {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
               </span>
             )}
             {/* 🔁 Recurrence badge */}
@@ -360,10 +366,11 @@ export default function TasksPage() {
   const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
   const [showModal, setShowModal]           = useState(false)
   const [editTask, setEditTask]             = useState<Task | null>(null)
-  const [filterStatus, setFilterStatus]     = useState('')
-  const [filterPriority, setFilterPriority] = useState('')
-  const [filterProject, setFilterProject]   = useState('')
-  const [search, setSearch]                 = useState('')
+  const [filterStatus, setFilterStatus]       = useState('')
+  const [filterPriority, setFilterPriority]   = useState('')
+  const [filterProject, setFilterProject]     = useState('')
+  const [filterRecurring, setFilterRecurring] = useState(false)
+  const [search, setSearch]                   = useState('')
   const [selected, setSelected]             = useState<Set<string>>(new Set())
   const [activeTask, setActiveTask]         = useState<Task | null>(null)
   const [quickTitle, setQuickTitle]         = useState('')
@@ -617,11 +624,10 @@ export default function TasksPage() {
   }
 
   const filteredTasks = tasks.filter(t => {
-    if (!t.parentId) {
-      if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
-      return true
-    }
-    return false
+    if (t.parentId) return false
+    if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
+    if (filterRecurring && (!t.recurrence || t.recurrence === 'NONE')) return false
+    return true
   })
 
   const grouped: Record<string, Task[]> = { TODO: [], IN_PROGRESS: [], IN_REVIEW: [], DONE: [], CANCELLED: [] }
@@ -723,8 +729,25 @@ export default function TasksPage() {
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
 
-        {(filterStatus || filterPriority || filterProject || search) && (
-          <button onClick={() => { setFilterStatus(''); setFilterPriority(''); setFilterProject(''); setSearch('') }} style={{
+        <button
+          onClick={() => setFilterRecurring(v => !v)}
+          title="Show only recurring tasks"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            backgroundColor: filterRecurring ? 'rgba(99,102,241,0.15)' : colors.filterBg,
+            border: filterRecurring ? '1px solid rgba(99,102,241,0.4)' : `1px solid ${colors.border}`,
+            borderRadius: '8px', padding: '8px 12px',
+            color: filterRecurring ? '#818cf8' : colors.textMuted,
+            fontSize: '13px', cursor: 'pointer', fontWeight: filterRecurring ? '600' : '400',
+            transition: 'all 0.15s', whiteSpace: 'nowrap' as const
+          }}
+        >
+          <RefreshCw size={13} />
+          Recurring
+        </button>
+
+        {(filterStatus || filterPriority || filterProject || filterRecurring || search) && (
+          <button onClick={() => { setFilterStatus(''); setFilterPriority(''); setFilterProject(''); setFilterRecurring(false); setSearch('') }} style={{
             backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
             borderRadius: '8px', padding: '8px 12px', color: '#f87171', fontSize: '13px', cursor: 'pointer'
           }}>Clear</button>
@@ -766,9 +789,9 @@ export default function TasksPage() {
         </div>
       ) : filteredTasks.length === 0 ? (
         <EmptyState
-          icon={CheckSquare}
-          title={filterStatus || filterPriority || filterProject || search ? 'No tasks match your filters' : 'No tasks yet'}
-          description={filterStatus || filterPriority || filterProject || search ? 'Try adjusting your filters or create a new task.' : 'Create your first task to get started tracking your work.'}
+          icon={filterRecurring ? RefreshCw : CheckSquare}
+          title={filterStatus || filterPriority || filterProject || filterRecurring || search ? 'No tasks match your filters' : 'No tasks yet'}
+          description={filterRecurring ? 'No recurring tasks found. Create a task and set a recurrence pattern to see it here.' : filterStatus || filterPriority || filterProject || search ? 'Try adjusting your filters or create a new task.' : 'Create your first task to get started tracking your work.'}
           action={{ label: '+ New Task', onClick: () => setShowModal(true) }}
           isDark={isDark}
           color="#6366f1"
