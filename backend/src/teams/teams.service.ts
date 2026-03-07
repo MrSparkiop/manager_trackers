@@ -447,6 +447,80 @@ export class TeamsService {
     return base
   }
 
+  // ── Activity Feed ────────────────────────────────────────────────
+  async getTeamActivity(teamId: string, userId: string) {
+    await this.requireMember(teamId, userId)
+
+    const projects = await this.prisma.teamProject.findMany({
+      where: { teamId },
+      select: { id: true, name: true }
+    })
+    const projectIds = projects.map(p => p.id)
+    const projectMap = Object.fromEntries(projects.map(p => [p.id, p.name]))
+
+    const [tasks, comments, members] = await Promise.all([
+      this.prisma.teamTask.findMany({
+        where: { projectId: { in: projectIds } },
+        orderBy: { createdAt: 'desc' },
+        take: 25,
+        select: { id: true, title: true, status: true, priority: true, projectId: true, createdAt: true, completedAt: true }
+      }),
+      this.prisma.teamTaskComment.findMany({
+        where: { task: { projectId: { in: projectIds } } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: { id: true, content: true, authorName: true, createdAt: true, task: { select: { title: true, projectId: true } } }
+      }),
+      this.prisma.teamMember.findMany({
+        where: { teamId },
+        orderBy: { joinedAt: 'desc' },
+        include: { user: { select: { firstName: true, lastName: true } } }
+      }),
+    ])
+
+    const events: any[] = []
+
+    for (const task of tasks) {
+      events.push({ type: 'task_created', id: `tc_${task.id}`, title: task.title, projectName: projectMap[task.projectId], priority: task.priority, timestamp: task.createdAt })
+      if (task.completedAt) {
+        events.push({ type: 'task_completed', id: `td_${task.id}`, title: task.title, projectName: projectMap[task.projectId], timestamp: task.completedAt })
+      }
+    }
+    for (const c of comments) {
+      events.push({ type: 'comment_added', id: `cm_${c.id}`, authorName: c.authorName, taskTitle: c.task.title, projectName: projectMap[c.task.projectId], content: c.content.slice(0, 80), timestamp: c.createdAt })
+    }
+    for (const m of members) {
+      events.push({ type: 'member_joined', id: `mj_${m.id}`, memberName: `${m.user.firstName} ${m.user.lastName}`, timestamp: m.joinedAt })
+    }
+
+    events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    return events.slice(0, 40)
+  }
+
+  // ── Team Workload ────────────────────────────────────────────────
+  async getTeamWorkload(teamId: string, userId: string) {
+    await this.requireMember(teamId, userId)
+
+    const [members, projects] = await Promise.all([
+      this.prisma.teamMember.findMany({
+        where: { teamId },
+        include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } }
+      }),
+      this.prisma.teamProject.findMany({ where: { teamId }, select: { id: true } })
+    ])
+    const projectIds = projects.map(p => p.id)
+
+    const workload = await Promise.all(members.map(async (m) => {
+      const [open, done] = await Promise.all([
+        this.prisma.teamTask.count({ where: { projectId: { in: projectIds }, assigneeId: m.userId, status: { not: 'DONE' } } }),
+        this.prisma.teamTask.count({ where: { projectId: { in: projectIds }, assigneeId: m.userId, status: 'DONE' } }),
+      ])
+      return { userId: m.userId, name: `${m.user.firstName} ${m.user.lastName}`, email: m.user.email, role: m.role, openTasks: open, completedTasks: done }
+    }))
+
+    return workload.sort((a, b) => b.openTasks - a.openTasks)
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────
   private async requireMember(teamId: string, userId: string) {
     const member = await this.prisma.teamMember.findUnique({

@@ -58,6 +58,18 @@ export class TeamsController {
     return this.teamsService.getInviteLink(id, req.user.id)
   }
 
+  @Get(':id/activity')
+  @ApiOperation({ summary: 'Get team activity feed' })
+  getTeamActivity(@Param('id') id: string, @Req() req: any) {
+    return this.teamsService.getTeamActivity(id, req.user.id)
+  }
+
+  @Get(':id/workload')
+  @ApiOperation({ summary: 'Get member workload' })
+  getTeamWorkload(@Param('id') id: string, @Req() req: any) {
+    return this.teamsService.getTeamWorkload(id, req.user.id)
+  }
+
   @Post(':id/invite/regenerate')
   @ApiOperation({ summary: 'Regenerate invite code' })
   regenerateInviteCode(@Param('id') id: string, @Req() req: any) {

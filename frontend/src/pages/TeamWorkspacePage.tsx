@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext, useNavigate, useParams } from 'react-router-dom'
-import { Users, Plus, X, Crown, FolderKanban, ArrowLeft, Trash2, Copy, Check, RefreshCw } from 'lucide-react'
+import { Users, Plus, X, Crown, FolderKanban, ArrowLeft, Trash2, Copy, Check, RefreshCw, CheckCircle2, MessageSquare, UserPlus, Zap } from 'lucide-react'
 import api from '../lib/axios'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'
@@ -31,7 +31,7 @@ export default function TeamWorkspacePage() {
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [projectForm, setProjectForm] = useState({ name: '', description: '', color: '#6366f1' })
   const [copied, setCopied] = useState(false)
-  const [activeTab, setActiveTab] = useState<'projects' | 'members'>('projects')
+  const [activeTab, setActiveTab] = useState<'projects' | 'members' | 'activity'>('projects')
 
   const colors = {
     card:        isDark ? '#0f172a' : '#ffffff',
@@ -46,6 +46,19 @@ export default function TeamWorkspacePage() {
   const { data: team, isLoading } = useQuery({
     queryKey: ['team', id],
     queryFn: () => api.get(`/teams/${id}`).then(r => r.data),
+  })
+
+  const { data: activity = [] } = useQuery({
+    queryKey: ['team-activity', id],
+    queryFn: () => api.get(`/teams/${id}/activity`).then(r => r.data),
+    enabled: activeTab === 'activity',
+    refetchInterval: 30000,
+  })
+
+  const { data: workload = [] } = useQuery({
+    queryKey: ['team-workload', id],
+    queryFn: () => api.get(`/teams/${id}/workload`).then(r => r.data),
+    enabled: !!team,
   })
 
   const createProjectMutation = useMutation({
@@ -188,7 +201,7 @@ export default function TeamWorkspacePage() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', backgroundColor: colors.subBg, borderRadius: '12px', padding: '4px', width: 'fit-content' }}>
-        {(['projects', 'members'] as const).map(tab => (
+        {(['projects', 'members', 'activity'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)} style={{
             padding: '8px 20px', borderRadius: '9px', border: 'none', cursor: 'pointer',
             fontSize: '13px', fontWeight: '600', textTransform: 'capitalize',
@@ -282,62 +295,152 @@ export default function TeamWorkspacePage() {
       {/* Members Tab */}
       {activeTab === 'members' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {team.members.map((member: any) => (
-            <div key={member.id} style={{
-              display: 'flex', alignItems: 'center', gap: '14px',
-              padding: '14px 18px', backgroundColor: colors.card,
-              borderRadius: '12px', border: `1px solid ${colors.border}`
-            }}>
-              <div style={{
-                width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-                background: member.role === 'OWNER' ? 'linear-gradient(135deg, #f59e0b, #f97316)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '14px', fontWeight: '700', color: '#fff'
+          {team.members.map((member: any) => {
+            const wl = (workload as any[]).find((w: any) => w.userId === member.user.id)
+            const totalTasks = wl ? wl.openTasks + wl.completedTasks : 0
+            const pct = totalTasks > 0 ? Math.round((wl.completedTasks / totalTasks) * 100) : 0
+            return (
+              <div key={member.id} style={{
+                display: 'flex', alignItems: 'center', gap: '14px',
+                padding: '14px 18px', backgroundColor: colors.card,
+                borderRadius: '12px', border: `1px solid ${colors.border}`
               }}>
-                {member.user.firstName[0]}{member.user.lastName[0]}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <p style={{ fontSize: '14px', fontWeight: '600', color: colors.text, margin: 0 }}>
-                    {member.user.firstName} {member.user.lastName}
-                    {member.user.id === (user as any)?.id && <span style={{ fontSize: '11px', color: colors.textMuted, fontWeight: '400' }}> (you)</span>}
-                  </p>
-                  {member.role === 'OWNER' && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <Crown size={11} color="#f59e0b" />
-                      <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: '600' }}>Owner</span>
+                <div style={{
+                  width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
+                  background: member.role === 'OWNER' ? 'linear-gradient(135deg, #f59e0b, #f97316)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '14px', fontWeight: '700', color: '#fff'
+                }}>
+                  {member.user.firstName[0]}{member.user.lastName[0]}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <p style={{ fontSize: '14px', fontWeight: '600', color: colors.text, margin: 0 }}>
+                      {member.user.firstName} {member.user.lastName}
+                      {member.user.id === (user as any)?.id && <span style={{ fontSize: '11px', color: colors.textMuted, fontWeight: '400' }}> (you)</span>}
+                    </p>
+                    {member.role === 'OWNER' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <Crown size={11} color="#f59e0b" />
+                        <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: '600' }}>Owner</span>
+                      </div>
+                    )}
+                  </div>
+                  <p style={{ fontSize: '12px', color: colors.textMuted, margin: '2px 0 0' }}>{member.user.email}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                    <div style={{
+                      width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                      backgroundColor: getOnlineStatus(member.user.lastSeenAt).online ? '#4ade80' : '#64748b',
+                      boxShadow: getOnlineStatus(member.user.lastSeenAt).online ? '0 0 6px #4ade80' : 'none'
+                    }} />
+                    <span style={{ fontSize: '11px', color: getOnlineStatus(member.user.lastSeenAt).online ? '#4ade80' : colors.textMuted }}>
+                      {getOnlineStatus(member.user.lastSeenAt).label}
+                    </span>
+                    {wl && totalTasks > 0 && (
+                      <span style={{ fontSize: '11px', color: colors.textMuted, marginLeft: '8px' }}>
+                        · {wl.openTasks} open · {wl.completedTasks} done
+                      </span>
+                    )}
+                  </div>
+                  {wl && totalTasks > 0 && (
+                    <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ flex: 1, height: '4px', backgroundColor: colors.subBg, borderRadius: '999px', overflow: 'hidden', maxWidth: '160px' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, #6366f1, #8b5cf6)', borderRadius: '999px', transition: 'width 0.5s' }} />
+                      </div>
+                      <span style={{ fontSize: '11px', color: colors.textMuted }}>{pct}% done</span>
                     </div>
                   )}
                 </div>
-                <p style={{ fontSize: '12px', color: colors.textMuted, margin: '2px 0 0' }}>{member.user.email}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                  <div style={{
-                    width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                    backgroundColor: getOnlineStatus(member.user.lastSeenAt).online ? '#4ade80' : '#64748b',
-                    boxShadow: getOnlineStatus(member.user.lastSeenAt).online ? '0 0 6px #4ade80' : 'none'
-                  }} />
-                  <span style={{ fontSize: '11px', color: getOnlineStatus(member.user.lastSeenAt).online ? '#4ade80' : colors.textMuted }}>
-                    {getOnlineStatus(member.user.lastSeenAt).label}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', color: colors.textMuted }}>
+                    Joined {new Date(member.joinedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
+                  {isOwner && member.user.id !== (user as any)?.id && (
+                    <button onClick={() => removeMemberMutation.mutate(member.user.id)} style={{
+                      padding: '5px', background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, borderRadius: '6px'
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
+                      onMouseLeave={e => e.currentTarget.style.color = colors.textMuted}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '11px', color: colors.textMuted }}>
-                  Joined {new Date(member.joinedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </span>
-                {isOwner && member.user.id !== (user as any)?.id && (
-                  <button onClick={() => removeMemberMutation.mutate(member.user.id)} style={{
-                    padding: '5px', background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, borderRadius: '6px'
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
-                    onMouseLeave={e => e.currentTarget.style.color = colors.textMuted}
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Activity Tab */}
+      {activeTab === 'activity' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+          {activity.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 20px', color: colors.textMuted }}>
+              <Zap size={32} style={{ marginBottom: '12px', opacity: 0.4 }} />
+              <p style={{ fontSize: '14px', margin: 0 }}>No activity yet — start collaborating!</p>
             </div>
-          ))}
+          ) : (
+            <div style={{ position: 'relative' }}>
+              {/* Timeline line */}
+              <div style={{ position: 'absolute', left: '18px', top: '20px', bottom: '20px', width: '2px', backgroundColor: colors.border }} />
+              {(activity as any[]).map((event: any) => {
+                const Icon = event.type === 'task_completed' ? CheckCircle2
+                  : event.type === 'comment_added' ? MessageSquare
+                  : event.type === 'member_joined' ? UserPlus : Zap
+                const iconColor = event.type === 'task_completed' ? '#4ade80'
+                  : event.type === 'comment_added' ? '#60a5fa'
+                  : event.type === 'member_joined' ? '#f59e0b' : '#a78bfa'
+                const timeAgo = (() => {
+                  const diff = Date.now() - new Date(event.timestamp).getTime()
+                  const m = Math.floor(diff / 60000)
+                  if (m < 1) return 'just now'
+                  if (m < 60) return `${m}m ago`
+                  const h = Math.floor(m / 60)
+                  if (h < 24) return `${h}h ago`
+                  const d = Math.floor(h / 24)
+                  return d === 1 ? 'yesterday' : `${d}d ago`
+                })()
+                return (
+                  <div key={event.id} style={{ display: 'flex', gap: '16px', padding: '10px 0', position: 'relative' }}>
+                    {/* Icon bubble */}
+                    <div style={{
+                      width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0, zIndex: 1,
+                      backgroundColor: colors.card, border: `2px solid ${iconColor}20`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Icon size={15} color={iconColor} />
+                    </div>
+                    {/* Content */}
+                    <div style={{ flex: 1, backgroundColor: colors.card, borderRadius: '10px', border: `1px solid ${colors.border}`, padding: '10px 14px' }}>
+                      {event.type === 'task_created' && (
+                        <p style={{ margin: 0, fontSize: '13px', color: colors.text, lineHeight: 1.5 }}>
+                          New task <strong>"{event.title}"</strong> added to <span style={{ color: '#a78bfa' }}>{event.projectName}</span>
+                        </p>
+                      )}
+                      {event.type === 'task_completed' && (
+                        <p style={{ margin: 0, fontSize: '13px', color: colors.text, lineHeight: 1.5 }}>
+                          Task <strong>"{event.title}"</strong> marked as <span style={{ color: '#4ade80' }}>done</span> in <span style={{ color: '#a78bfa' }}>{event.projectName}</span>
+                        </p>
+                      )}
+                      {event.type === 'comment_added' && (
+                        <p style={{ margin: 0, fontSize: '13px', color: colors.text, lineHeight: 1.5 }}>
+                          <strong>{event.authorName}</strong> commented on <strong>"{event.taskTitle}"</strong>
+                          {event.content && <span style={{ color: colors.textMuted }}> — "{event.content}{event.content.length >= 80 ? '…' : ''}"</span>}
+                        </p>
+                      )}
+                      {event.type === 'member_joined' && (
+                        <p style={{ margin: 0, fontSize: '13px', color: colors.text, lineHeight: 1.5 }}>
+                          <strong>{event.memberName}</strong> joined the team 🎉
+                        </p>
+                      )}
+                      <p style={{ margin: '4px 0 0', fontSize: '11px', color: colors.textMuted }}>{timeAgo}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 

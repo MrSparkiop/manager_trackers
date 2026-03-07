@@ -35,6 +35,7 @@ export default function TeamProjectPage() {
   const [comment, setComment] = useState<Record<string, string>>({})
   const [taskForm, setTaskForm] = useState({ title: '', description: '', priority: 'MEDIUM', dueDate: '', assigneeId: '' })
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [assigneeFilter, setAssigneeFilter] = useState('ALL')
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
   const dragTaskId = useRef<string | null>(null)
 
@@ -104,7 +105,14 @@ export default function TeamProjectPage() {
 
   const project = team?.projects?.find((p: any) => p.id === projectId)
   const members = team?.members || []
-  const filteredTasks = statusFilter === 'ALL' ? tasks : tasks.filter((t: any) => t.status === statusFilter)
+  const filteredTasks = tasks.filter((t: any) => {
+    if (statusFilter !== 'ALL' && t.status !== statusFilter) return false
+    if (assigneeFilter !== 'ALL') {
+      if (assigneeFilter === 'UNASSIGNED' && t.assigneeId) return false
+      if (assigneeFilter !== 'UNASSIGNED' && t.assigneeId !== assigneeFilter) return false
+    }
+    return true
+  })
 
   // ── Drag handlers ─────────────────────────────────────────────────
   const handleDragStart = (taskId: string) => {
@@ -382,18 +390,32 @@ export default function TeamProjectPage() {
       {/* ── LIST VIEW ──────────────────────────────────────────────── */}
       {view === 'list' && (
         <>
-          {/* Status filter */}
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
-            {['ALL', ...STATUSES].map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)} style={{
-                padding: '5px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                fontSize: '12px', fontWeight: '600',
-                backgroundColor: statusFilter === s ? (s === 'ALL' ? '#6366f1' : statusColors[s]) : colors.subBg,
-                color: statusFilter === s ? '#fff' : colors.textMuted,
+          {/* Status + Assignee filters */}
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {['ALL', ...STATUSES].map(s => (
+                <button key={s} onClick={() => setStatusFilter(s)} style={{
+                  padding: '5px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  fontSize: '12px', fontWeight: '600',
+                  backgroundColor: statusFilter === s ? (s === 'ALL' ? '#6366f1' : statusColors[s]) : colors.subBg,
+                  color: statusFilter === s ? '#fff' : colors.textMuted,
+                }}>
+                  {s === 'ALL' ? `All (${tasks.length})` : `${statusLabels[s]} (${tasks.filter((t: any) => t.status === s).length})`}
+                </button>
+              ))}
+            </div>
+            {members.length > 0 && (
+              <select value={assigneeFilter} onChange={e => setAssigneeFilter(e.target.value)} style={{
+                padding: '5px 10px', borderRadius: '8px', border: `1px solid ${colors.inputBorder}`,
+                backgroundColor: colors.input, color: colors.text, fontSize: '12px', cursor: 'pointer', outline: 'none',
               }}>
-                {s === 'ALL' ? `All (${tasks.length})` : `${statusLabels[s]} (${tasks.filter((t: any) => t.status === s).length})`}
-              </button>
-            ))}
+                <option value="ALL">All Members</option>
+                <option value="UNASSIGNED">Unassigned</option>
+                {members.map((m: any) => (
+                  <option key={m.user.id} value={m.user.id}>{m.user.firstName} {m.user.lastName}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           {isLoading ? (
