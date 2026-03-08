@@ -37,13 +37,6 @@ interface Attachment {
   createdAt: string
 }
 
-interface MentionUser {
-  id: string
-  firstName: string
-  lastName: string
-  email: string
-}
-
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 function timeAgo(date: string) {
   const diff = (Date.now() - new Date(date).getTime()) / 1000
@@ -140,9 +133,6 @@ export default function TaskDetailDrawer({ taskId, taskTitle, isDark, onClose }:
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<'activity' | 'comments' | 'attachments'>('activity')
   const [comment, setComment] = useState('')
-  const [showMentions, setShowMentions] = useState(false)
-  const [mentionSearch, setMentionSearch] = useState('')
-  const [mentionCursor, setMentionCursor] = useState(0)
   const commentRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -173,12 +163,6 @@ export default function TaskDetailDrawer({ taskId, taskTitle, isDark, onClose }:
     queryKey: ['task-attachments', taskId],
     queryFn: () => api.get(`/tasks/${taskId}/attachments`).then(r => r.data),
     enabled: !!taskId && tab === 'attachments',
-  })
-
-  const { data: mentionableUsers = [] } = useQuery<MentionUser[]>({
-    queryKey: ['mentionable-users', taskId],
-    queryFn: () => api.get(`/tasks/${taskId}/mentionable-users`).then(r => r.data),
-    enabled: !!taskId,
   })
 
   const addCommentMutation = useMutation({
@@ -217,42 +201,7 @@ export default function TaskDetailDrawer({ taskId, taskTitle, isDark, onClose }:
     onError: () => toast.error('Failed to remove attachment'),
   })
 
-  const handleCommentInput = (val: string) => {
-    setComment(val)
-    const cursor = commentRef.current?.selectionStart ?? val.length
-    const before = val.slice(0, cursor)
-    const atMatch = before.match(/@(\w*)$/)
-    if (atMatch) {
-      setMentionSearch(atMatch[1].toLowerCase())
-      setShowMentions(true)
-      setMentionCursor(0)
-    } else {
-      setShowMentions(false)
-    }
-  }
-
-  const insertMention = (u: MentionUser) => {
-    const cursor = commentRef.current?.selectionStart ?? comment.length
-    const before = comment.slice(0, cursor)
-    const after = comment.slice(cursor)
-    const atIndex = before.lastIndexOf('@')
-    const newBefore = before.slice(0, atIndex) + `@[${u.firstName} ${u.lastName}](${u.id}) `
-    setComment(newBefore + after)
-    setShowMentions(false)
-    setTimeout(() => commentRef.current?.focus(), 0)
-  }
-
-  const filteredMentions = mentionableUsers.filter(u =>
-    `${u.firstName} ${u.lastName}`.toLowerCase().includes(mentionSearch)
-  )
-
   const handleCommentKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (showMentions) {
-      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionCursor(c => Math.min(c + 1, filteredMentions.length - 1)) }
-      if (e.key === 'ArrowUp') { e.preventDefault(); setMentionCursor(c => Math.max(c - 1, 0)) }
-      if (e.key === 'Enter') { e.preventDefault(); if (filteredMentions[mentionCursor]) insertMention(filteredMentions[mentionCursor]); return }
-      if (e.key === 'Escape') { setShowMentions(false); return }
-    }
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && comment.trim()) {
       e.preventDefault()
       addCommentMutation.mutate(comment.trim())
@@ -473,30 +422,7 @@ export default function TaskDetailDrawer({ taskId, taskTitle, isDark, onClose }:
         <div style={{ padding: '12px 24px 20px', borderTop: `1px solid ${c.border}`, flexShrink: 0 }}>
 
           {tab === 'comments' && (
-            <div style={{ position: 'relative' }}>
-              {showMentions && filteredMentions.length > 0 && (
-                <div style={{
-                  position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 4,
-                  background: c.card, border: `1px solid ${c.border}`, borderRadius: 10,
-                  boxShadow: '0 -4px 20px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 10,
-                }}>
-                  {filteredMentions.map((u, i) => (
-                    <button key={u.id} onClick={() => insertMention(u)} style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      width: '100%', padding: '8px 12px', border: 'none',
-                      background: i === mentionCursor ? (isDark ? '#1e293b' : '#f1f5f9') : 'transparent',
-                      cursor: 'pointer', textAlign: 'left',
-                    }}>
-                      <Avatar name={`${u.firstName} ${u.lastName}`} size={24} />
-                      <span style={{ fontSize: 13, color: c.text, fontWeight: 500 }}>
-                        {u.firstName} {u.lastName}
-                      </span>
-                      <span style={{ fontSize: 11, color: c.muted }}>{u.email}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
+            <div>
               <div style={{
                 display: 'flex', gap: 8, alignItems: 'flex-end',
                 background: c.input, border: `1px solid ${c.border}`,
@@ -506,9 +432,9 @@ export default function TaskDetailDrawer({ taskId, taskTitle, isDark, onClose }:
                 <textarea
                   ref={commentRef}
                   value={comment}
-                  onChange={e => handleCommentInput(e.target.value)}
+                  onChange={e => setComment(e.target.value)}
                   onKeyDown={handleCommentKeyDown}
-                  placeholder="Write a comment... Type @ to mention someone (Ctrl+Enter to send)"
+                  placeholder="Write a comment... (Ctrl+Enter to send)"
                   rows={2}
                   style={{
                     flex: 1, background: 'none', border: 'none', outline: 'none',
@@ -530,7 +456,7 @@ export default function TaskDetailDrawer({ taskId, taskTitle, isDark, onClose }:
                 </button>
               </div>
               <p style={{ fontSize: 11, color: c.muted, margin: '6px 0 0', paddingLeft: 4 }}>
-                Ctrl+Enter to send · @ to mention
+                Ctrl+Enter to send
               </p>
             </div>
           )}

@@ -358,6 +358,22 @@ export class TeamsService {
       })
     }
 
+    // Parse @mentions — format: @[Name](userId)
+    const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g
+    let match
+    while ((match = mentionRegex.exec(content)) !== null) {
+      const mentionedUserId = match[2]
+      if (mentionedUserId !== userId) {
+        await this.notifications.create({
+          userId: mentionedUserId,
+          type: 'TASK_MENTIONED',
+          title: 'You were mentioned',
+          message: `${user!.firstName} ${user!.lastName} mentioned you in "${task.title}" (${task.project.team.name})`,
+          link: `/app/teams/${task.project.teamId}/projects/${task.projectId}`,
+        })
+      }
+    }
+
     return comment
   }
 

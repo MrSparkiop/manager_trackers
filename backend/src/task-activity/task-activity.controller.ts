@@ -76,8 +76,4 @@ export class TaskActivityController {
     return this.service.deleteAttachment(taskId, attachmentId, req.user.id)
   }
 
-  @Get('mentionable-users')
-  getMentionableUsers(@Req() req: any) {
-    return this.service.getMentionableUsers(req.user.id)
-  }
 }

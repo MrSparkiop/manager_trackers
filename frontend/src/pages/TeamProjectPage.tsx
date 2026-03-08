@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext, useNavigate, useParams } from 'react-router-dom'
-import { Plus, X, ArrowLeft, MessageSquare, User, Trash2, ChevronDown, ChevronUp, LayoutList, LayoutDashboard, CheckSquare } from 'lucide-react'
+import { Plus, X, ArrowLeft, MessageSquare, User, Trash2, ChevronDown, ChevronUp, LayoutList, LayoutDashboard, CheckSquare, Send } from 'lucide-react'
 import api from '../lib/axios'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'
@@ -21,6 +21,135 @@ const statusLabels: Record<string, string> = {
   TODO: 'To Do', IN_PROGRESS: 'In Progress', IN_REVIEW: 'In Review', DONE: 'Done', CANCELLED: 'Cancelled'
 }
 const KANBAN_COLUMNS = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE']
+
+function CommentContent({ content, textColor }: { content: string; textColor: string }) {
+  const parts = content.split(/(@\[[^\]]+\]\([^)]+\))/g)
+  return (
+    <p style={{ fontSize: '12px', color: textColor, margin: 0, lineHeight: '1.5', wordBreak: 'break-word' }}>
+      {parts.map((part, i) => {
+        const match = part.match(/^@\[([^\]]+)\]\(([^)]+)\)$/)
+        if (match) {
+          return (
+            <span key={i} style={{
+              background: 'rgba(99,102,241,0.15)', color: '#818cf8',
+              borderRadius: 4, padding: '0 4px', fontWeight: 700, fontSize: 11,
+            }}>@{match[1]}</span>
+          )
+        }
+        return <span key={i}>{part}</span>
+      })}
+    </p>
+  )
+}
+
+function MentionCommentInput({ members, colors, isDark, value, onChange, onSend, isSending }: {
+  members: any[]; colors: any; isDark: boolean
+  value: string; onChange: (val: string) => void; onSend: () => void; isSending: boolean
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [showMentions, setShowMentions] = useState(false)
+  const [mentionSearch, setMentionSearch] = useState('')
+  const [mentionCursor, setMentionCursor] = useState(0)
+
+  const handleInput = (val: string) => {
+    onChange(val)
+    const cursor = inputRef.current?.selectionStart ?? val.length
+    const before = val.slice(0, cursor)
+    const atMatch = before.match(/@(\w*)$/)
+    if (atMatch) {
+      setMentionSearch(atMatch[1].toLowerCase())
+      setShowMentions(true)
+      setMentionCursor(0)
+    } else {
+      setShowMentions(false)
+    }
+  }
+
+  const filteredMembers = members.filter(m =>
+    `${m.user.firstName} ${m.user.lastName}`.toLowerCase().includes(mentionSearch)
+  )
+
+  const insertMention = (m: any) => {
+    const cursor = inputRef.current?.selectionStart ?? value.length
+    const before = value.slice(0, cursor)
+    const after = value.slice(cursor)
+    const atIndex = before.lastIndexOf('@')
+    const newVal = before.slice(0, atIndex) + `@[${m.user.firstName} ${m.user.lastName}](${m.user.id}) ` + after
+    onChange(newVal)
+    setShowMentions(false)
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (showMentions && filteredMembers.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionCursor(c => Math.min(c + 1, filteredMembers.length - 1)); return }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); setMentionCursor(c => Math.max(c - 1, 0)); return }
+      if (e.key === 'Enter')     { e.preventDefault(); insertMention(filteredMembers[mentionCursor]); return }
+      if (e.key === 'Escape')    { setShowMentions(false); return }
+    }
+    if (e.key === 'Enter' && value.trim()) { e.preventDefault(); onSend() }
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      {showMentions && filteredMembers.length > 0 && (
+        <div style={{
+          position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 4,
+          background: colors.card, border: `1px solid ${colors.border}`,
+          borderRadius: 10, overflow: 'hidden', zIndex: 20,
+          boxShadow: '0 -4px 20px rgba(0,0,0,0.2)',
+        }}>
+          {filteredMembers.map((m, i) => (
+            <button key={m.user.id} onClick={() => insertMention(m)} style={{
+              display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+              padding: '8px 12px', border: 'none',
+              background: i === mentionCursor ? (isDark ? '#1e293b' : '#f1f5f9') : 'transparent',
+              cursor: 'pointer', textAlign: 'left',
+            }}>
+              <div style={{
+                width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, fontWeight: 700, color: '#fff',
+              }}>
+                {m.user.firstName[0]}
+              </div>
+              <span style={{ fontSize: 13, color: colors.text, fontWeight: 500 }}>
+                {m.user.firstName} {m.user.lastName}
+              </span>
+              <span style={{ fontSize: 11, color: colors.textMuted }}>{m.user.email}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <div style={{
+        display: 'flex', gap: 8, alignItems: 'center',
+        background: colors.input, border: `1px solid ${colors.inputBorder}`,
+        borderRadius: 10, padding: '6px 10px',
+      }}>
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={e => handleInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Add a comment... @ to mention"
+          style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: colors.text, fontSize: 13 }}
+        />
+        <button onClick={onSend} disabled={!value.trim() || isSending} style={{
+          background: value.trim() ? '#6366f1' : colors.border,
+          border: 'none', borderRadius: 7, padding: '5px 8px',
+          cursor: value.trim() ? 'pointer' : 'default',
+          color: '#fff', display: 'flex', alignItems: 'center', transition: 'all 0.15s', flexShrink: 0,
+        }}>
+          <Send size={13} />
+        </button>
+      </div>
+      <p style={{ fontSize: 10, color: colors.textMuted, margin: '4px 0 0', paddingLeft: 2 }}>
+        Enter to send · @ to mention a team member
+      </p>
+    </div>
+  )
+}
 
 export default function TeamProjectPage() {
   const { id: teamId, projectId } = useParams()
@@ -298,29 +427,24 @@ export default function TeamProjectPage() {
                         )}
                       </div>
                     </div>
-                    <p style={{ fontSize: '12px', color: colors.text, margin: 0, lineHeight: '1.5' }}>{c.content}</p>
+                    <CommentContent content={c.content} textColor={colors.text} />
                   </div>
                 </div>
               ))}
             </div>
           )}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input
-              value={comment[task.id] || ''}
-              onChange={e => setComment({ ...comment, [task.id]: e.target.value })}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey && comment[task.id]?.trim()) {
-                  addCommentMutation.mutate({ taskId: task.id, content: comment[task.id] })
-                }
-              }}
-              placeholder="Add a comment..."
-              style={{ ...inputStyle, flex: 1, fontSize: '13px', padding: '8px 12px' }}
-            />
-            <button onClick={() => { if (comment[task.id]?.trim()) addCommentMutation.mutate({ taskId: task.id, content: comment[task.id] }) }}
-              style={{ padding: '8px 14px', backgroundColor: '#6366f1', border: 'none', borderRadius: '10px', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600', flexShrink: 0 }}>
-              Send
-            </button>
-          </div>
+          <MentionCommentInput
+            members={members}
+            colors={colors}
+            isDark={isDark}
+            value={comment[task.id] || ''}
+            onChange={val => setComment(prev => ({ ...prev, [task.id]: val }))}
+            onSend={() => {
+              const content = comment[task.id]?.trim()
+              if (content) addCommentMutation.mutate({ taskId: task.id, content })
+            }}
+            isSending={addCommentMutation.isPending}
+          />
         </div>
       )}
     </div>

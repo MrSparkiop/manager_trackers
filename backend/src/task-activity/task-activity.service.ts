@@ -180,40 +180,4 @@ export class TaskActivityService {
     return { deleted: true }
   }
 
-  // ── TEAM MEMBERS for @mention autocomplete ───────────────────────────────────
-
-  async getMentionableUsers(userId: string) {
-    // Returns the current user themselves (solo app — for future team expand)
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, firstName: true, lastName: true, email: true },
-    })
-
-    // Also get all team members from teams the user belongs to
-    const teamMemberships = await this.prisma.teamMember.findMany({
-      where: { userId },
-      include: {
-        team: {
-          include: {
-            members: {
-              include: {
-                user: { select: { id: true, firstName: true, lastName: true, email: true } },
-              },
-            },
-          },
-        },
-      },
-    })
-
-    const usersMap = new Map<string, any>()
-    if (user) usersMap.set(user.id, user)
-
-    for (const membership of teamMemberships) {
-      for (const member of membership.team.members) {
-        usersMap.set(member.user.id, member.user)
-      }
-    }
-
-    return Array.from(usersMap.values())
-  }
 }
