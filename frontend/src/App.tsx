@@ -18,6 +18,7 @@ import SettingsPage from './pages/SettingsPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import TagsPage from './pages/TagsPage'
+import InsightsPage from './pages/InsightsPage'
 import TeamsPage from './pages/TeamsPage'
 import TeamWorkspacePage from './pages/TeamWorkspacePage'
 import TeamProjectPage from './pages/TeamProjectPage'
@@ -95,6 +96,7 @@ export default function App() {
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="tags" element={<TagsPage />} />
+            <Route path="insights" element={<InsightsPage />} />
             <Route path="teams" element={<TeamsPage />} />
             <Route path="teams/:id" element={<TeamWorkspacePage />} />
             <Route path="teams/:id/settings" element={<TeamSettingsPage />} />

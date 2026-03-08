@@ -14,6 +14,8 @@ import { TeamsModule } from './teams/teams.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { LastSeenMiddleware } from './auth/last-seen.middleware'
 import { SearchModule } from './search/search.module'
+import { AnalyticsModule } from './analytics/analytics.module'
+import { TaskActivityModule } from './task-activity/task-activity.module'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { APP_GUARD } from '@nestjs/core'
 
@@ -40,6 +42,8 @@ import { APP_GUARD } from '@nestjs/core'
     TeamsModule,
     NotificationsModule,
     SearchModule,
+    AnalyticsModule,
+    TaskActivityModule,
   ],
   providers: [
     {

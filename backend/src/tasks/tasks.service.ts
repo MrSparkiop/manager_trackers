@@ -43,7 +43,7 @@ export class TasksService {
 
   async create(userId: string, dto: CreateTaskDto) {
     const { tagIds, ...rest } = dto as any
-    return this.prisma.task.create({
+    const task = await this.prisma.task.create({
       data: {
         ...rest,
         userId,
@@ -56,10 +56,26 @@ export class TasksService {
         tags: true,
       },
     })
+
+    const actor = await this.prisma.user.findUnique({ where: { id: userId } })
+    if (actor) {
+      await this.prisma.taskActivity.create({
+        data: {
+          taskId: task.id,
+          actorId: userId,
+          actorName: `${actor.firstName} ${actor.lastName}`,
+          actorEmail: actor.email,
+          action: 'created',
+          newValue: task.title,
+        },
+      })
+    }
+
+    return task
   }
 
-  async update(id: string, userId: string, dto: UpdateTaskDto) {
-    await this.findOne(id, userId)
+  async update(id: string, userId: string, dto: UpdateTaskDto, actor?: { id: string; firstName: string; lastName: string; email: string }) {
+    const existing = await this.findOne(id, userId)
     const { tagIds, ...rest } = dto as any
     const data: any = {
       ...rest,
@@ -74,7 +90,8 @@ export class TasksService {
     if (tagIds !== undefined) {
       data.tags = { set: tagIds.map((id: string) => ({ id })) }
     }
-    return this.prisma.task.update({
+
+    const updated = await this.prisma.task.update({
       where: { id },
       data,
       include: {
@@ -83,6 +100,39 @@ export class TasksService {
         tags: true,
       },
     })
+
+    if (actor) {
+      const actorName = `${actor.firstName} ${actor.lastName}`
+      const changes: { field: string; oldValue: string; newValue: string }[] = []
+
+      if (dto.status && dto.status !== existing.status)
+        changes.push({ field: 'status', oldValue: existing.status, newValue: dto.status })
+      if (dto.priority && dto.priority !== existing.priority)
+        changes.push({ field: 'priority', oldValue: existing.priority, newValue: dto.priority as string })
+      if ('assigneeId' in dto && (dto as any).assigneeId !== existing.assigneeId)
+        changes.push({ field: 'assignee', oldValue: existing.assigneeId ?? 'none', newValue: (dto as any).assigneeId ?? 'none' })
+      if (dto.dueDate && dto.dueDate !== (existing.dueDate?.toISOString().split('T')[0] ?? ''))
+        changes.push({ field: 'dueDate', oldValue: existing.dueDate?.toLocaleDateString() ?? 'none', newValue: new Date(dto.dueDate).toLocaleDateString() })
+      if (dto.title && dto.title !== existing.title)
+        changes.push({ field: 'title', oldValue: existing.title, newValue: dto.title })
+
+      for (const change of changes) {
+        await this.prisma.taskActivity.create({
+          data: {
+            taskId: id,
+            actorId: actor.id,
+            actorName,
+            actorEmail: actor.email,
+            action: `${change.field}_changed`,
+            field: change.field,
+            oldValue: change.oldValue,
+            newValue: change.newValue,
+          },
+        })
+      }
+    }
+
+    return updated
   }
 
   async remove(id: string, userId: string) {

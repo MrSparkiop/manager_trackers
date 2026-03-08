@@ -17,6 +17,7 @@ import { TaskRowSkeleton } from '../components/Skeleton'
 import EmptyState from '../components/EmptyState'
 import RecurrenceSelector, { RecurrenceBadge } from '../components/RecurrenceSelector'
 import RecurringTaskModal from '../components/RecurringTaskModal'
+import TaskDetailDrawer from '../components/TaskDetailDrawer'
 import toast from 'react-hot-toast'
 
 interface Project { id: string; name: string; color: string }
@@ -69,7 +70,7 @@ function formatDurationShort(seconds: number): string {
 // ── Sortable Task Row ─────────────────────────────────────────────────
 function SortableTaskRow({
   task, colors, selected, onSelect, onToggleDone, onEdit, onDelete, onAddSubtask, isDark,
-  running, onStartTimer, onStopTimer
+  running, onStartTimer, onStopTimer, onOpenDrawer
 }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
   const [expanded, setExpanded] = useState(false)
@@ -137,11 +138,16 @@ function SortableTaskRow({
 
         {/* Content */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{
-            fontSize: '14px', fontWeight: '500', color: colors.text, margin: 0,
-            textDecoration: isDone ? 'line-through' : 'none',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-          }}>
+          <p
+            onClick={() => onOpenDrawer(task)}
+            title="Click to view activity, comments & files"
+            style={{
+              fontSize: '14px', fontWeight: '500', color: colors.text, margin: 0,
+              textDecoration: isDone ? 'line-through' : 'none',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              cursor: 'pointer',
+            }}
+          >
             {task.title}
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', flexWrap: 'wrap' }}>
@@ -377,6 +383,7 @@ export default function TasksPage() {
 
   // Recurring task confirmation
   const [recurringTask, setRecurringTask]   = useState<Task | null>(null)
+  const [drawerTask, setDrawerTask]         = useState<{ id: string; title: string } | null>(null)
 
   const quickInputRef = useRef<HTMLInputElement>(null)
 
@@ -825,6 +832,7 @@ export default function TasksPage() {
                           running={running}
                           onStartTimer={(t: Task) => startTimerMutation.mutate(t)}
                           onStopTimer={() => stopTimerMutation.mutate()}
+                          onOpenDrawer={(t: Task) => setDrawerTask({ id: t.id, title: t.title })}
                         />
                       ))}
                     </div>
@@ -992,6 +1000,15 @@ export default function TasksPage() {
           onConfirm={() => nextOccurrenceMutation.mutate(recurringTask.id)}
           onSkip={() => skipOccurrenceMutation.mutate(recurringTask.id)}
           onDismiss={() => setRecurringTask(null)}
+        />
+      )}
+
+      {drawerTask && (
+        <TaskDetailDrawer
+          taskId={drawerTask.id}
+          taskTitle={drawerTask.title}
+          isDark={isDark}
+          onClose={() => setDrawerTask(null)}
         />
       )}
     </div>

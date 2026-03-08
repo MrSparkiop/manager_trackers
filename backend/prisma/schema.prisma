@@ -33,6 +33,8 @@ model User {
   ownedTeams          Team[]        @relation("TeamOwner")
   teamMemberships     TeamMember[]
   notifications       Notification[]
+  taskComments        TaskComment[]
+  taskActivities      TaskActivity[]
 
   @@map("users")
 }
@@ -181,6 +183,10 @@ model Task {
   timeEntries       TimeEntry[]
   calendarEvents    CalendarEvent[]
   tags              Tag[]
+  comments          TaskComment[]
+  activities        TaskActivity[]
+  attachments       TaskAttachment[]
+  assigneeId        String?
 
   @@index([userId])
   @@index([projectId])
@@ -190,6 +196,58 @@ model Task {
   @@index([userId, priority])
   @@index([userId, dueDate])
   @@map("tasks")
+}
+
+model TaskComment {
+  id          String   @id @default(cuid())
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([authorId])
+  @@map("task_comments")
+}
+
+model TaskActivity {
+  id          String   @id @default(cuid())
+  action      String
+  field       String?
+  oldValue    String?
+  newValue    String?
+  actorName   String
+  actorEmail  String
+  createdAt   DateTime @default(now())
+
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  actorId     String
+  actor       User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([actorId])
+  @@map("task_activities")
+}
+
+model TaskAttachment {
+  id          String   @id @default(cuid())
+  filename    String
+  mimeType    String
+  size        Int
+  url         String
+  createdAt   DateTime @default(now())
+
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploaderId  String
+
+  @@index([taskId])
+  @@map("task_attachments")
 }
 
 model TimeEntry {
@@ -360,6 +418,7 @@ model Notification {
 enum NotificationType {
   TASK_ASSIGNED
   TASK_COMMENT
+  TASK_MENTIONED
   TEAM_JOINED
   TEAM_REMOVED
 }
