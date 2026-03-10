@@ -35,6 +35,8 @@ model User {
   notifications       Notification[]
   taskComments        TaskComment[]
   taskActivities      TaskActivity[]
+  supportTickets      SupportTicket[]
+  ticketReplies       TicketReply[]
 
   @@map("users")
 }
@@ -248,6 +250,55 @@ model TaskAttachment {
 
   @@index([taskId])
   @@map("task_attachments")
+}
+
+model SupportTicket {
+  id          String         @id @default(cuid())
+  subject     String
+  description String
+  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority @default(NORMAL)
+  category    String         @default("general")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  closedAt    DateTime?
+
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies     TicketReply[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("support_tickets")
+}
+
+model TicketReply {
+  id        String        @id @default(cuid())
+  content   String
+  isStaff   Boolean       @default(false)
+  createdAt DateTime      @default(now())
+
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("ticket_replies")
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
 }
 
 model TimeEntry {

@@ -30,6 +30,8 @@ import AdminSearchPage from './pages/admin/AdminSearchPage'
 import AdminUserDetailPage from './pages/admin/AdminUserDetailPage'
 import AdminSettingsPage from './pages/admin/AdminSettingsPage'
 import TeamSettingsPage from './pages/TeamSettingsPage'
+import SupportPage from './pages/SupportPage'
+import AdminSupportPage from './pages/admin/AdminSupportPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -102,6 +104,7 @@ export default function App() {
             <Route path="teams/:id/settings" element={<TeamSettingsPage />} />
             <Route path="teams/:id/projects/:projectId" element={<TeamProjectPage />} />
             <Route path="join" element={<JoinTeamPage />} />
+            <Route path="support" element={<SupportPage />} />
           </Route>
 
           {/* Admin routes */}
@@ -113,6 +116,7 @@ export default function App() {
             <Route path="activity" element={<AdminActivityPage />} />
             <Route path="search" element={<AdminSearchPage />} />
             <Route path="settings" element={<AdminSettingsPage />} />
+            <Route path="support" element={<AdminSupportPage />} />
           </Route>
 
           {/* Catch all */}

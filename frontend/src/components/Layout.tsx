@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import {
   LayoutDashboard, FolderKanban, CheckSquare,
-  Timer, Calendar, LogOut, User, Sun, Moon, Settings, Menu, X, Tag, Users, Shield, BarChart2
+  Timer, Calendar, LogOut, User, Sun, Moon, Settings, Menu, X, Tag, Users, Shield, BarChart2, Headphones
 } from 'lucide-react'
 import AnnouncementBanner from './AnnouncementBanner'
 import MaintenanceBanner from './MaintenanceBanner'
@@ -21,6 +21,7 @@ const navItems = [
   { to: '/app/tags',         icon: Tag,             label: 'Tags'  },
   { to: '/app/teams',        icon: Users,           label: 'Teams' },
   { to: '/app/insights',     icon: BarChart2,        label: 'Insights' },
+  { to: '/app/support',     icon: Headphones,       label: 'Support'  },
 ]
 
 function useIsMobile() {
