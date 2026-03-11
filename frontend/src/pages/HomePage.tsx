@@ -214,27 +214,30 @@ export default function HomePage() {
 
           {/* CTA buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Link to="/login" style={{
-              fontSize: '14px', fontWeight: '500', color: '#94a3b8',
-              textDecoration: 'none', padding: '8px 16px',
-              transition: 'color 0.2s'
-            }}>
-              Sign in
-            </Link>
-            <Link to="/register" style={{
-              fontSize: '14px', fontWeight: '600', color: '#fff',
-              textDecoration: 'none', padding: '9px 20px',
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-              borderRadius: '9px',
-              boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
-              transition: 'opacity 0.2s'
-            }}>
-              Get started free
-            </Link>
+            <div className="desktop-nav" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Link to="/login" style={{
+                fontSize: '14px', fontWeight: '500', color: '#94a3b8',
+                textDecoration: 'none', padding: '8px 16px',
+                transition: 'color 0.2s'
+              }}>
+                Sign in
+              </Link>
+              <Link to="/register" style={{
+                fontSize: '14px', fontWeight: '600', color: '#fff',
+                textDecoration: 'none', padding: '9px 20px',
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                borderRadius: '9px',
+                boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
+                transition: 'opacity 0.2s'
+              }}>
+                Get started free
+              </Link>
+            </div>
             {/* Mobile menu btn */}
             <button onClick={() => setMenuOpen(!menuOpen)} style={{
-              display: 'none', background: 'none', border: 'none',
-              color: '#94a3b8', cursor: 'pointer', padding: '4px'
+              display: 'none', background: 'none', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '8px', color: '#94a3b8', cursor: 'pointer', padding: '8px',
+              alignItems: 'center', justifyContent: 'center'
             }} className="mobile-menu-btn">
               {menuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
@@ -329,7 +332,7 @@ export default function HomePage() {
           </p>
 
           {/* CTA buttons */}
-          <div className="hero-cta" style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div className="hero-cta" style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', padding: '0 16px' }}>
             <Link to="/register" style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px',
               fontSize: '16px', fontWeight: '700', color: '#fff',
@@ -379,6 +382,7 @@ export default function HomePage() {
           {/* Floating preview card */}
           <div className="hero-card" style={{
             marginTop: '72px',
+            display: 'none',
             backgroundColor: '#0f172a',
             border: '1px solid rgba(255,255,255,0.08)',
             borderRadius: '20px',
@@ -776,6 +780,10 @@ export default function HomePage() {
         @media (max-width: 768px) {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
+          .hero-card { display: none !important; }
+        }
+        @media (min-width: 769px) {
+          .hero-card { display: block !important; }
         }
       `}</style>
     </div>

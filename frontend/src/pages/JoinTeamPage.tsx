@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { Users, Loader } from 'lucide-react'
 import api from '../lib/axios'
-import toast from 'react-hot-toast'
 
 export default function JoinTeamPage() {
   const [searchParams] = useSearchParams()

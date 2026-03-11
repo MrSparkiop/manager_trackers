@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import {
   LayoutDashboard, Users, LogOut, User,
-  Sun, Moon, Menu, X, Shield, Timer, ArrowLeft, Activity, Search, Settings, Headphones
+  Sun, Moon, Menu, X, Shield, ArrowLeft, Activity, Search, Settings, Headphones
 } from 'lucide-react'
 
 const navItems = [

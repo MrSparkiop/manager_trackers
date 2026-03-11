@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext, useNavigate } from 'react-router-dom'
-import { Users, Plus, X, Crown, LogIn, Trash2, Settings, Link, Copy, Check } from 'lucide-react'
+import { Users, Plus, X, Crown, LogIn, Trash2, Settings, Link, Check } from 'lucide-react'
 import api from '../lib/axios'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'

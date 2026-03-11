@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Bell, X, CheckCheck, CheckSquare, MessageSquare, Users, Trash2 } from 'lucide-react'
+import { Bell, X, CheckCheck, CheckSquare, MessageSquare, Users } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/axios'
 import { getSocket } from '../lib/socket'

@@ -1,9 +1,7 @@
 import { useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { User, Moon, Sun, Save } from 'lucide-react'
-import api from '../lib/axios'
 
 export default function SettingsPage() {
   const { isDark } = useThemeStore()
@@ -13,9 +11,7 @@ export default function SettingsPage() {
     lastName: user?.lastName || '',
     email: user?.email || '',
   })
-  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [saved, setSaved] = useState(false)
-  const [error, setError] = useState('')
   const { toggle } = useThemeStore()
 
   const colors = {

@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext } from 'react-router-dom'
-import { MessageSquare, ChevronRight, Search, X, Send, Circle, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { MessageSquare, Search, X, Send, Circle, Clock, CheckCircle } from 'lucide-react'
 import api from '../../lib/axios'
-import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -27,7 +26,6 @@ function timeAgo(date: string) {
 
 export default function AdminSupportPage() {
   const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
-  const { user } = useAuthStore()
   const queryClient = useQueryClient()
 
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null)

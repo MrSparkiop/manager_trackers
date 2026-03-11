@@ -175,7 +175,7 @@ export default function InsightsPage() {
         <div style={cardStyle}>
           <SectionTitle icon={Clock} title="Focus Time This Week" color="#34d399" textColor={c.text} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {data.focusThisWeek.map(({ day, date, seconds }) => {
+            {data.focusThisWeek.map(({ day, seconds }) => {
               const barPct = pct(seconds, maxFocus)
               const isToday = day === ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]
               return (

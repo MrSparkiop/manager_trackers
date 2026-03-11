@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext } from 'react-router-dom'
-import { Plus, X, Send, MessageSquare, ChevronDown, Paperclip, Inbox, LifeBuoy, Clock, CheckCircle2, CircleDot, AlertTriangle, ArrowLeft } from 'lucide-react'
+import { Plus, X, Send, MessageSquare, Inbox, LifeBuoy, Clock, CheckCircle2, CircleDot, ArrowLeft } from 'lucide-react'
 import api from '../lib/axios'
 import { useAuthStore } from '../store/authStore'
 import toast from 'react-hot-toast'

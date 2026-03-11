@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext, useNavigate, useParams } from 'react-router-dom'
-import { Plus, X, ArrowLeft, MessageSquare, User, Trash2, ChevronDown, ChevronUp, LayoutList, LayoutDashboard, CheckSquare, Send } from 'lucide-react'
+import { Plus, X, ArrowLeft, MessageSquare, Trash2, LayoutList, LayoutDashboard, CheckSquare, Send } from 'lucide-react'
 import api from '../lib/axios'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'
