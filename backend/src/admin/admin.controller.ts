@@ -1,12 +1,14 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Req } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
-import { AdminGuard } from './admin.guard'
+import { RolesGuard } from '../auth/roles.guard'
+import { Roles, Role } from '../auth/roles.decorator'
 import { AdminService } from './admin.service'
 import { MaintenanceService } from './maintenance.service'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 
 @ApiTags('Admin')
-@UseGuards(AuthGuard('jwt'), AdminGuard)
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles(Role.ADMIN)
 @Controller('admin')
 export class AdminController {
   constructor(
