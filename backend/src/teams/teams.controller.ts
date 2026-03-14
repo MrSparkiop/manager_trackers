@@ -1,5 +1,8 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Req } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
+import { RolesGuard } from '../auth/roles.guard'
+import { Roles, Role } from '../auth/roles.decorator'
+import { TeamMemberGuard } from './team-member.guard'
 import { TeamsService } from './teams.service'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
 
@@ -17,6 +20,8 @@ export class TeamsController {
   }
 
   @Post()
+  @UseGuards(RolesGuard)
+  @Roles(Role.PRO, Role.ADMIN)
   @ApiOperation({ summary: 'Create a team' })
   createTeam(@Req() req: any, @Body() body: { name: string; description?: string; color?: string }) {
     return this.teamsService.createTeam(req.user.id, body)
@@ -29,60 +34,71 @@ export class TeamsController {
   }
 
   @Post('join')
+  @UseGuards(RolesGuard)
+  @Roles(Role.PRO, Role.ADMIN)
   @ApiOperation({ summary: 'Join a team via invite code' })
   joinTeam(@Req() req: any, @Body() body: { inviteCode: string }) {
     return this.teamsService.joinTeam(body.inviteCode, req.user.id)
   }
 
   @Get(':id')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Get team details' })
   getTeam(@Param('id') id: string, @Req() req: any) {
     return this.teamsService.getTeam(id, req.user.id)
   }
 
   @Put(':id')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Update team' })
   updateTeam(@Param('id') id: string, @Req() req: any, @Body() body: any) {
     return this.teamsService.updateTeam(id, req.user.id, body)
   }
 
   @Delete(':id')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Delete team' })
   deleteTeam(@Param('id') id: string, @Req() req: any) {
     return this.teamsService.deleteTeam(id, req.user.id)
   }
 
   @Get(':id/invite')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Get invite link' })
   getInviteLink(@Param('id') id: string, @Req() req: any) {
     return this.teamsService.getInviteLink(id, req.user.id)
   }
 
   @Get(':id/activity')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Get team activity feed' })
   getTeamActivity(@Param('id') id: string, @Req() req: any) {
     return this.teamsService.getTeamActivity(id, req.user.id)
   }
 
   @Get(':id/workload')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Get member workload' })
   getTeamWorkload(@Param('id') id: string, @Req() req: any) {
     return this.teamsService.getTeamWorkload(id, req.user.id)
   }
 
   @Post(':id/invite/regenerate')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Regenerate invite code' })
   regenerateInviteCode(@Param('id') id: string, @Req() req: any) {
     return this.teamsService.regenerateInviteCode(id, req.user.id)
   }
 
   @Delete(':id/leave')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Leave team' })
   leaveTeam(@Param('id') id: string, @Req() req: any) {
     return this.teamsService.leaveTeam(id, req.user.id)
   }
 
   @Delete(':id/members/:memberId')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Remove a member' })
   removeMember(@Param('id') id: string, @Param('memberId') memberId: string, @Req() req: any) {
     return this.teamsService.removeMember(id, req.user.id, memberId)
@@ -90,12 +106,14 @@ export class TeamsController {
 
   // ── Team Projects ────────────────────────────────────────────────
   @Get(':id/projects')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Get team projects' })
   getTeamProjects(@Param('id') id: string, @Req() req: any) {
     return this.teamsService.getTeamProjects(id, req.user.id)
   }
 
   @Post(':id/projects')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Create team project' })
   createTeamProject(@Param('id') id: string, @Req() req: any, @Body() body: any) {
     return this.teamsService.createTeamProject(id, req.user.id, body)

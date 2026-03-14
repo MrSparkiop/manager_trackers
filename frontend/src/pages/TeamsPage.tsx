@@ -52,7 +52,7 @@ export default function TeamsPage() {
       setCreateForm({ name: '', description: '', color: '#6366f1' })
       toast.success('Team created!')
     },
-    onError: () => toast.error('Failed to create team'),
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to create team'),
   })
 
   const joinMutation = useMutation({
@@ -73,7 +73,7 @@ export default function TeamsPage() {
       queryClient.invalidateQueries({ queryKey: ['teams'] })
       toast.success('Team deleted')
     },
-    onError: () => toast.error('Failed to delete team'),
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to delete team'),
   })
 
   const leaveMutation = useMutation({

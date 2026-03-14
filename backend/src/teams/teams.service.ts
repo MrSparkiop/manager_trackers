@@ -51,18 +51,11 @@ export class TeamsService {
     if (!team) throw new NotFoundException('Team not found')
 
     const member = team.members.find(m => m.userId === userId)
-    if (!member) throw new ForbiddenException('You are not a member of this team')
 
-    return { ...team, myRole: member.role }
+    return { ...team, myRole: member?.role ?? null }
   }
 
   async createTeam(userId: string, dto: { name: string; description?: string; color?: string }) {
-    // Check if user is PRO or ADMIN
-    const user = await this.prisma.user.findUnique({ where: { id: userId } })
-    if (!user || (user.role !== 'PRO' && user.role !== 'ADMIN')) {
-      throw new ForbiddenException('Only PRO users can create teams')
-    }
-
     const team = await this.prisma.team.create({
       data: {
         name: dto.name,
@@ -95,7 +88,6 @@ export class TeamsService {
 
   // ── Invite Link ──────────────────────────────────────────────────
   async getInviteLink(teamId: string, userId: string) {
-    await this.requireMember(teamId, userId)
     const team = await this.prisma.team.findUnique({
       where: { id: teamId },
       select: { inviteCode: true, name: true }
@@ -126,12 +118,6 @@ export class TeamsService {
   async joinTeam(inviteCode: string, userId: string) {
     const team = await this.prisma.team.findUnique({ where: { inviteCode } })
     if (!team) throw new NotFoundException('Invalid invite code')
-
-    // Check if user is PRO or ADMIN
-    const user = await this.prisma.user.findUnique({ where: { id: userId } })
-    if (!user || (user.role !== 'PRO' && user.role !== 'ADMIN')) {
-      throw new ForbiddenException('Only PRO users can join teams. Upgrade your account to continue.')
-    }
 
     if (team.ownerId === userId) throw new BadRequestException('You are already the owner of this team')
 
@@ -176,7 +162,6 @@ export class TeamsService {
 
   // ── Team Projects ────────────────────────────────────────────────
   async getTeamProjects(teamId: string, userId: string) {
-    await this.requireMember(teamId, userId)
     return this.prisma.teamProject.findMany({
       where: { teamId },
       include: { _count: { select: { tasks: true } } },
@@ -185,7 +170,6 @@ export class TeamsService {
   }
 
   async createTeamProject(teamId: string, userId: string, dto: { name: string; description?: string; color?: string; deadline?: string }) {
-    await this.requireMember(teamId, userId)
     return this.prisma.teamProject.create({
       data: {
         teamId,
@@ -465,8 +449,6 @@ export class TeamsService {
 
   // ── Activity Feed ────────────────────────────────────────────────
   async getTeamActivity(teamId: string, userId: string) {
-    await this.requireMember(teamId, userId)
-
     const projects = await this.prisma.teamProject.findMany({
       where: { teamId },
       select: { id: true, name: true }
@@ -515,8 +497,6 @@ export class TeamsService {
 
   // ── Team Workload ────────────────────────────────────────────────
   async getTeamWorkload(teamId: string, userId: string) {
-    await this.requireMember(teamId, userId)
-
     const [members, projects] = await Promise.all([
       this.prisma.teamMember.findMany({
         where: { teamId },

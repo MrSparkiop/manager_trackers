@@ -69,7 +69,7 @@ export default function TeamWorkspacePage() {
       setProjectForm({ name: '', description: '', color: '#6366f1' })
       toast.success('Project created!')
     },
-    onError: () => toast.error('Failed to create project'),
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to create project'),
   })
 
   const deleteProjectMutation = useMutation({
@@ -78,7 +78,7 @@ export default function TeamWorkspacePage() {
       queryClient.invalidateQueries({ queryKey: ['team', id] })
       toast.success('Project deleted')
     },
-    onError: () => toast.error('Failed to delete project'),
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to delete project'),
   })
 
   const removeMemberMutation = useMutation({
@@ -87,7 +87,7 @@ export default function TeamWorkspacePage() {
       queryClient.invalidateQueries({ queryKey: ['team', id] })
       toast.success('Member removed')
     },
-    onError: () => toast.error('Failed to remove member'),
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to remove member'),
   })
 
   const copyInviteLink = async () => {

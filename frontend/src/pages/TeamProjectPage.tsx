@@ -197,14 +197,14 @@ export default function TeamProjectPage() {
       setTaskForm({ title: '', description: '', priority: 'MEDIUM', dueDate: '', assigneeId: '' })
       toast.success('Task created!')
     },
-    onError: () => toast.error('Failed to create task'),
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to create task'),
   })
 
   const updateTaskMutation = useMutation({
     mutationFn: ({ taskId, data }: { taskId: string; data: any }) =>
       api.put(`/teams/tasks/${taskId}`, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['team-tasks', projectId] }),
-    onError: () => toast.error('Failed to update task'),
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to update task'),
   })
 
   const deleteTaskMutation = useMutation({
@@ -213,7 +213,7 @@ export default function TeamProjectPage() {
       queryClient.invalidateQueries({ queryKey: ['team-tasks', projectId] })
       toast.success('Task deleted')
     },
-    onError: () => toast.error('Failed to delete task'),
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to delete task'),
   })
 
   const addCommentMutation = useMutation({
@@ -223,13 +223,13 @@ export default function TeamProjectPage() {
       queryClient.invalidateQueries({ queryKey: ['team-tasks', projectId] })
       setComment({ ...comment, [vars.taskId]: '' })
     },
-    onError: () => toast.error('Failed to add comment'),
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to add comment'),
   })
 
   const deleteCommentMutation = useMutation({
     mutationFn: (commentId: string) => api.delete(`/teams/comments/${commentId}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['team-tasks', projectId] }),
-    onError: () => toast.error('Failed to delete comment'),
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to delete comment'),
   })
 
   const project = team?.projects?.find((p: any) => p.id === projectId)

@@ -56,7 +56,7 @@ export default function TeamSettingsPage() {
       queryClient.invalidateQueries({ queryKey: ['teams'] })
       toast.success('Team updated!')
     },
-    onError: () => toast.error('Failed to update team'),
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to update team'),
   })
 
   const deleteMutation = useMutation({
@@ -66,7 +66,7 @@ export default function TeamSettingsPage() {
       toast.success('Team deleted')
       navigate('/app/teams')
     },
-    onError: () => toast.error('Failed to delete team'),
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to delete team'),
   })
 
   const regenerateMutation = useMutation({
@@ -76,7 +76,7 @@ export default function TeamSettingsPage() {
       queryClient.invalidateQueries({ queryKey: ['team-invite', id] })
       toast.success('Invite code regenerated!')
     },
-    onError: () => toast.error('Failed to regenerate code'),
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to regenerate code'),
   })
 
   const copyInviteLink = async () => {
