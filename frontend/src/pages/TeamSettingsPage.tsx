@@ -81,10 +81,26 @@ export default function TeamSettingsPage() {
 
   const copyInviteLink = async () => {
     const link = `${window.location.origin}/app/join?code=${inviteCode}`
-    await navigator.clipboard.writeText(link)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-    toast.success('Invite link copied!')
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(link)
+      } else {
+        const ta = document.createElement('textarea')
+        ta.value = link
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.focus()
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+      }
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+      toast.success('Invite link copied!')
+    } catch {
+      toast.error('Could not copy — please copy manually')
+    }
   }
 
   const inputStyle = {
