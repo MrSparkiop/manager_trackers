@@ -8,7 +8,7 @@ import { SentryExceptionFilter } from './sentry.filter'
 const cookieParser = require('cookie-parser')
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule)
+  const app = await NestFactory.create(AppModule, { rawBody: true })
 
   // Register Sentry global exception filter (captures 5xx errors)
   const { httpAdapter } = app.get(HttpAdapterHost)

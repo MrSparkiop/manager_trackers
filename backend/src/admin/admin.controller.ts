@@ -42,6 +42,12 @@ export class AdminController {
     return this.adminService.updateUser(req.user.id, id, dto)
   }
 
+  @Put('users/:id/role')
+  @ApiOperation({ summary: 'Update a user role' })
+  updateUserRole(@Req() req: any, @Param('id') id: string, @Body() dto: { role: string }) {
+    return this.adminService.updateUser(req.user.id, id, { role: dto.role })
+  }
+
   @Put('users/:id/suspend')
   @ApiOperation({ summary: 'Suspend or unsuspend a user' })
   suspendUser(@Req() req: any, @Param('id') id: string, @Body() dto: any) {

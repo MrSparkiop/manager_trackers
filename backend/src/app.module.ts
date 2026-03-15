@@ -17,6 +17,7 @@ import { SearchModule } from './search/search.module'
 import { AnalyticsModule } from './analytics/analytics.module'
 import { TaskActivityModule } from './task-activity/task-activity.module'
 import { SupportModule } from './support/support.module'
+import { BillingModule } from './billing/billing.module'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { APP_GUARD } from '@nestjs/core'
 
@@ -46,6 +47,7 @@ import { APP_GUARD } from '@nestjs/core'
     AnalyticsModule,
     TaskActivityModule,
     SupportModule,
+    BillingModule,
   ],
   providers: [
     {

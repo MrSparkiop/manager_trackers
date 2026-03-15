@@ -32,6 +32,9 @@ import AdminSettingsPage from './pages/admin/AdminSettingsPage'
 import TeamSettingsPage from './pages/TeamSettingsPage'
 import SupportPage from './pages/SupportPage'
 import AdminSupportPage from './pages/admin/AdminSupportPage'
+import BillingPage from './pages/BillingPage'
+import BillingSuccessPage from './pages/BillingSuccessPage'
+import BillingCancelPage from './pages/BillingCancelPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -105,6 +108,9 @@ export default function App() {
             <Route path="teams/:id/projects/:projectId" element={<TeamProjectPage />} />
             <Route path="join" element={<JoinTeamPage />} />
             <Route path="support" element={<SupportPage />} />
+            <Route path="billing" element={<BillingPage />} />
+            <Route path="billing/success" element={<BillingSuccessPage />} />
+            <Route path="billing/cancel" element={<BillingCancelPage />} />
           </Route>
 
           {/* Admin routes */}
