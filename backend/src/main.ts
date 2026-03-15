@@ -1,6 +1,7 @@
 import './instrument'
 import { NestFactory, HttpAdapterHost } from '@nestjs/core'
 import { AppModule } from './app.module'
+import { RedisIoAdapter } from './redis-io.adapter'
 import { ValidationPipe } from '@nestjs/common'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import { SentryExceptionFilter } from './sentry.filter'
@@ -13,6 +14,11 @@ async function bootstrap() {
   // Register Sentry global exception filter (captures 5xx errors)
   const { httpAdapter } = app.get(HttpAdapterHost)
   app.useGlobalFilters(new SentryExceptionFilter(httpAdapter))
+
+  // Redis-backed Socket.io adapter for multi-instance WebSocket support
+  const redisIoAdapter = new RedisIoAdapter(app)
+  await redisIoAdapter.connectToRedis()
+  app.useWebSocketAdapter(redisIoAdapter)
 
   app.use(cookieParser())
 

@@ -10,7 +10,7 @@ export class ProjectsService {
   async findAll(userId: string) {
     return this.prisma.project.findMany({
       // Filter out soft-deleted projects
-      where: { userId, deletedAt: null },
+      where: { userId, teamId: null, deletedAt: null },
       include: {
         _count: { select: { tasks: true } },
         tasks: {
@@ -24,7 +24,7 @@ export class ProjectsService {
   async findOne(id: string, userId: string) {
     const project = await this.prisma.project.findFirst({
       // Filter out soft-deleted projects
-      where: { id, userId, deletedAt: null },
+      where: { id, userId, teamId: null, deletedAt: null },
       include: {
         tasks: {
           include: { timeEntries: true },
@@ -73,7 +73,7 @@ export class ProjectsService {
   async getStats(userId: string) {
     const projects = await this.prisma.project.findMany({
       // Filter out soft-deleted projects from statistics
-      where: { userId, deletedAt: null },
+      where: { userId, teamId: null, deletedAt: null },
       include: { tasks: { select: { status: true } } },
     });
 

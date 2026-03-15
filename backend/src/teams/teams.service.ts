@@ -42,6 +42,7 @@ export class TeamsService {
           orderBy: { joinedAt: 'asc' }
         },
         projects: {
+          where: { teamId },
           include: { _count: { select: { tasks: true } } },
           orderBy: { createdAt: 'desc' }
         }
@@ -162,7 +163,7 @@ export class TeamsService {
 
   // ── Team Projects ────────────────────────────────────────────────
   async getTeamProjects(teamId: string, userId: string) {
-    return this.prisma.teamProject.findMany({
+    return this.prisma.project.findMany({
       where: { teamId },
       include: { _count: { select: { tasks: true } } },
       orderBy: { createdAt: 'desc' }
@@ -170,9 +171,10 @@ export class TeamsService {
   }
 
   async createTeamProject(teamId: string, userId: string, dto: { name: string; description?: string; color?: string; deadline?: string }) {
-    return this.prisma.teamProject.create({
+    return this.prisma.project.create({
       data: {
         teamId,
+        userId,  // creator
         name: dto.name,
         description: dto.description,
         color: dto.color || '#6366f1',
@@ -182,37 +184,42 @@ export class TeamsService {
   }
 
   async updateTeamProject(projectId: string, userId: string, dto: any) {
-    const project = await this.prisma.teamProject.findUnique({ where: { id: projectId } })
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } })
     if (!project) throw new NotFoundException('Project not found')
-    await this.requireMember(project.teamId, userId)
-    return this.prisma.teamProject.update({
+    await this.requireMember(project.teamId!, userId)
+    return this.prisma.project.update({
       where: { id: projectId },
       data: { ...dto, deadline: dto.deadline ? new Date(dto.deadline) : undefined }
     })
   }
 
   async deleteTeamProject(projectId: string, userId: string) {
-    const project = await this.prisma.teamProject.findUnique({ where: { id: projectId } })
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } })
     if (!project) throw new NotFoundException('Project not found')
-    await this.requireOwner(project.teamId, userId)
-    return this.prisma.teamProject.delete({ where: { id: projectId } })
+    await this.requireOwner(project.teamId!, userId)
+    return this.prisma.project.delete({ where: { id: projectId } })
   }
 
   // ── Team Tasks ───────────────────────────────────────────────────
   async getTeamTasks(projectId: string, userId: string) {
-    const project = await this.prisma.teamProject.findUnique({ where: { id: projectId } })
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } })
     if (!project) throw new NotFoundException('Project not found')
-    await this.requireMember(project.teamId, userId)
+    await this.requireMember(project.teamId!, userId)
 
     // Get team members for assignee info
     const members = await this.prisma.teamMember.findMany({
-      where: { teamId: project.teamId },
+      where: { teamId: project.teamId! },
       include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } }
     })
 
-    const tasks = await this.prisma.teamTask.findMany({
+    const tasks = await this.prisma.task.findMany({
       where: { projectId },
-      include: { comments: { orderBy: { createdAt: 'asc' } } },
+      include: {
+        comments: {
+          include: { author: { select: { id: true, firstName: true, lastName: true, email: true } } },
+          orderBy: { createdAt: 'asc' }
+        }
+      },
       orderBy: { createdAt: 'desc' }
     })
 
@@ -226,16 +233,18 @@ export class TeamsService {
     title: string; description?: string; priority?: string;
     dueDate?: string; assigneeId?: string
   }) {
-    const project = await this.prisma.teamProject.findUnique({
+    const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: { team: true }
     })
     if (!project) throw new NotFoundException('Project not found')
-    await this.requireMember(project.teamId, userId)
+    await this.requireMember(project.teamId!, userId)
 
-    const task = await this.prisma.teamTask.create({
+    const task = await this.prisma.task.create({
       data: {
         projectId,
+        userId,
+        teamId: project.teamId!,
         title: dto.title,
         description: dto.description,
         priority: dto.priority as any || 'MEDIUM',
@@ -254,7 +263,7 @@ export class TeamsService {
         userId: dto.assigneeId,
         type: 'TASK_ASSIGNED',
         title: 'New task assigned to you',
-        message: `${creator!.firstName} ${creator!.lastName} assigned you "${dto.title}" in ${project.team.name}`,
+        message: `${creator!.firstName} ${creator!.lastName} assigned you "${dto.title}" in ${project.team!.name}`,
         link: `/app/teams/${project.teamId}/projects/${projectId}`,
       })
     }
@@ -263,14 +272,14 @@ export class TeamsService {
   }
 
   async updateTeamTask(taskId: string, userId: string, dto: any) {
-    const task = await this.prisma.teamTask.findUnique({
+    const task = await this.prisma.task.findUnique({
       where: { id: taskId },
       include: { project: { include: { team: true } } }
     })
     if (!task) throw new NotFoundException('Task not found')
-    await this.requireMember(task.project.teamId, userId)
+    await this.requireMember(task.project!.teamId!, userId)
 
-    const updated = await this.prisma.teamTask.update({
+    const updated = await this.prisma.task.update({
       where: { id: taskId },
       data: {
         ...dto,
@@ -289,8 +298,8 @@ export class TeamsService {
         userId: dto.assigneeId,
         type: 'TASK_ASSIGNED',
         title: 'Task assigned to you',
-        message: `${updater!.firstName} ${updater!.lastName} assigned you "${task.title}" in ${task.project.team.name}`,
-        link: `/app/teams/${task.project.teamId}/projects/${task.projectId}`,
+        message: `${updater!.firstName} ${updater!.lastName} assigned you "${task.title}" in ${task.project!.team!.name}`,
+        link: `/app/teams/${task.project!.teamId}/projects/${task.projectId}`,
       })
     }
 
@@ -298,36 +307,33 @@ export class TeamsService {
   }
 
   async deleteTeamTask(taskId: string, userId: string) {
-    const task = await this.prisma.teamTask.findUnique({
+    const task = await this.prisma.task.findUnique({
       where: { id: taskId },
       include: { project: true }
     })
     if (!task) throw new NotFoundException('Task not found')
-    await this.requireMember(task.project.teamId, userId)
-    return this.prisma.teamTask.delete({ where: { id: taskId } })
+    await this.requireMember(task.project!.teamId!, userId)
+    return this.prisma.task.delete({ where: { id: taskId } })
   }
 
   // ── Comments ─────────────────────────────────────────────────────
   async addComment(taskId: string, userId: string, content: string) {
-    const task = await this.prisma.teamTask.findUnique({
+    const task = await this.prisma.task.findUnique({
       where: { id: taskId },
       include: { project: { include: { team: true } } }
     })
     if (!task) throw new NotFoundException('Task not found')
-    await this.requireMember(task.project.teamId, userId)
+    await this.requireMember(task.project!.teamId!, userId)
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { firstName: true, lastName: true, email: true }
     })
 
-    const comment = await this.prisma.teamTaskComment.create({
-      data: {
-        taskId,
-        userId,
-        content,
-        authorName: `${user!.firstName} ${user!.lastName}`,
-        authorEmail: user!.email,
+    const comment = await this.prisma.taskComment.create({
+      data: { taskId, authorId: userId, content },
+      include: {
+        author: { select: { id: true, firstName: true, lastName: true, email: true } }
       }
     })
 
@@ -338,7 +344,7 @@ export class TeamsService {
         type: 'TASK_COMMENT',
         title: 'New comment on your task',
         message: `${user!.firstName} ${user!.lastName} commented on "${task.title}"`,
-        link: `/app/teams/${task.project.teamId}/projects/${task.projectId}`,
+        link: `/app/teams/${task.project!.teamId}/projects/${task.projectId}`,
       })
     }
 
@@ -352,8 +358,8 @@ export class TeamsService {
           userId: mentionedUserId,
           type: 'TASK_MENTIONED',
           title: 'You were mentioned',
-          message: `${user!.firstName} ${user!.lastName} mentioned you in "${task.title}" (${task.project.team.name})`,
-          link: `/app/teams/${task.project.teamId}/projects/${task.projectId}`,
+          message: `${user!.firstName} ${user!.lastName} mentioned you in "${task.title}" (${task.project!.team!.name})`,
+          link: `/app/teams/${task.project!.teamId}/projects/${task.projectId}`,
         })
       }
     }
@@ -362,20 +368,20 @@ export class TeamsService {
   }
 
   async deleteComment(commentId: string, userId: string) {
-    const comment = await this.prisma.teamTaskComment.findUnique({ where: { id: commentId } })
+    const comment = await this.prisma.taskComment.findUnique({ where: { id: commentId } })
     if (!comment) throw new NotFoundException('Comment not found')
-    if (comment.userId !== userId) throw new ForbiddenException('Cannot delete others comments')
-    return this.prisma.teamTaskComment.delete({ where: { id: commentId } })
+    if (comment.authorId !== userId) throw new ForbiddenException('Cannot delete others comments')
+    return this.prisma.taskComment.delete({ where: { id: commentId } })
   }
 
   // ── Recurring Team Tasks ─────────────────────────────────────────
   async createNextTeamOccurrence(taskId: string, userId: string) {
-    const task = await this.prisma.teamTask.findUnique({
+    const task = await this.prisma.task.findUnique({
       where: { id: taskId },
       include: { project: { include: { team: true } } },
     })
     if (!task) throw new NotFoundException('Task not found')
-    await this.requireMember(task.project.teamId, userId)
+    await this.requireMember(task.project!.teamId!, userId)
     if (task.recurrence === 'NONE') throw new NotFoundException('Task is not recurring')
 
     const nextDueDate = this.getNextDueDate(task.dueDate, task.recurrence)
@@ -384,9 +390,11 @@ export class TeamsService {
       return { message: 'Recurrence has ended', created: false }
     }
 
-    const nextTask = await this.prisma.teamTask.create({
+    const nextTask = await this.prisma.task.create({
       data: {
-        projectId: task.projectId,
+        projectId: task.projectId!,
+        userId: task.userId,
+        teamId: task.teamId,
         title: task.title,
         description: task.description,
         priority: task.priority,
@@ -403,12 +411,12 @@ export class TeamsService {
   }
 
   async skipNextTeamOccurrence(taskId: string, userId: string) {
-    const task = await this.prisma.teamTask.findUnique({
+    const task = await this.prisma.task.findUnique({
       where: { id: taskId },
       include: { project: { include: { team: true } } },
     })
     if (!task) throw new NotFoundException('Task not found')
-    await this.requireMember(task.project.teamId, userId)
+    await this.requireMember(task.project!.teamId!, userId)
 
     const skippedDate = this.getNextDueDate(task.dueDate, task.recurrence)
     const nextDueDate = this.getNextDueDate(skippedDate, task.recurrence)
@@ -417,9 +425,11 @@ export class TeamsService {
       return { message: 'Recurrence has ended', created: false }
     }
 
-    const nextTask = await this.prisma.teamTask.create({
+    const nextTask = await this.prisma.task.create({
       data: {
-        projectId: task.projectId,
+        projectId: task.projectId!,
+        userId: task.userId,
+        teamId: task.teamId,
         title: task.title,
         description: task.description,
         priority: task.priority,
@@ -435,21 +445,9 @@ export class TeamsService {
     return { message: 'Occurrence skipped', created: true, task: nextTask }
   }
 
-  private getNextDueDate(currentDue: Date | null, recurrence: string): Date {
-    const base = currentDue ? new Date(currentDue) : new Date()
-    switch (recurrence) {
-      case 'DAILY':    base.setDate(base.getDate() + 1);         break
-      case 'WEEKLY':   base.setDate(base.getDate() + 7);         break
-      case 'BIWEEKLY': base.setDate(base.getDate() + 14);        break
-      case 'MONTHLY':  base.setMonth(base.getMonth() + 1);       break
-      case 'YEARLY':   base.setFullYear(base.getFullYear() + 1); break
-    }
-    return base
-  }
-
   // ── Activity Feed ────────────────────────────────────────────────
   async getTeamActivity(teamId: string, userId: string) {
-    const projects = await this.prisma.teamProject.findMany({
+    const projects = await this.prisma.project.findMany({
       where: { teamId },
       select: { id: true, name: true }
     })
@@ -457,17 +455,20 @@ export class TeamsService {
     const projectMap = Object.fromEntries(projects.map(p => [p.id, p.name]))
 
     const [tasks, comments, members] = await Promise.all([
-      this.prisma.teamTask.findMany({
-        where: { projectId: { in: projectIds } },
+      this.prisma.task.findMany({
+        where: { projectId: { in: projectIds }, teamId },
         orderBy: { createdAt: 'desc' },
         take: 25,
         select: { id: true, title: true, status: true, priority: true, projectId: true, createdAt: true, completedAt: true }
       }),
-      this.prisma.teamTaskComment.findMany({
-        where: { task: { projectId: { in: projectIds } } },
+      this.prisma.taskComment.findMany({
+        where: { task: { projectId: { in: projectIds }, teamId } },
         orderBy: { createdAt: 'desc' },
         take: 20,
-        select: { id: true, content: true, authorName: true, createdAt: true, task: { select: { title: true, projectId: true } } }
+        include: {
+          author: { select: { firstName: true, lastName: true } },
+          task: { select: { title: true, projectId: true } }
+        }
       }),
       this.prisma.teamMember.findMany({
         where: { teamId },
@@ -479,13 +480,14 @@ export class TeamsService {
     const events: any[] = []
 
     for (const task of tasks) {
-      events.push({ type: 'task_created', id: `tc_${task.id}`, title: task.title, projectName: projectMap[task.projectId], priority: task.priority, timestamp: task.createdAt })
+      events.push({ type: 'task_created', id: `tc_${task.id}`, title: task.title, projectName: projectMap[task.projectId!], priority: task.priority, timestamp: task.createdAt })
       if (task.completedAt) {
-        events.push({ type: 'task_completed', id: `td_${task.id}`, title: task.title, projectName: projectMap[task.projectId], timestamp: task.completedAt })
+        events.push({ type: 'task_completed', id: `td_${task.id}`, title: task.title, projectName: projectMap[task.projectId!], timestamp: task.completedAt })
       }
     }
     for (const c of comments) {
-      events.push({ type: 'comment_added', id: `cm_${c.id}`, authorName: c.authorName, taskTitle: c.task.title, projectName: projectMap[c.task.projectId], content: c.content.slice(0, 80), timestamp: c.createdAt })
+      const authorName = `${c.author.firstName} ${c.author.lastName}`
+      events.push({ type: 'comment_added', id: `cm_${c.id}`, authorName, taskTitle: c.task.title, projectName: projectMap[c.task.projectId!], content: c.content.slice(0, 80), timestamp: c.createdAt })
     }
     for (const m of members) {
       events.push({ type: 'member_joined', id: `mj_${m.id}`, memberName: `${m.user.firstName} ${m.user.lastName}`, timestamp: m.joinedAt })
@@ -502,14 +504,14 @@ export class TeamsService {
         where: { teamId },
         include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } }
       }),
-      this.prisma.teamProject.findMany({ where: { teamId }, select: { id: true } })
+      this.prisma.project.findMany({ where: { teamId }, select: { id: true } })
     ])
     const projectIds = projects.map(p => p.id)
 
     const workload = await Promise.all(members.map(async (m) => {
       const [open, done] = await Promise.all([
-        this.prisma.teamTask.count({ where: { projectId: { in: projectIds }, assigneeId: m.userId, status: { not: 'DONE' } } }),
-        this.prisma.teamTask.count({ where: { projectId: { in: projectIds }, assigneeId: m.userId, status: 'DONE' } }),
+        this.prisma.task.count({ where: { projectId: { in: projectIds }, teamId, assigneeId: m.userId, status: { not: 'DONE' } } }),
+        this.prisma.task.count({ where: { projectId: { in: projectIds }, teamId, assigneeId: m.userId, status: 'DONE' } }),
       ])
       return { userId: m.userId, name: `${m.user.firstName} ${m.user.lastName}`, email: m.user.email, role: m.role, openTasks: open, completedTasks: done }
     }))
@@ -532,5 +534,17 @@ export class TeamsService {
     })
     if (!member || member.role !== 'OWNER') throw new ForbiddenException('Only team owner can do this')
     return member
+  }
+
+  private getNextDueDate(currentDue: Date | null, recurrence: string): Date {
+    const base = currentDue ? new Date(currentDue) : new Date()
+    switch (recurrence) {
+      case 'DAILY':    base.setDate(base.getDate() + 1);         break
+      case 'WEEKLY':   base.setDate(base.getDate() + 7);         break
+      case 'BIWEEKLY': base.setDate(base.getDate() + 14);        break
+      case 'MONTHLY':  base.setMonth(base.getMonth() + 1);       break
+      case 'YEARLY':   base.setFullYear(base.getFullYear() + 1); break
+    }
+    return base
   }
 }

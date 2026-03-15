@@ -55,7 +55,8 @@ model Team {
   ownerId     String
   owner       User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   members     TeamMember[]
-  projects    TeamProject[]
+  projects    Project[]
+  tasks       Task[]
 
   @@index([ownerId])
   @@map("teams")
@@ -77,67 +78,6 @@ model TeamMember {
   @@map("team_members")
 }
 
-model TeamProject {
-  id          String        @id @default(cuid())
-  name        String
-  description String?
-  color       String        @default("#6366f1")
-  status      ProjectStatus @default(ACTIVE)
-  deadline    DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  teamId      String
-  team        Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  tasks       TeamTask[]
-
-  @@index([teamId])
-  @@map("team_projects")
-}
-
-model TeamTask {
-  id                String      @id @default(cuid())
-  title             String
-  description       String?
-  status            TaskStatus  @default(TODO)
-  priority          Priority    @default(MEDIUM)
-  dueDate           DateTime?
-  completedAt       DateTime?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  recurrence        Recurrence  @default(NONE)
-  recurrenceEndDate DateTime?
-  parentTaskId      String?
-  parentTask        TeamTask?   @relation("RecurringTeamTask", fields: [parentTaskId], references: [id])
-  childTasks        TeamTask[]  @relation("RecurringTeamTask")
-
-  projectId         String
-  project           TeamProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assigneeId        String?
-  comments          TeamTaskComment[]
-
-  @@index([projectId])
-  @@index([assigneeId])
-  @@index([parentTaskId])
-  @@map("team_tasks")
-}
-
-model TeamTaskComment {
-  id          String   @id @default(cuid())
-  content     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  taskId      String
-  task        TeamTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  userId      String
-  authorName  String
-  authorEmail String
-
-  @@index([taskId])
-  @@map("team_task_comments")
-}
-
 model Project {
   id          String        @id @default(cuid())
   name        String
@@ -147,15 +87,16 @@ model Project {
   deadline    DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
-  
-  // NEW: Soft delete column
-  deletedAt   DateTime?     
+  deletedAt   DateTime?
 
   userId      String
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId      String?
+  team        Team?         @relation(fields: [teamId], references: [id], onDelete: Cascade)
   tasks       Task[]
 
   @@index([userId])
+  @@index([teamId])
   @@index([userId, status])
   @@map("projects")
 }
@@ -179,6 +120,8 @@ model Task {
 
   userId            String
   user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId            String?
+  team              Team?       @relation(fields: [teamId], references: [id], onDelete: Cascade)
   projectId         String?
   project           Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
   parentId          String?
@@ -193,6 +136,7 @@ model Task {
   assigneeId        String?
 
   @@index([userId])
+  @@index([teamId])
   @@index([projectId])
   @@index([parentId])
   @@index([parentTaskId])

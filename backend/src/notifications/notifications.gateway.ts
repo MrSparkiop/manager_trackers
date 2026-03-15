@@ -13,8 +13,6 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
   @WebSocketServer()
   server: Server
 
-  private userSockets = new Map<string, string>() // userId -> socketId
-
   constructor(private jwtService: JwtService) {}
 
   async handleConnection(client: Socket) {
@@ -23,24 +21,19 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
       if (!token) { client.disconnect(); return }
       const payload = this.jwtService.verify(token, { secret: process.env.JWT_SECRET })
       client.data.userId = payload.sub
-      this.userSockets.set(payload.sub, client.id)
+      // Join a per-user room so sendNotification() works across multiple instances
+      // via the Redis adapter — no local socket map needed.
       client.join(`user:${payload.sub}`)
     } catch {
       client.disconnect()
     }
   }
 
-  handleDisconnect(client: Socket) {
-    if (client.data.userId) {
-      this.userSockets.delete(client.data.userId)
-    }
+  handleDisconnect(_client: Socket) {
+    // Room membership is managed by Socket.io; nothing to clean up locally.
   }
 
   sendNotification(userId: string, notification: any) {
     this.server.to(`user:${userId}`).emit('notification', notification)
-  }
-
-  isOnline(userId: string): boolean {
-    return this.userSockets.has(userId)
   }
 }
