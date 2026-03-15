@@ -140,7 +140,16 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } })
     if (!user || !user.refreshToken) throw new UnauthorizedException('Refresh token revoked')
 
-    if (!verifyRefreshToken(refreshToken, user.refreshToken)) {
+    // Try SHA-256 first (tokens issued after the migration).
+    // Fall back to bcrypt for tokens issued before the SHA-256 change so that
+    // existing sessions keep working. On the next rotation the new token will
+    // be stored as SHA-256, naturally upgrading every session.
+    const sha256Valid = verifyRefreshToken(refreshToken, user.refreshToken)
+    const bcryptValid = sha256Valid
+      ? false
+      : await bcrypt.compare(refreshToken, user.refreshToken).catch(() => false)
+
+    if (!sha256Valid && !bcryptValid) {
       throw new UnauthorizedException('Refresh token mismatch')
     }
 
