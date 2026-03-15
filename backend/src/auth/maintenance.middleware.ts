@@ -62,12 +62,18 @@ export class MaintenanceMiddleware implements NestMiddleware {
         where: { key: 'maintenanceMessage' },
       })
 
-      throw new ServiceUnavailableException(
-        messageConfig?.value || 'Platform is under maintenance. Please try again later.',
+      // Use next(err) — the correct Express pattern for async middleware errors.
+      // Throwing inside an async middleware causes an unhandled rejection that
+      // NestJS converts to a generic 500. next(err) routes through the exception
+      // filter pipeline and returns the correct 503 response.
+      return next(
+        new ServiceUnavailableException(
+          messageConfig?.value || 'Platform is under maintenance. Please try again later.',
+        ),
       )
     } catch (err) {
-      // Re-throw NestJS HTTP exceptions; swallow unexpected errors silently
-      if ((err as any)?.status) throw err
+      // Unexpected errors (e.g., DB timeout): swallow and let the request through
+      // rather than taking down every route with a 500.
       next()
     }
   }
