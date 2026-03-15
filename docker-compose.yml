@@ -19,6 +19,22 @@ services:
       timeout: 5s
       retries: 5
 
+  migrator:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: client_tracker_migrator
+    environment:
+      DATABASE_URL: "${DATABASE_URL}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: npx prisma migrate deploy
+    restart: "no"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
   backend:
     build:
       context: ./backend
@@ -40,7 +56,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "npx prisma migrate deploy && npm run start:dev"
+      migrator:
+        condition: service_completed_successfully
+    command: npm run start:dev
     volumes:
       # Mount the entire backend folder for config/schema hot-reloading
       - ./backend:/app

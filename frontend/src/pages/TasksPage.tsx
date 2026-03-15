@@ -481,14 +481,31 @@ export default function TasksPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: any) => api.put(`/tasks/${id}`, data),
+    // Optimistic update: immediately reflect status/priority changes in the UI
+    onMutate: async ({ id, data }: any) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks'], exact: false })
+      const previousSnapshots = queryClient.getQueriesData<Task[]>({ queryKey: ['tasks'] })
+      queryClient.setQueriesData<Task[]>({ queryKey: ['tasks'], exact: false }, (old) =>
+        old ? old.map(t => t.id === id ? { ...t, ...data } : t) : old
+      )
+      return { previousSnapshots }
+    },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
       if (variables.closeModal) {
         closeModal()
         toast.success('Task updated!')
       }
     },
-    onError: () => toast.error('Failed to update task')
+    onError: (_err, _vars, ctx: any) => {
+      // Roll back to the snapshot taken before the optimistic update
+      ctx?.previousSnapshots?.forEach(([queryKey, data]: [any, any]) => {
+        queryClient.setQueryData(queryKey, data)
+      })
+      toast.error('Failed to update task')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'], exact: false })
+    },
   })
 
   const deleteMutation = useMutation({

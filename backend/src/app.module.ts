@@ -20,6 +20,7 @@ import { TaskActivityModule } from './task-activity/task-activity.module'
 import { SupportModule } from './support/support.module'
 import { BillingModule } from './billing/billing.module'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
+import { ScheduleModule } from '@nestjs/schedule'
 import { APP_GUARD } from '@nestjs/core'
 
 @Module({
@@ -33,6 +34,7 @@ import { APP_GUARD } from '@nestjs/core'
       },
     ]),
     JwtModule.register({ secret: process.env.JWT_SECRET, global: true }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     ProjectsModule,
