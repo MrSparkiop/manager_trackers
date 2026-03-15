@@ -142,7 +142,7 @@ export class BillingService {
       invoices: invoices.data.map(inv => ({
         id: inv.id,
         number: inv.number,
-        date: new Date(inv.created * 1000).toISOString(),
+        date: inv.created ? new Date(inv.created * 1000).toISOString() : null,
         amount: (inv.amount_paid ?? 0) / 100,
         currency: inv.currency,
         status: inv.status,
