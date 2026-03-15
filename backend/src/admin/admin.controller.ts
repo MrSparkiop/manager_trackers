@@ -60,6 +60,23 @@ export class AdminController {
     return this.adminService.deleteUser(req.user.id, id)
   }
 
+  // ── Billing management ───────────────────────────────────────────
+  @Get('billing')
+  @ApiOperation({ summary: 'Get all users with subscription info' })
+  getBillingOverview() { return this.adminService.getBillingOverview() }
+
+  @Post('billing/:userId/grant-pro')
+  @ApiOperation({ summary: 'Manually grant PRO to a user' })
+  grantPro(@Req() req: any, @Param('userId') userId: string) {
+    return this.adminService.setUserRole(req.user.id, userId, 'PRO')
+  }
+
+  @Post('billing/:userId/revoke-pro')
+  @ApiOperation({ summary: 'Revoke PRO from a user' })
+  revokePro(@Req() req: any, @Param('userId') userId: string) {
+    return this.adminService.setUserRole(req.user.id, userId, 'USER')
+  }
+
   @Get('activity')
   @ApiOperation({ summary: 'Get platform activity log' })
   getActivityLog(

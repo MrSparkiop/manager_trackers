@@ -4,12 +4,13 @@ import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import {
   LayoutDashboard, Users, LogOut, User,
-  Sun, Moon, Menu, X, Shield, ArrowLeft, Activity, Search, Settings, Headphones
+  Sun, Moon, Menu, X, Shield, ArrowLeft, Activity, Search, Settings, Headphones, CreditCard
 } from 'lucide-react'
 
 const navItems = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard'    },
   { to: '/admin/users',     icon: Users,           label: 'Users'        },
+  { to: '/admin/billing',   icon: CreditCard,      label: 'Billing'      },
   { to: '/admin/activity',  icon: Activity,        label: 'Activity Log' },
   { to: '/admin/search',    icon: Search,          label: 'Search'       },
   { to: '/admin/settings',  icon: Settings,        label: 'Settings'     },

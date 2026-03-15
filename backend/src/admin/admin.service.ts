@@ -318,4 +318,34 @@ export class AdminService {
     ])
     return { users, tasks, projects }
   }
+
+  // ── Billing management ─────────────────────────────────────────────
+  async getBillingOverview() {
+    const users = await this.prisma.user.findMany({
+      select: {
+        id: true, email: true, firstName: true, lastName: true,
+        role: true, isSuspended: true, createdAt: true,
+        stripeCustomerId: true, stripeSubscriptionId: true,
+      },
+      orderBy: [{ role: 'asc' }, { createdAt: 'desc' }],
+    })
+
+    const stats = {
+      total: users.length,
+      pro: users.filter(u => u.role === 'PRO').length,
+      admin: users.filter(u => u.role === 'ADMIN').length,
+      free: users.filter(u => u.role === 'USER').length,
+    }
+
+    return { users, stats }
+  }
+
+  async setUserRole(adminId: string, userId: string, role: string) {
+    if (adminId === userId) throw new ForbiddenException('Cannot change your own role')
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { role: role as any },
+      select: { id: true, email: true, firstName: true, lastName: true, role: true },
+    })
+  }
 }

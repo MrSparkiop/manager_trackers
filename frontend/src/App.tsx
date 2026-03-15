@@ -32,6 +32,7 @@ import AdminSettingsPage from './pages/admin/AdminSettingsPage'
 import TeamSettingsPage from './pages/TeamSettingsPage'
 import SupportPage from './pages/SupportPage'
 import AdminSupportPage from './pages/admin/AdminSupportPage'
+import AdminBillingPage from './pages/admin/AdminBillingPage'
 import BillingPage from './pages/BillingPage'
 import BillingSuccessPage from './pages/BillingSuccessPage'
 import BillingCancelPage from './pages/BillingCancelPage'
@@ -123,6 +124,7 @@ export default function App() {
             <Route path="search" element={<AdminSearchPage />} />
             <Route path="settings" element={<AdminSettingsPage />} />
             <Route path="support" element={<AdminSupportPage />} />
+            <Route path="billing" element={<AdminBillingPage />} />
           </Route>
 
           {/* Catch all */}

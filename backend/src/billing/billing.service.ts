@@ -61,15 +61,23 @@ export class BillingService {
 
   /** Handle incoming Stripe webhooks */
   async handleWebhook(rawBody: Buffer, signature: string) {
-    const webhookSecret = this.config.get<string>('STRIPE_WEBHOOK_SECRET')
-    if (!webhookSecret) return { received: true } // skip in dev if not set
+    const secrets = [
+      this.config.get<string>('STRIPE_WEBHOOK_SECRET'),
+      this.config.get<string>('STRIPE_WEBHOOK_SECRET_2'),
+    ].filter(Boolean) as string[]
 
-    let event: Stripe.Event
-    try {
-      event = this.stripe.webhooks.constructEvent(rawBody, signature, webhookSecret)
-    } catch {
-      throw new BadRequestException('Invalid Stripe webhook signature')
+    if (!secrets.length) return { received: true } // skip in dev if not set
+
+    let event: Stripe.Event | null = null
+    for (const secret of secrets) {
+      try {
+        event = this.stripe.webhooks.constructEvent(rawBody, signature, secret)
+        break
+      } catch {
+        // try next secret
+      }
     }
+    if (!event) throw new BadRequestException('Invalid Stripe webhook signature')
 
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -117,11 +125,17 @@ export class BillingService {
       this.stripe.invoices.list({ customer: user.stripeCustomerId!, limit: 10 }),
     ])
 
+    // current_period_end moved in newer Stripe API versions
+    const periodEnd = (sub as any).current_period_end
+      ?? sub.items?.data?.[0]?.current_period_end
+      ?? null
+    const periodEndIso = periodEnd ? new Date(periodEnd * 1000).toISOString() : null
+
     return {
       active: sub.status === 'active',
       status: sub.status,
       plan: user.role,
-      currentPeriodEnd: new Date((sub as any).current_period_end * 1000).toISOString(),
+      currentPeriodEnd: periodEndIso,
       cancelAtPeriodEnd: sub.cancel_at_period_end,
       amount: (sub.items.data[0]?.price?.unit_amount ?? 0) / 100,
       currency: sub.items.data[0]?.price?.currency ?? 'usd',
