@@ -79,6 +79,12 @@ export class BillingService {
     }
     if (!event) throw new BadRequestException('Invalid Stripe webhook signature')
 
+    // Idempotency check — skip already-processed events
+    const alreadyProcessed = await this.prisma.stripeEvent.findUnique({
+      where: { id: event.id },
+    })
+    if (alreadyProcessed) return { received: true }
+
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
@@ -104,7 +110,24 @@ export class BillingService {
         })
         break
       }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice
+        const customerId = invoice.customer as string
+        if (customerId) {
+          await this.prisma.user.updateMany({
+            where: { stripeCustomerId: customerId },
+            data: { role: 'USER' },
+          })
+        }
+        break
+      }
     }
+
+    // Record event so duplicates are skipped
+    await this.prisma.stripeEvent.create({
+      data: { id: event.id, type: event.type },
+    })
 
     return { received: true }
   }

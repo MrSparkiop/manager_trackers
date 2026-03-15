@@ -13,6 +13,7 @@ import { AnnouncementsModule } from './announcements/announcements.module'
 import { TeamsModule } from './teams/teams.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { LastSeenMiddleware } from './auth/last-seen.middleware'
+import { MaintenanceMiddleware } from './auth/maintenance.middleware'
 import { SearchModule } from './search/search.module'
 import { AnalyticsModule } from './analytics/analytics.module'
 import { TaskActivityModule } from './task-activity/task-activity.module'
@@ -58,6 +59,7 @@ import { APP_GUARD } from '@nestjs/core'
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    consumer.apply(MaintenanceMiddleware).forRoutes('*')
     consumer.apply(LastSeenMiddleware).forRoutes('*')
   }
 }

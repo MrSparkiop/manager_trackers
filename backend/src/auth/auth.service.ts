@@ -3,8 +3,21 @@ import { JwtService } from '@nestjs/jwt'
 import { PrismaService } from '../prisma/prisma.service'
 import { MailService } from '../mail/mail.service'
 import * as bcrypt from 'bcrypt'
+import { createHash, timingSafeEqual } from 'crypto'
 import * as crypto from 'crypto'
 import type { Response } from 'express'
+
+/** Fast, constant-time-safe SHA-256 hash for refresh tokens */
+function hashRefreshToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
+
+function verifyRefreshToken(token: string, stored: string): boolean {
+  const hashed = Buffer.from(hashRefreshToken(token))
+  const storedBuf = Buffer.from(stored)
+  if (hashed.length !== storedBuf.length) return false
+  return timingSafeEqual(hashed, storedBuf)
+}
 
 @Injectable()
 export class AuthService {
@@ -49,19 +62,6 @@ export class AuthService {
   }
 
   async register(dto: any, res: Response) {
-    // Check maintenance mode
-    const maintenanceConfig = await this.prisma.systemConfig.findUnique({
-      where: { key: 'maintenanceMode' }
-    })
-    if (maintenanceConfig?.value === 'true') {
-      const messageConfig = await this.prisma.systemConfig.findUnique({
-        where: { key: 'maintenanceMessage' }
-      })
-      throw new ConflictException(
-        messageConfig?.value || 'Platform is under maintenance. Please try again later.'
-      )
-    }
-
     const regConfig = await this.prisma.systemConfig.findUnique({
       where: { key: 'disableRegistrations' }
     })
@@ -85,11 +85,9 @@ export class AuthService {
 
     const { accessToken, refreshToken } = this.generateTokens(user.id)
 
-    // Store hashed refresh token in DB
-    const hashedRefresh = await bcrypt.hash(refreshToken, 10)
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { refreshToken: hashedRefresh }
+      data: { refreshToken: hashRefreshToken(refreshToken) }
     })
 
     this.setAuthCookies(res, accessToken, refreshToken)
@@ -103,30 +101,12 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.password)
     if (!valid) throw new UnauthorizedException('Invalid credentials')
 
-    // Check maintenance mode — skip for admins
-    if (user.role !== 'ADMIN') {
-      const maintenanceConfig = await this.prisma.systemConfig.findUnique({
-        where: { key: 'maintenanceMode' }
-      })
-      if (maintenanceConfig?.value === 'true') {
-        const messageConfig = await this.prisma.systemConfig.findUnique({
-          where: { key: 'maintenanceMessage' }
-        })
-        throw new UnauthorizedException(
-          messageConfig?.value || 'Platform is under maintenance. Please try again later.'
-        )
-      }
-    }
-
     if (user.isSuspended) throw new UnauthorizedException('Your account has been suspended')
-
     const { accessToken, refreshToken } = this.generateTokens(user.id)
 
-    // Store hashed refresh token in DB
-    const hashedRefresh = await bcrypt.hash(refreshToken, 10)
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { refreshToken: hashedRefresh }
+      data: { refreshToken: hashRefreshToken(refreshToken) }
     })
 
     this.setAuthCookies(res, accessToken, refreshToken)
@@ -160,17 +140,16 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } })
     if (!user || !user.refreshToken) throw new UnauthorizedException('Refresh token revoked')
 
-    const isValid = await bcrypt.compare(refreshToken, user.refreshToken)
-    if (!isValid) throw new UnauthorizedException('Refresh token mismatch')
+    if (!verifyRefreshToken(refreshToken, user.refreshToken)) {
+      throw new UnauthorizedException('Refresh token mismatch')
+    }
 
     // Generate new token pair (rotation)
     const { accessToken: newAccessToken, refreshToken: newRefreshToken } = this.generateTokens(user.id)
 
-    // Store new hashed refresh token
-    const hashedRefresh = await bcrypt.hash(newRefreshToken, 10)
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { refreshToken: hashedRefresh }
+      data: { refreshToken: hashRefreshToken(newRefreshToken) }
     })
 
     this.setAuthCookies(res, newAccessToken, newRefreshToken)

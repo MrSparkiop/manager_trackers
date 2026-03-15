@@ -475,3 +475,12 @@ enum NotificationType {
   TEAM_JOINED
   TEAM_REMOVED
 }
+
+// Stripe webhook idempotency: one row per processed Stripe event ID
+model StripeEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
+
+  @@map("stripe_events")
+}

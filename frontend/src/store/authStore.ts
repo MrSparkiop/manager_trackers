@@ -15,10 +15,13 @@ interface User {
 interface AuthState {
   user: User | null
   isAuthenticated: boolean
+  isLoading: boolean
+  error: string | null
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>
   logout: () => Promise<void>
   fetchMe: () => Promise<void>
+  clearError: () => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -26,18 +29,42 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       isAuthenticated: false,
+      isLoading: false,
+      error: null,
+
+      clearError: () => set({ error: null }),
 
       login: async (email, password) => {
-        const res = await api.post('/auth/login', { email, password })
-        set({ user: res.data.user, isAuthenticated: true })
-        Sentry.setUser({ id: res.data.user.id, email: res.data.user.email, username: `${res.data.user.firstName} ${res.data.user.lastName}` })
-        connectSocket()
+        set({ isLoading: true, error: null })
+        try {
+          const res = await api.post('/auth/login', { email, password })
+          set({ user: res.data.user, isAuthenticated: true, isLoading: false })
+          Sentry.setUser({ id: res.data.user.id, email: res.data.user.email, username: `${res.data.user.firstName} ${res.data.user.lastName}` })
+          connectSocket()
+        } catch (err: any) {
+          const message =
+            err?.response?.data?.message ||
+            err?.message ||
+            'Login failed. Please try again.'
+          set({ isLoading: false, error: message })
+          throw err
+        }
       },
 
       register: async (email, password, firstName, lastName) => {
-        const res = await api.post('/auth/register', { email, password, firstName, lastName })
-        set({ user: res.data.user, isAuthenticated: true })
-        Sentry.setUser({ id: res.data.user.id, email: res.data.user.email, username: `${res.data.user.firstName} ${res.data.user.lastName}` })
+        set({ isLoading: true, error: null })
+        try {
+          const res = await api.post('/auth/register', { email, password, firstName, lastName })
+          set({ user: res.data.user, isAuthenticated: true, isLoading: false })
+          Sentry.setUser({ id: res.data.user.id, email: res.data.user.email, username: `${res.data.user.firstName} ${res.data.user.lastName}` })
+        } catch (err: any) {
+          const message =
+            err?.response?.data?.message ||
+            err?.message ||
+            'Registration failed. Please try again.'
+          set({ isLoading: false, error: message })
+          throw err
+        }
       },
 
       logout: async () => {
@@ -46,10 +73,9 @@ export const useAuthStore = create<AuthState>()(
         } catch (error) {
           console.warn('Server logout failed, clearing local state anyway', error)
         } finally {
-          // Disconnect socket and wipe local auth state reliably
           disconnectSocket()
           Sentry.setUser(null)
-          set({ user: null, isAuthenticated: false })
+          set({ user: null, isAuthenticated: false, isLoading: false, error: null })
         }
       },
 
