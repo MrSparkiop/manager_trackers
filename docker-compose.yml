@@ -93,6 +93,7 @@ services:
       VITE_API_URL: /api
       VITE_SOCKET_URL: ""
       BACKEND_URL: http://backend:3000
+      ALLOWED_HOST: "${ALLOWED_HOST:-}"
     depends_on:
       - backend
     volumes:

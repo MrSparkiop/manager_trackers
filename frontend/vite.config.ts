@@ -5,6 +5,10 @@ import react from '@vitejs/plugin-react'
 // BACKEND_URL is only set in Docker (docker-compose frontend environment).
 // Local dev leaves it unset so proxy is skipped and VITE_API_URL is used directly.
 const backendUrl = process.env.BACKEND_URL
+// ALLOWED_HOST is set in Docker/VPS environments where Nginx proxies a real
+// domain to this dev server (e.g. trackers.blagoytechnology.tech).
+// Vite 5 blocks Host headers it doesn't recognise unless explicitly allowed.
+const allowedHost = process.env.ALLOWED_HOST
 
 export default defineConfig({
   plugins: [react(), sentryVitePlugin({
@@ -15,6 +19,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
+    allowedHosts: allowedHost ? [allowedHost] : undefined,
     proxy: backendUrl ? {
       '/api': { target: backendUrl, changeOrigin: true },
       '/socket.io': { target: backendUrl, changeOrigin: true, ws: true },
