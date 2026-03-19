@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuards, Req } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
-import { RolesGuard } from '../auth/roles.guard'
-import { Roles, Role } from '../auth/roles.decorator'
+import { PermissionsGuard } from '../auth/permissions.guard'
+import { RequirePermissions } from '../auth/permissions'
 import { TeamMemberGuard } from './team-member.guard'
 import { TeamsService } from './teams.service'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
@@ -20,8 +20,8 @@ export class TeamsController {
   }
 
   @Post()
-  @UseGuards(RolesGuard)
-  @Roles(Role.PRO, Role.ADMIN)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions('create:team')
   @ApiOperation({ summary: 'Create a team' })
   createTeam(@Req() req: any, @Body() body: { name: string; description?: string; color?: string }) {
     return this.teamsService.createTeam(req.user.id, body)
@@ -34,8 +34,8 @@ export class TeamsController {
   }
 
   @Post('join')
-  @UseGuards(RolesGuard)
-  @Roles(Role.PRO, Role.ADMIN)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions('join:team')
   @ApiOperation({ summary: 'Join a team via invite code' })
   joinTeam(@Req() req: any, @Body() body: { inviteCode: string }) {
     return this.teamsService.joinTeam(body.inviteCode, req.user.id)

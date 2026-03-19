@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Req } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
-import { RolesGuard } from '../auth/roles.guard'
-import { Roles, Role } from '../auth/roles.decorator'
+import { PermissionsGuard } from '../auth/permissions.guard'
+import { RequirePermissions } from '../auth/permissions'
 import { SupportService } from './support.service'
 
 // ── User-facing support endpoints ────────────────────────────────
@@ -37,8 +37,8 @@ export class SupportController {
 }
 
 // ── Admin support endpoints ───────────────────────────────────────
-@UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles(Role.ADMIN)
+@UseGuards(AuthGuard('jwt'), PermissionsGuard)
+@RequirePermissions('access:admin')
 @Controller('admin/support')
 export class AdminSupportController {
   constructor(private service: SupportService) {}
