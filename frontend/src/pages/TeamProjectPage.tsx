@@ -278,8 +278,11 @@ export default function TeamProjectPage() {
   }
 
   // ── Task Card (shared between list and kanban) ────────────────────
-  const TaskCard = ({ task, kanban = false }: { task: any; kanban?: boolean }) => (
+  // NOTE: defined as a plain render function (not a React component) so that
+  // typing in the comment input doesn't cause the card to unmount/remount.
+  const renderTaskCard = (task: any, kanban = false) => (
     <div
+      key={task.id}
       draggable
       onDragStart={() => handleDragStart(task.id)}
       onDragEnd={handleDragEnd}
@@ -408,16 +411,16 @@ export default function TeamProjectPage() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '10px', fontWeight: '700', color: '#fff'
                   }}>
-                    {c.authorName[0]}
+                    {c.author?.firstName?.[0]}
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: '600', color: colors.text }}>{c.authorName}</span>
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: colors.text }}>{c.author?.firstName} {c.author?.lastName}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '10px', color: colors.textMuted }}>
                           {new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </span>
-                        {c.userId === (user as any)?.id && (
+                        {c.authorId === (user as any)?.id && (
                           <button onClick={() => deleteCommentMutation.mutate(c.id)} style={{ padding: '2px', background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted }}
                             onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
                             onMouseLeave={e => e.currentTarget.style.color = colors.textMuted}
@@ -557,7 +560,7 @@ export default function TeamProjectPage() {
             />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {filteredTasks.map((task: any) => <TaskCard key={task.id} task={task} />)}
+              {filteredTasks.map((task: any) => renderTaskCard(task))}
             </div>
           )}
         </>
@@ -617,7 +620,7 @@ export default function TeamProjectPage() {
                     {isDragTarget ? '📥 Drop here' : 'No tasks'}
                   </div>
                 ) : (
-                  columnTasks.map((task: any) => <TaskCard key={task.id} task={task} kanban />)
+                  columnTasks.map((task: any) => renderTaskCard(task, true))
                 )}
 
                 {/* Quick add button */}

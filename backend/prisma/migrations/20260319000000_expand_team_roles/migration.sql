@@ -1,10 +1,13 @@
 -- Expand TeamRole: OWNER | MEMBER  →  OWNER | ADMIN | EDITOR | VIEWER
 -- PostgreSQL does not allow removing enum values, so we recreate the type.
 
--- 1. Create new enum with all four roles
+-- 1. Drop the default first (required before changing the column type)
+ALTER TABLE "team_members" ALTER COLUMN "role" DROP DEFAULT;
+
+-- 2. Create new enum with all four roles
 CREATE TYPE "TeamRole_new" AS ENUM ('OWNER', 'ADMIN', 'EDITOR', 'VIEWER');
 
--- 2. Migrate existing rows: OWNER stays OWNER, MEMBER becomes EDITOR
+-- 3. Migrate existing rows: OWNER stays OWNER, MEMBER becomes EDITOR
 ALTER TABLE "team_members"
   ALTER COLUMN "role" TYPE "TeamRole_new"
   USING (
@@ -14,9 +17,9 @@ ALTER TABLE "team_members"
     END
   );
 
--- 3. Drop old type and rename new one
+-- 4. Drop old type and rename new one
 DROP TYPE "TeamRole";
 ALTER TYPE "TeamRole_new" RENAME TO "TeamRole";
 
--- 4. Update the column default to EDITOR (was MEMBER)
+-- 5. Restore the default as EDITOR
 ALTER TABLE "team_members" ALTER COLUMN "role" SET DEFAULT 'EDITOR';

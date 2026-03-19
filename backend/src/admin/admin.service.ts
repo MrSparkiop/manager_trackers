@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common'
+import { JwtService } from '@nestjs/jwt'
 import { PrismaService } from '../prisma/prisma.service'
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) {}
 
   // ── existing methods stay the same ──────────────────────────────
 
@@ -346,6 +350,48 @@ export class AdminService {
       where: { id: userId },
       data: { role: role as any },
       select: { id: true, email: true, firstName: true, lastName: true, role: true },
+    })
+  }
+
+  // ── Admin Impersonation ───────────────────────────────────────────
+  async impersonateUser(adminId: string, targetUserId: string, ip?: string) {
+    if (adminId === targetUserId) throw new ForbiddenException('Cannot impersonate yourself')
+
+    const target = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, email: true, firstName: true, lastName: true, role: true, isSuspended: true },
+    })
+    if (!target) throw new NotFoundException('User not found')
+
+    // Log the impersonation — immutable audit record
+    await this.prisma.adminAuditLog.create({
+      data: {
+        action:       'IMPERSONATE',
+        adminId,
+        targetUserId,
+        metadata:     { ip: ip ?? null, targetEmail: target.email },
+      }
+    })
+
+    // Issue a 1-hour access token scoped to the target user.
+    // The impersonatedBy claim lets the frontend show a banner and
+    // lets server-side code detect impersonated sessions if needed.
+    const token = this.jwtService.sign(
+      { sub: targetUserId, impersonatedBy: adminId },
+      { expiresIn: '1h' },
+    )
+
+    return {
+      token,
+      expiresIn: 3600,
+      user: target,
+    }
+  }
+
+  async getAuditLogs(limit = 50) {
+    return this.prisma.adminAuditLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
     })
   }
 }

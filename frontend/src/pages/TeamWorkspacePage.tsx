@@ -97,6 +97,16 @@ export default function TeamWorkspacePage() {
     onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to remove member'),
   })
 
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ memberId, role }: { memberId: string; role: string }) =>
+      api.patch(`/teams/${id}/members/${memberId}/role`, { role }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team', id] })
+      toast.success('Role updated')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to update role'),
+  })
+
   const copyInviteLink = async () => {
     const res = await api.get(`/teams/${id}/invite`)
     const link = `${window.location.origin}/app/join?code=${res.data.inviteCode}`
@@ -375,6 +385,21 @@ export default function TeamWorkspacePage() {
                   <span style={{ fontSize: '11px', color: colors.textMuted }}>
                     Joined {new Date(member.joinedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
+                  {isOwner && member.user.id !== (user as any)?.id && member.role !== 'OWNER' && (
+                    <select
+                      value={member.role}
+                      onChange={e => updateRoleMutation.mutate({ memberId: member.user.id, role: e.target.value })}
+                      style={{
+                        fontSize: '11px', fontWeight: '600', padding: '3px 6px', borderRadius: '6px',
+                        border: `1px solid ${colors.border}`, backgroundColor: colors.subBg,
+                        color: ROLE_CONFIG[member.role]?.color ?? colors.textMuted, cursor: 'pointer', outline: 'none',
+                      }}
+                    >
+                      <option value="ADMIN">Admin</option>
+                      <option value="EDITOR">Editor</option>
+                      <option value="VIEWER">Viewer</option>
+                    </select>
+                  )}
                   {isAdmin && member.user.id !== (user as any)?.id && member.role !== 'OWNER' && (
                     <button onClick={() => removeMemberMutation.mutate(member.user.id)} style={{
                       padding: '5px', background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, borderRadius: '6px'

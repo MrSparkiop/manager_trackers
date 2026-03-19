@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOutletContext, useNavigate } from 'react-router-dom'
-import { Search, Shield, User, Trash2, ChevronLeft, ChevronRight, Crown, Ban, Users } from 'lucide-react'
+import { Search, Shield, User, Trash2, ChevronLeft, ChevronRight, Crown, Ban, Users, LogIn, Copy, X } from 'lucide-react'
 import api from '../../lib/axios'
 import toast from 'react-hot-toast'
 import { TableRowSkeleton } from '../../components/Skeleton'
@@ -17,6 +17,7 @@ export default function AdminUsersPage() {
   const [search, setSearch]           = useState('')
   const [page, setPage]               = useState(1)
   const [searchInput, setSearchInput] = useState('')
+  const [impersonatedToken, setImpersonatedToken] = useState<{ token: string; name: string } | null>(null)
 
   // Confirm modal state
   const [confirmModal, setConfirmModal] = useState<{
@@ -89,6 +90,34 @@ export default function AdminUsersPage() {
       closeConfirm()
     },
   })
+
+  const impersonateMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/admin/impersonate/${id}`).then(r => r.data),
+    onSuccess: (data: any, id: string) => {
+      const u = data?.user ?? data
+      const name = `${u?.firstName ?? ''} ${u?.lastName ?? ''}`.trim() || id
+      setImpersonatedToken({ token: data.token, name })
+      toast.success('Impersonation token generated')
+      closeConfirm()
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to generate token')
+      closeConfirm()
+    },
+  })
+
+  const handleImpersonate = (e: React.MouseEvent, u: any) => {
+    e.stopPropagation()
+    setConfirmModal({
+      isOpen: true,
+      title: `Impersonate ${u.firstName} ${u.lastName}`,
+      description: `You will receive a 1-hour JWT scoped as ${u.firstName} ${u.lastName}. This action is logged in the admin audit trail.`,
+      variant: 'warning',
+      actionLabel: 'Generate Token',
+      confirmText: 'IMPERSONATE',
+      onConfirm: () => impersonateMutation.mutate(u.id),
+    })
+  }
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -168,6 +197,43 @@ export default function AdminUsersPage() {
 
   return (
     <div style={{ padding: isMobile ? '16px' : '32px', fontFamily: 'Inter, sans-serif' }}>
+
+      {/* Impersonation token banner */}
+      {impersonatedToken && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap',
+          marginBottom: '20px', padding: '12px 16px', borderRadius: '12px',
+          backgroundColor: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)',
+        }}>
+          <LogIn size={15} color="#f59e0b" style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: '13px', fontWeight: '600', color: '#f59e0b', flexShrink: 0 }}>
+            Impersonation token for {impersonatedToken.name}:
+          </span>
+          <code style={{
+            flex: 1, fontSize: '11px', color: isDark ? '#cbd5e1' : '#475569',
+            backgroundColor: isDark ? '#0f172a' : '#f1f5f9',
+            padding: '4px 8px', borderRadius: '6px',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            display: 'block', minWidth: 0,
+          }}>
+            {impersonatedToken.token}
+          </code>
+          <button
+            onClick={() => { navigator.clipboard.writeText(impersonatedToken.token); toast.success('Token copied!') }}
+            title="Copy token"
+            style={{ display: 'flex', alignItems: 'center', padding: '5px 10px', gap: '4px', borderRadius: '7px', border: 'none', cursor: 'pointer', backgroundColor: 'rgba(245,158,11,0.2)', color: '#f59e0b', fontSize: '12px', fontWeight: '600', flexShrink: 0 }}
+          >
+            <Copy size={12} /> Copy
+          </button>
+          <button
+            onClick={() => setImpersonatedToken(null)}
+            title="Dismiss"
+            style={{ display: 'flex', alignItems: 'center', padding: '5px', borderRadius: '7px', border: 'none', cursor: 'pointer', backgroundColor: 'transparent', color: '#f59e0b', flexShrink: 0 }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
@@ -392,6 +458,31 @@ export default function AdminUsersPage() {
                   >
                     <Trash2 size={14} />
                   </button>
+
+                  {/* Impersonate */}
+                  {!self && (
+                    <button
+                      onClick={(e) => handleImpersonate(e, u)}
+                      title="Impersonate user"
+                      style={{
+                        display: 'flex', alignItems: 'center',
+                        padding: '6px', borderRadius: '7px', border: 'none',
+                        cursor: 'pointer',
+                        backgroundColor: 'transparent', color: colors.textMuted,
+                        transition: 'all 0.15s'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.1)'
+                        e.currentTarget.style.color = '#f59e0b'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                        e.currentTarget.style.color = colors.textMuted
+                      }}
+                    >
+                      <LogIn size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             )
@@ -452,7 +543,7 @@ export default function AdminUsersPage() {
         confirmText={confirmModal.confirmText}
         actionLabel={confirmModal.actionLabel}
         variant={confirmModal.variant}
-        isLoading={deleteMutation.isPending || suspendMutation.isPending || roleMutation.isPending}
+        isLoading={deleteMutation.isPending || suspendMutation.isPending || roleMutation.isPending || impersonateMutation.isPending}
         isDark={isDark}
       />
     </div>

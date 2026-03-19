@@ -148,4 +148,19 @@ export class AdminController {
   deleteMaintenance(@Param('id') id: string) {
     return this.maintenanceService.delete(id)
   }
+
+  // ── Impersonation ─────────────────────────────────────────────────
+  @Post('impersonate/:userId')
+  @ApiOperation({ summary: 'Generate a 1-hour token scoped as the target user (logged to audit trail)' })
+  impersonateUser(@Param('userId') userId: string, @Req() req: any) {
+    const ip = req.headers['x-forwarded-for'] ?? req.socket?.remoteAddress
+    return this.adminService.impersonateUser(req.user.id, userId, ip)
+  }
+
+  // ── Audit Log ─────────────────────────────────────────────────────
+  @Get('audit-logs')
+  @ApiOperation({ summary: 'Get recent admin audit log entries' })
+  getAuditLogs(@Query('limit') limit?: string) {
+    return this.adminService.getAuditLogs(limit ? parseInt(limit) : 50)
+  }
 }

@@ -4,13 +4,17 @@ import { PermissionsGuard } from '../auth/permissions.guard'
 import { RequirePermissions } from '../auth/permissions'
 import { TeamMemberGuard } from './team-member.guard'
 import { TeamsService } from './teams.service'
+import { CustomRolesService } from './custom-roles.service'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
 
 @ApiTags('Teams')
 @UseGuards(AuthGuard('jwt'))
 @Controller('teams')
 export class TeamsController {
-  constructor(private teamsService: TeamsService) {}
+  constructor(
+    private teamsService: TeamsService,
+    private customRolesService: CustomRolesService,
+  ) {}
 
   // ── Teams ────────────────────────────────────────────────────────
   @Get()
@@ -187,5 +191,46 @@ export class TeamsController {
   @ApiOperation({ summary: 'Delete comment' })
   deleteComment(@Param('commentId') commentId: string, @Req() req: any) {
     return this.teamsService.deleteComment(commentId, req.user.id)
+  }
+
+  // ── Custom Team Roles ─────────────────────────────────────────────
+  @Get(':id/custom-roles')
+  @UseGuards(TeamMemberGuard)
+  @ApiOperation({ summary: 'List custom roles for a team' })
+  listCustomRoles(@Param('id') id: string) {
+    return this.customRolesService.list(id)
+  }
+
+  @Post(':id/custom-roles')
+  @UseGuards(TeamMemberGuard)
+  @ApiOperation({ summary: 'Create a custom role (Owner only)' })
+  createCustomRole(@Param('id') id: string, @Req() req: any, @Body() body: any) {
+    return this.customRolesService.create(id, req.user.id, body)
+  }
+
+  @Put(':id/custom-roles/:roleId')
+  @UseGuards(TeamMemberGuard)
+  @ApiOperation({ summary: 'Update a custom role (Owner only)' })
+  updateCustomRole(@Param('id') id: string, @Param('roleId') roleId: string, @Req() req: any, @Body() body: any) {
+    return this.customRolesService.update(id, roleId, req.user.id, body)
+  }
+
+  @Delete(':id/custom-roles/:roleId')
+  @UseGuards(TeamMemberGuard)
+  @ApiOperation({ summary: 'Delete a custom role (Owner only)' })
+  deleteCustomRole(@Param('id') id: string, @Param('roleId') roleId: string, @Req() req: any) {
+    return this.customRolesService.remove(id, roleId, req.user.id)
+  }
+
+  @Patch(':id/members/:memberId/custom-role')
+  @UseGuards(TeamMemberGuard)
+  @ApiOperation({ summary: 'Assign or clear a custom role on a member (Owner only)' })
+  assignCustomRole(
+    @Param('id') id: string,
+    @Param('memberId') memberId: string,
+    @Req() req: any,
+    @Body() body: { customRoleId: string | null },
+  ) {
+    return this.customRolesService.assignToMember(id, memberId, req.user.id, body.customRoleId)
   }
 }

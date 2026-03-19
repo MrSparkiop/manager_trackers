@@ -57,9 +57,28 @@ model Team {
   members     TeamMember[]
   projects    Project[]
   tasks       Task[]
+  customRoles CustomTeamRole[]
 
   @@index([ownerId])
   @@map("teams")
+}
+
+model CustomTeamRole {
+  id   String @id @default(cuid())
+  name String
+
+  // Permission flags - owner can toggle these per custom role
+  canInviteMembers  Boolean @default(false)
+  canManageProjects Boolean @default(false)
+  canDeleteTasks    Boolean @default(false)
+  canManageSettings Boolean @default(false)
+
+  teamId  String
+  team    Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  members TeamMember[]
+
+  @@unique([teamId, name])
+  @@map("custom_team_roles")
 }
 
 model TeamMember {
@@ -68,9 +87,13 @@ model TeamMember {
   joinedAt  DateTime   @default(now())
 
   teamId    String
-  team      Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  team      Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
   userId    String
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Optional custom role - overrides the enum role when set
+  customRoleId String?
+  customRole   CustomTeamRole? @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
 
   @@unique([teamId, userId])
   @@index([teamId])
@@ -429,4 +452,18 @@ model StripeEvent {
   processedAt DateTime @default(now())
 
   @@map("stripe_events")
+}
+
+// Admin audit trail - every sensitive admin action is logged here
+model AdminAuditLog {
+  id           String   @id @default(cuid())
+  action       String   // e.g. "IMPERSONATE", "SUSPEND_USER", "DELETE_USER"
+  adminId      String
+  targetUserId String?
+  metadata     Json?    // extra context (IP, reason, etc.)
+  createdAt    DateTime @default(now())
+
+  @@index([adminId])
+  @@index([targetUserId])
+  @@map("admin_audit_logs")
 }

@@ -11,6 +11,7 @@ import { TagsModule } from './tags/tags.module'
 import { AdminModule } from './admin/admin.module'
 import { AnnouncementsModule } from './announcements/announcements.module'
 import { TeamsModule } from './teams/teams.module'
+import { CaslModule } from './casl/casl.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { LastSeenMiddleware } from './auth/last-seen.middleware'
 import { MaintenanceMiddleware } from './auth/maintenance.middleware'
@@ -45,6 +46,7 @@ import { APP_GUARD } from '@nestjs/core'
     AdminModule,
     AnnouncementsModule,
     TeamsModule,
+    CaslModule,
     NotificationsModule,
     SearchModule,
     AnalyticsModule,
