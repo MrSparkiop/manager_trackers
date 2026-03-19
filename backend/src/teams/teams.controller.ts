@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards, Req } from '@nestjs/common'
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuards, Req } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
 import { RolesGuard } from '../auth/roles.guard'
 import { Roles, Role } from '../auth/roles.decorator'
@@ -102,6 +102,13 @@ export class TeamsController {
   @ApiOperation({ summary: 'Remove a member' })
   removeMember(@Param('id') id: string, @Param('memberId') memberId: string, @Req() req: any) {
     return this.teamsService.removeMember(id, req.user.id, memberId)
+  }
+
+  @Patch(':id/members/:memberId/role')
+  @UseGuards(TeamMemberGuard)
+  @ApiOperation({ summary: 'Update member role (Owner only)' })
+  updateMemberRole(@Param('id') id: string, @Param('memberId') memberId: string, @Req() req: any, @Body() body: { role: string }) {
+    return this.teamsService.updateMemberRole(id, req.user.id, memberId, body.role)
   }
 
   // ── Team Projects ────────────────────────────────────────────────

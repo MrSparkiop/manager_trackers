@@ -75,7 +75,7 @@ export class TeamsService {
   }
 
   async updateTeam(teamId: string, userId: string, dto: { name?: string; description?: string; color?: string }) {
-    await this.requireOwner(teamId, userId)
+    await this.requireAtLeast(teamId, userId, 'ADMIN')
     return this.prisma.team.update({
       where: { id: teamId },
       data: dto,
@@ -97,7 +97,7 @@ export class TeamsService {
   }
 
   async regenerateInviteCode(teamId: string, userId: string) {
-    await this.requireOwner(teamId, userId)
+    await this.requireAtLeast(teamId, userId, 'ADMIN')
     const { randomBytes } = await import('crypto')
     const newCode = randomBytes(16).toString('hex')
     return this.prisma.team.update({
@@ -125,7 +125,7 @@ export class TeamsService {
     // Catch race conditions at DB level
     try {
       await this.prisma.teamMember.create({
-        data: { teamId: team.id, userId, role: 'MEMBER' }
+        data: { teamId: team.id, userId, role: 'EDITOR' }
       })
     } catch (e: any) {
       if (e?.code === 'P2002') throw new BadRequestException('You are already a member of this team')
@@ -148,13 +148,16 @@ export class TeamsService {
   }
 
   async removeMember(teamId: string, userId: string, memberId: string) {
-    await this.requireOwner(teamId, userId)
+    const actor = await this.requireAtLeast(teamId, userId, 'ADMIN')
     if (userId === memberId) throw new BadRequestException('Cannot remove yourself')
 
-    const member = await this.prisma.teamMember.findUnique({
+    const target = await this.prisma.teamMember.findUnique({
       where: { teamId_userId: { teamId, userId: memberId } }
     })
-    if (!member) throw new NotFoundException('Member not found')
+    if (!target) throw new NotFoundException('Member not found')
+    if (this.roleLevel(target.role) >= this.roleLevel(actor.role)) {
+      throw new ForbiddenException('Cannot remove a member with equal or higher role')
+    }
 
     return this.prisma.teamMember.delete({
       where: { teamId_userId: { teamId, userId: memberId } }
@@ -171,6 +174,7 @@ export class TeamsService {
   }
 
   async createTeamProject(teamId: string, userId: string, dto: { name: string; description?: string; color?: string; deadline?: string }) {
+    await this.requireAtLeast(teamId, userId, 'EDITOR')
     return this.prisma.project.create({
       data: {
         teamId,
@@ -186,7 +190,7 @@ export class TeamsService {
   async updateTeamProject(projectId: string, userId: string, dto: any) {
     const project = await this.prisma.project.findUnique({ where: { id: projectId } })
     if (!project) throw new NotFoundException('Project not found')
-    await this.requireMember(project.teamId!, userId)
+    await this.requireAtLeast(project.teamId!, userId, 'EDITOR')
     return this.prisma.project.update({
       where: { id: projectId },
       data: { ...dto, deadline: dto.deadline ? new Date(dto.deadline) : undefined }
@@ -196,7 +200,7 @@ export class TeamsService {
   async deleteTeamProject(projectId: string, userId: string) {
     const project = await this.prisma.project.findUnique({ where: { id: projectId } })
     if (!project) throw new NotFoundException('Project not found')
-    await this.requireOwner(project.teamId!, userId)
+    await this.requireAtLeast(project.teamId!, userId, 'ADMIN')
     return this.prisma.project.delete({ where: { id: projectId } })
   }
 
@@ -238,7 +242,7 @@ export class TeamsService {
       include: { team: true }
     })
     if (!project) throw new NotFoundException('Project not found')
-    await this.requireMember(project.teamId!, userId)
+    await this.requireAtLeast(project.teamId!, userId, 'EDITOR')
 
     const task = await this.prisma.task.create({
       data: {
@@ -277,7 +281,7 @@ export class TeamsService {
       include: { project: { include: { team: true } } }
     })
     if (!task) throw new NotFoundException('Task not found')
-    await this.requireMember(task.project!.teamId!, userId)
+    await this.requireAtLeast(task.project!.teamId!, userId, 'EDITOR')
 
     const updated = await this.prisma.task.update({
       where: { id: taskId },
@@ -312,7 +316,7 @@ export class TeamsService {
       include: { project: true }
     })
     if (!task) throw new NotFoundException('Task not found')
-    await this.requireMember(task.project!.teamId!, userId)
+    await this.requireAtLeast(task.project!.teamId!, userId, 'EDITOR')
     return this.prisma.task.delete({ where: { id: taskId } })
   }
 
@@ -323,7 +327,7 @@ export class TeamsService {
       include: { project: { include: { team: true } } }
     })
     if (!task) throw new NotFoundException('Task not found')
-    await this.requireMember(task.project!.teamId!, userId)
+    await this.requireAtLeast(task.project!.teamId!, userId, 'EDITOR')
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -368,9 +372,20 @@ export class TeamsService {
   }
 
   async deleteComment(commentId: string, userId: string) {
-    const comment = await this.prisma.taskComment.findUnique({ where: { id: commentId } })
+    const comment = await this.prisma.taskComment.findUnique({
+      where: { id: commentId },
+      include: { task: { select: { teamId: true } } }
+    })
     if (!comment) throw new NotFoundException('Comment not found')
-    if (comment.authorId !== userId) throw new ForbiddenException('Cannot delete others comments')
+
+    // Own comment: any role can delete; others' comments: require ADMIN+
+    if (comment.authorId !== userId) {
+      if (comment.task.teamId) {
+        await this.requireAtLeast(comment.task.teamId, userId, 'ADMIN')
+      } else {
+        throw new ForbiddenException('Cannot delete others comments')
+      }
+    }
     return this.prisma.taskComment.delete({ where: { id: commentId } })
   }
 
@@ -381,7 +396,7 @@ export class TeamsService {
       include: { project: { include: { team: true } } },
     })
     if (!task) throw new NotFoundException('Task not found')
-    await this.requireMember(task.project!.teamId!, userId)
+    await this.requireAtLeast(task.project!.teamId!, userId, 'EDITOR')
     if (task.recurrence === 'NONE') throw new NotFoundException('Task is not recurring')
 
     const nextDueDate = this.getNextDueDate(task.dueDate, task.recurrence)
@@ -416,7 +431,7 @@ export class TeamsService {
       include: { project: { include: { team: true } } },
     })
     if (!task) throw new NotFoundException('Task not found')
-    await this.requireMember(task.project!.teamId!, userId)
+    await this.requireAtLeast(task.project!.teamId!, userId, 'EDITOR')
 
     const skippedDate = this.getNextDueDate(task.dueDate, task.recurrence)
     const nextDueDate = this.getNextDueDate(skippedDate, task.recurrence)
@@ -519,21 +534,52 @@ export class TeamsService {
     return workload.sort((a, b) => b.openTasks - a.openTasks)
   }
 
+  // ── Role management ──────────────────────────────────────────────
+  async updateMemberRole(teamId: string, actorId: string, memberId: string, newRole: string) {
+    await this.requireAtLeast(teamId, actorId, 'OWNER')
+    if (actorId === memberId) throw new BadRequestException('Cannot change your own role')
+
+    const target = await this.prisma.teamMember.findUnique({
+      where: { teamId_userId: { teamId, userId: memberId } }
+    })
+    if (!target) throw new NotFoundException('Member not found')
+    if (target.role === 'OWNER') throw new ForbiddenException('Cannot change the owner\'s role')
+
+    const allowed = ['ADMIN', 'EDITOR', 'VIEWER']
+    if (!allowed.includes(newRole)) throw new BadRequestException('Invalid role')
+
+    return this.prisma.teamMember.update({
+      where: { teamId_userId: { teamId, userId: memberId } },
+      data: { role: newRole as any },
+    })
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────
-  private async requireMember(teamId: string, userId: string) {
+  private roleLevel(role: string): number {
+    const levels: Record<string, number> = { VIEWER: 1, EDITOR: 2, ADMIN: 3, OWNER: 4 }
+    return levels[role] ?? 0
+  }
+
+  private async requireAtLeast(teamId: string, userId: string, minRole: 'VIEWER' | 'EDITOR' | 'ADMIN' | 'OWNER') {
     const member = await this.prisma.teamMember.findUnique({
       where: { teamId_userId: { teamId, userId } }
     })
     if (!member) throw new ForbiddenException('You are not a member of this team')
+    if (this.roleLevel(member.role) < this.roleLevel(minRole)) {
+      const labels: Record<string, string> = { EDITOR: 'Editor', ADMIN: 'Admin', OWNER: 'Owner' }
+      throw new ForbiddenException(`Requires ${labels[minRole] ?? minRole} role or higher`)
+    }
     return member
   }
 
+  /** @deprecated use requireAtLeast */
+  private async requireMember(teamId: string, userId: string) {
+    return this.requireAtLeast(teamId, userId, 'VIEWER')
+  }
+
+  /** @deprecated use requireAtLeast */
   private async requireOwner(teamId: string, userId: string) {
-    const member = await this.prisma.teamMember.findUnique({
-      where: { teamId_userId: { teamId, userId } }
-    })
-    if (!member || member.role !== 'OWNER') throw new ForbiddenException('Only team owner can do this')
-    return member
+    return this.requireAtLeast(teamId, userId, 'OWNER')
   }
 
   private getNextDueDate(currentDue: Date | null, recurrence: string): Date {

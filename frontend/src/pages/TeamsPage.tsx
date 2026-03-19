@@ -213,12 +213,18 @@ export default function TeamsPage() {
                       <h3 style={{ fontSize: '15px', fontWeight: '700', color: colors.text, margin: 0 }}>
                         {team.name}
                       </h3>
-                      {team.myRole === 'OWNER' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-                          <Crown size={11} color="#f59e0b" />
-                          <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: '600' }}>Owner</span>
-                        </div>
-                      )}
+                      {team.myRole && (() => {
+                        const roleColors: Record<string, string> = { OWNER: '#f59e0b', ADMIN: '#6366f1', EDITOR: '#22c55e', VIEWER: '#64748b' }
+                        const roleLabels: Record<string, string> = { OWNER: 'Owner', ADMIN: 'Admin', EDITOR: 'Editor', VIEWER: 'Viewer' }
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                            {team.myRole === 'OWNER' && <Crown size={11} color="#f59e0b" />}
+                            <span style={{ fontSize: '11px', color: roleColors[team.myRole] ?? '#64748b', fontWeight: '600' }}>
+                              {roleLabels[team.myRole] ?? team.myRole}
+                            </span>
+                          </div>
+                        )
+                      })()}
                     </div>
                   </div>
 
@@ -235,7 +241,7 @@ export default function TeamsPage() {
                     >
                       {copied === team.id ? <Check size={14} color="#4ade80" /> : <Link size={14} />}
                     </button>
-                    {team.myRole === 'OWNER' ? (
+                    {(team.myRole === 'OWNER' || team.myRole === 'ADMIN') ? (
                       <>
                         <button
                           onClick={e => { e.stopPropagation(); navigate(`/app/teams/${team.id}/settings`) }}

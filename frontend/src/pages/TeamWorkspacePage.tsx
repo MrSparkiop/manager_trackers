@@ -10,6 +10,13 @@ import EmptyState from '../components/EmptyState'
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#22c55e', '#14b8a6', '#3b82f6']
 
+const ROLE_CONFIG: Record<string, { label: string; color: string; avatarGradient: string }> = {
+  OWNER:  { label: 'Owner',  color: '#f59e0b', avatarGradient: 'linear-gradient(135deg, #f59e0b, #f97316)' },
+  ADMIN:  { label: 'Admin',  color: '#6366f1', avatarGradient: 'linear-gradient(135deg, #6366f1, #4f46e5)' },
+  EDITOR: { label: 'Editor', color: '#22c55e', avatarGradient: 'linear-gradient(135deg, #22c55e, #16a34a)' },
+  VIEWER: { label: 'Viewer', color: '#64748b', avatarGradient: 'linear-gradient(135deg, #64748b, #475569)' },
+}
+
 const getOnlineStatus = (lastSeenAt: string | null) => {
   if (!lastSeenAt) return { online: false, label: 'Never' }
   const diff = Date.now() - new Date(lastSeenAt).getTime()
@@ -134,6 +141,8 @@ export default function TeamWorkspacePage() {
   )
 
   const isOwner = team.myRole === 'OWNER'
+  const isAdmin = team.myRole === 'OWNER' || team.myRole === 'ADMIN'
+  const isEditor = isAdmin || team.myRole === 'EDITOR'
 
   return (
     <div style={{ padding: isMobile ? '16px' : '32px', fontFamily: 'Inter, sans-serif' }}>
@@ -178,7 +187,7 @@ export default function TeamWorkspacePage() {
             }}>
               {copied ? <><Check size={13} color="#4ade80" /> Copied!</> : <><Copy size={13} /> Copy Invite Link</>}
             </button>
-            {isOwner && (
+            {isAdmin && (
               <button onClick={regenerateCode} title="Regenerate invite code" style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
                 padding: '8px 10px', backgroundColor: colors.subBg,
@@ -269,7 +278,7 @@ export default function TeamWorkspacePage() {
                       <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: project.color, flexShrink: 0 }} />
                       <h3 style={{ fontSize: '14px', fontWeight: '700', color: colors.text, margin: 0 }}>{project.name}</h3>
                     </div>
-                    {isOwner && (
+                    {isAdmin && (
                       <button onClick={e => { e.stopPropagation();
                         toast((t) => (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -318,7 +327,7 @@ export default function TeamWorkspacePage() {
               }}>
                 <div style={{
                   width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-                  background: member.role === 'OWNER' ? 'linear-gradient(135deg, #f59e0b, #f97316)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  background: ROLE_CONFIG[member.role]?.avatarGradient ?? 'linear-gradient(135deg, #6366f1, #8b5cf6)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '14px', fontWeight: '700', color: '#fff'
                 }}>
@@ -330,12 +339,12 @@ export default function TeamWorkspacePage() {
                       {member.user.firstName} {member.user.lastName}
                       {member.user.id === (user as any)?.id && <span style={{ fontSize: '11px', color: colors.textMuted, fontWeight: '400' }}> (you)</span>}
                     </p>
-                    {member.role === 'OWNER' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                        <Crown size={11} color="#f59e0b" />
-                        <span style={{ fontSize: '11px', color: '#f59e0b', fontWeight: '600' }}>Owner</span>
-                      </div>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      {member.role === 'OWNER' && <Crown size={11} color="#f59e0b" />}
+                      <span style={{ fontSize: '11px', color: ROLE_CONFIG[member.role]?.color ?? colors.textMuted, fontWeight: '600' }}>
+                        {ROLE_CONFIG[member.role]?.label ?? member.role}
+                      </span>
+                    </div>
                   </div>
                   <p style={{ fontSize: '12px', color: colors.textMuted, margin: '2px 0 0' }}>{member.user.email}</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
@@ -366,7 +375,7 @@ export default function TeamWorkspacePage() {
                   <span style={{ fontSize: '11px', color: colors.textMuted }}>
                     Joined {new Date(member.joinedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
-                  {isOwner && member.user.id !== (user as any)?.id && (
+                  {isAdmin && member.user.id !== (user as any)?.id && member.role !== 'OWNER' && (
                     <button onClick={() => removeMemberMutation.mutate(member.user.id)} style={{
                       padding: '5px', background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, borderRadius: '6px'
                     }}

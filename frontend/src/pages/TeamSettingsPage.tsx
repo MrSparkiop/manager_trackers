@@ -117,7 +117,7 @@ export default function TeamSettingsPage() {
     </div>
   )
 
-  if (!team || team.myRole !== 'OWNER') {
+  if (!team || (team.myRole !== 'OWNER' && team.myRole !== 'ADMIN')) {
     navigate(`/app/teams/${id}`)
     return null
   }
