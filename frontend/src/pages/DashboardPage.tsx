@@ -57,7 +57,7 @@ export default function DashboardPage() {
 
   const { data: allTasks = [], isLoading: loadingAll } = useQuery<Task[]>({
     queryKey: ['tasks'],
-    queryFn: () => api.get('/tasks').then(r => r.data),
+    queryFn: () => api.get('/tasks?limit=200').then(r => r.data.tasks ?? r.data),
   })
 
   const { data: timeSummary } = useQuery<TimeSummary>({

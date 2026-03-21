@@ -160,7 +160,7 @@ export default function ProjectsPage() {
 
   const { data: allTasks = [] } = useQuery<Task[]>({
     queryKey: ['tasks'],
-    queryFn: () => api.get('/tasks').then(r => r.data)
+    queryFn: () => api.get('/tasks?limit=200').then(r => r.data.tasks ?? r.data)
   })
 
   const createMutation = useMutation({

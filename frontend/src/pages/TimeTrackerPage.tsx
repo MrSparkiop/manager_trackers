@@ -73,7 +73,7 @@ export default function TimeTrackerPage() {
 
   const { data: tasks = [] } = useQuery<Task[]>({
     queryKey: ['tasks'],
-    queryFn: () => api.get('/tasks').then(r => r.data),
+    queryFn: () => api.get('/tasks?limit=200').then(r => r.data.tasks ?? r.data),
   })
 
   useEffect(() => {
