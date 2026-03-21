@@ -42,10 +42,11 @@ export default function CalendarPage() {
     queryFn: () => api.get('/calendar').then(r => r.data),
   })
 
-  const { data: tasks = [] } = useQuery<Task[]>({
+  const { data: _tasksRaw } = useQuery<any>({
     queryKey: ['tasks'],
     queryFn: () => api.get('/tasks?limit=200').then(r => r.data.tasks ?? r.data),
   })
+  const tasks: Task[] = Array.isArray(_tasksRaw) ? _tasksRaw : (_tasksRaw?.tasks ?? [])
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/calendar', data),

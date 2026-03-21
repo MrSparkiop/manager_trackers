@@ -158,10 +158,11 @@ export default function ProjectsPage() {
     queryFn: () => api.get('/projects').then(r => r.data)
   })
 
-  const { data: allTasks = [] } = useQuery<Task[]>({
+  const { data: _allTasksRaw } = useQuery<any>({
     queryKey: ['tasks'],
     queryFn: () => api.get('/tasks?limit=200').then(r => r.data.tasks ?? r.data)
   })
+  const allTasks: Task[] = Array.isArray(_allTasksRaw) ? _allTasksRaw : (_allTasksRaw?.tasks ?? [])
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/projects', data),

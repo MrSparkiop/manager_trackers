@@ -55,10 +55,11 @@ export default function DashboardPage() {
     queryFn: () => api.get('/projects').then(r => r.data),
   })
 
-  const { data: allTasks = [], isLoading: loadingAll } = useQuery<Task[]>({
+  const { data: _allTasksRaw, isLoading: loadingAll } = useQuery<any>({
     queryKey: ['tasks'],
     queryFn: () => api.get('/tasks?limit=200').then(r => r.data.tasks ?? r.data),
   })
+  const allTasks: Task[] = Array.isArray(_allTasksRaw) ? _allTasksRaw : (_allTasksRaw?.tasks ?? [])
 
   const { data: timeSummary } = useQuery<TimeSummary>({
     queryKey: ['time-summary'],

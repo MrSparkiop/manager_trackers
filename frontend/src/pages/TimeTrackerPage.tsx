@@ -71,10 +71,11 @@ export default function TimeTrackerPage() {
     queryFn: () => api.get('/time-tracker/summary').then(r => r.data),
   })
 
-  const { data: tasks = [] } = useQuery<Task[]>({
+  const { data: _tasksRaw } = useQuery<any>({
     queryKey: ['tasks'],
     queryFn: () => api.get('/tasks?limit=200').then(r => r.data.tasks ?? r.data),
   })
+  const tasks: Task[] = Array.isArray(_tasksRaw) ? _tasksRaw : (_tasksRaw?.tasks ?? [])
 
   useEffect(() => {
     if (!running) { setElapsed(0); return }
