@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useOutletContext, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { useThemeStore } from '../store/themeStore'
+import { useIsMobile } from '../lib/useIsMobile'
 import { Users, Plus, X, Crown, LogIn, Trash2, Settings, Link, Check } from 'lucide-react'
 import api from '../lib/axios'
 import toast from 'react-hot-toast'
@@ -8,11 +10,13 @@ import { useAuthStore } from '../store/authStore'
 import { CardSkeleton } from '../components/Skeleton'
 import EmptyState from '../components/EmptyState'
 import { useColors } from '../lib/useColors'
+import { getInputStyle } from '../lib/formStyles'
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#22c55e', '#14b8a6', '#3b82f6']
 
 export default function TeamsPage() {
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
   const { user, fetchMe } = useAuthStore()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -86,13 +90,7 @@ export default function TeamsPage() {
     toast.success('Invite link copied!')
   }
 
-  const inputStyle = {
-    width: '100%', backgroundColor: colors.input,
-    border: `1px solid ${colors.inputBorder}`,
-    borderRadius: '10px', padding: '10px 14px',
-    color: colors.text, fontSize: '14px', outline: 'none',
-    boxSizing: 'border-box' as const,
-  }
+  const inputStyle = getInputStyle(colors)
 
   return (
     <div style={{ padding: isMobile ? '16px' : '32px', fontFamily: 'Inter, sans-serif' }}>

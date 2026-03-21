@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useOutletContext } from 'react-router-dom'
+import { useThemeStore } from '../../store/themeStore'
+import { useIsMobile } from '../../lib/useIsMobile'
 import { MessageSquare, Search, X, Send, Circle, Clock, CheckCircle } from 'lucide-react'
 import api from '../../lib/axios'
 import toast from 'react-hot-toast'
@@ -25,7 +26,8 @@ function timeAgo(date: string) {
 }
 
 export default function AdminSupportPage() {
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
   const queryClient = useQueryClient()
 
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null)

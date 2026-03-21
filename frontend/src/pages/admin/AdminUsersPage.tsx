@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useOutletContext, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { useThemeStore } from '../../store/themeStore'
+import { useIsMobile } from '../../lib/useIsMobile'
 import { Search, Shield, User, Trash2, ChevronLeft, ChevronRight, Crown, Ban, Users, LogIn, Copy, X } from 'lucide-react'
 import api from '../../lib/axios'
 import toast from 'react-hot-toast'
@@ -10,7 +12,8 @@ import ConfirmModal from '../../components/ConfirmModal'
 import { useAuthStore } from '../../store/authStore'
 
 export default function AdminUsersPage() {
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
   const { user: currentUser } = useAuthStore()
   const queryClient = useQueryClient()
   const navigate = useNavigate()

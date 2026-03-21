@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Plus, X, Trash2, CheckCircle2, Clock, RefreshCw } from 'lucide-react'
 import api from '../lib/axios'
-import { useOutletContext } from 'react-router-dom'
+import { useThemeStore } from '../store/themeStore'
+import { useIsMobile } from '../lib/useIsMobile'
 import toast from 'react-hot-toast'
 import type { CalendarEvent, Task } from '../types'
 import { useColors } from '../lib/useColors'
+import { getInputStyle } from '../lib/formStyles'
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6']
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -13,7 +15,8 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 
 export default function CalendarPage() {
   const queryClient = useQueryClient()
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
   const today = new Date()
   const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
@@ -161,13 +164,7 @@ export default function CalendarPage() {
     return items.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 10)
   })()
 
-  const inputStyle = {
-    width: '100%', backgroundColor: colors.input,
-    border: `1px solid ${colors.inputBorder}`,
-    borderRadius: '10px', padding: '10px 14px',
-    color: colors.text, fontSize: '14px', outline: 'none',
-    boxSizing: 'border-box' as const
-  }
+  const inputStyle = getInputStyle(colors)
 
   return (
     <div style={{ padding: isMobile ? '12px' : '32px', fontFamily: 'Inter, sans-serif', minHeight: '100vh', backgroundColor: colors.bg }}>

@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Delete, Param, UseGuards } from '@nestjs/common'
+import { Controller, Get, Put, Delete, Param, Query, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
 import { NotificationsService } from './notifications.service'
 import { ApiTags } from '@nestjs/swagger'
@@ -11,8 +11,12 @@ export class NotificationsController {
   constructor(private notificationsService: NotificationsService) {}
 
   @Get()
-  getMyNotifications(@CurrentUser() user: AuthUser) {
-    return this.notificationsService.getMyNotifications(user.id)
+  getMyNotifications(
+    @CurrentUser() user: AuthUser,
+    @Query('page') page = '1',
+    @Query('limit') limit = '30',
+  ) {
+    return this.notificationsService.getMyNotifications(user.id, +page, +limit)
   }
 
   @Get('unread-count')

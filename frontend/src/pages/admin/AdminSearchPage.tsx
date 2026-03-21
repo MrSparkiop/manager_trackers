@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useOutletContext } from 'react-router-dom'
+import { useThemeStore } from '../../store/themeStore'
+import { useIsMobile } from '../../lib/useIsMobile'
 import { Search, Users, CheckSquare, FolderKanban, Crown, Ban } from 'lucide-react'
 import api from '../../lib/axios'
 
 export default function AdminSearchPage() {
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
   const navigate = useNavigate()
   const [query, setQuery]     = useState('')
   const [results, setResults] = useState<any>(null)

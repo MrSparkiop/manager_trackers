@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import { useOutletContext } from 'react-router-dom'
+import { useThemeStore } from '../../store/themeStore'
+import { useIsMobile } from '../../lib/useIsMobile'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Users, CheckSquare, FolderKanban, Clock, TrendingUp, UserCheck, Activity } from 'lucide-react'
 import api from '../../lib/axios'
 
 export default function AdminDashboardPage() {
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
 
   const colors = {
     card:      isDark ? '#0f172a' : '#ffffff',

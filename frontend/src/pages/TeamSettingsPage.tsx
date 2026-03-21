@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useOutletContext, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
+import { useThemeStore } from '../store/themeStore'
+import { useIsMobile } from '../lib/useIsMobile'
 import { ArrowLeft, Save, Trash2, RefreshCw, Copy, Check, AlertTriangle } from 'lucide-react'
 import api from '../lib/axios'
 import toast from 'react-hot-toast'
@@ -10,7 +12,8 @@ const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#22c55e'
 
 export default function TeamSettingsPage() {
   const { id } = useParams()
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 

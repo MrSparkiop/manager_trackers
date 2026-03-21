@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useOutletContext } from 'react-router-dom'
+import { useThemeStore } from '../store/themeStore'
+import { useIsMobile } from '../lib/useIsMobile'
 import { Plus, X, Send, MessageSquare, Inbox, LifeBuoy, Clock, CheckCircle2, CircleDot, ArrowLeft } from 'lucide-react'
 import api from '../lib/axios'
 import { useAuthStore } from '../store/authStore'
@@ -42,7 +43,8 @@ function Avatar({ name, size = 32, staff = false }: { name: string; size?: numbe
 }
 
 export default function SupportPage() {
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
   const { user } = useAuthStore()
   const qc = useQueryClient()
 

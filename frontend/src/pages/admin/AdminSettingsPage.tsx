@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useOutletContext } from 'react-router-dom'
+import { useThemeStore } from '../../store/themeStore'
+import { useIsMobile } from '../../lib/useIsMobile'
 import { Settings, Save, Plus, Trash2, ToggleLeft, ToggleRight, Megaphone, Users, Crown, Shield, Globe, Calendar, Clock } from 'lucide-react'
 import api from '../../lib/axios'
 import toast from 'react-hot-toast'
@@ -23,7 +24,8 @@ const targetConfig: Record<string, { color: string; bg: string; icon: any; label
 }
 
 export default function AdminSettingsPage() {
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
   const queryClient = useQueryClient()
 
   const colors = {

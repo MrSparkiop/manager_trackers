@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useOutletContext } from 'react-router-dom'
+import { useThemeStore } from '../store/themeStore'
+import { useIsMobile } from '../lib/useIsMobile'
 import { Plus, Tag, Edit2, Trash2, X, Check } from 'lucide-react'
 import api from '../lib/axios'
 import toast from 'react-hot-toast'
 import { CardSkeleton } from '../components/Skeleton'
 import EmptyState from '../components/EmptyState'
 import { useColors } from '../lib/useColors'
+import { getInputStyle } from '../lib/formStyles'
 
 interface Tag {
   id: string
@@ -22,7 +24,8 @@ const COLORS = [
 ]
 
 export default function TagsPage() {
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
   const queryClient = useQueryClient()
   const [showModal, setShowModal] = useState(false)
   const [editTag, setEditTag]     = useState<Tag | null>(null)
@@ -84,11 +87,7 @@ export default function TagsPage() {
     else createMutation.mutate(form)
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', backgroundColor: colors.input, border: `1px solid ${colors.inputBorder}`,
-    borderRadius: '10px', padding: '10px 14px', color: colors.text,
-    fontSize: '14px', outline: 'none', boxSizing: 'border-box',
-  }
+  const inputStyle = getInputStyle(colors)
 
   return (
     <div style={{

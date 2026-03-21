@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
+import { useIsMobile } from '../lib/useIsMobile'
 import {
   LayoutDashboard, FolderKanban, CheckSquare,
   Timer, Calendar, LogOut, Sun, Moon, Settings, Menu, X, Tag, Users, Shield, BarChart2, Headphones, Zap
@@ -24,16 +25,6 @@ const navItems = [
   { to: '/app/support',     icon: Headphones,       label: 'Support'  },
   { to: '/app/billing',     icon: Zap,              label: 'Billing'  },
 ]
-
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
-  return isMobile
-}
 
 export default function Layout() {
   const { user, logout } = useAuthStore()

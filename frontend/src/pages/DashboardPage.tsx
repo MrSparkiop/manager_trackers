@@ -1,5 +1,7 @@
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useOutletContext } from 'react-router-dom'
+import { useThemeStore } from '../store/themeStore'
+import { useIsMobile } from '../lib/useIsMobile'
 import { CheckSquare, FolderKanban, Timer, AlertCircle, Clock, TrendingUp } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import api from '../lib/axios'
@@ -36,7 +38,8 @@ function PriorityBadge({ priority }: { priority: string }) {
 
 export default function DashboardPage() {
   const { user } = useAuthStore()
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
 
   const colors = useColors(isDark)
 
@@ -68,25 +71,25 @@ export default function DashboardPage() {
 
   const isLoading = loadingToday || loadingProjects || loadingAll
 
-  const statusCounts = [
+  const statusCounts = useMemo(() => [
     { name: 'To Do',       value: allTasks.filter(t => t.status === 'TODO').length,        color: '#64748b' },
     { name: 'In Progress', value: allTasks.filter(t => t.status === 'IN_PROGRESS').length, color: '#60a5fa' },
     { name: 'In Review',   value: allTasks.filter(t => t.status === 'IN_REVIEW').length,   color: '#a78bfa' },
     { name: 'Done',        value: allTasks.filter(t => t.status === 'DONE').length,        color: '#4ade80' },
-  ].filter(s => s.value > 0)
+  ].filter(s => s.value > 0), [allTasks])
 
-  const priorityData = [
+  const priorityData = useMemo(() => [
     { name: 'Low',    value: allTasks.filter(t => t.priority === 'LOW').length,    color: '#4ade80' },
     { name: 'Medium', value: allTasks.filter(t => t.priority === 'MEDIUM').length, color: '#facc15' },
     { name: 'High',   value: allTasks.filter(t => t.priority === 'HIGH').length,   color: '#fb923c' },
     { name: 'Urgent', value: allTasks.filter(t => t.priority === 'URGENT').length, color: '#f87171' },
-  ]
+  ], [allTasks])
 
-  const projectChartData = projects.slice(0, 5).map(p => ({
+  const projectChartData = useMemo(() => projects.slice(0, 5).map(p => ({
     name: p.name.length > 12 ? p.name.slice(0, 12) + '…' : p.name,
     total: p.tasks?.length || 0,
     done: p.tasks?.filter((t: any) => t.status === 'DONE').length || 0,
-  }))
+  })), [projects])
 
   const stats = [
     { label: "Today's Tasks", value: todayTasks.length,   icon: CheckSquare, color: '#60a5fa', bg: 'rgba(96,165,250,0.1)' },

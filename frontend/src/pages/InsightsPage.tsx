@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { useOutletContext } from 'react-router-dom'
+import { useThemeStore } from '../store/themeStore'
+import { useIsMobile } from '../lib/useIsMobile'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, CartesianGrid,
@@ -90,7 +91,8 @@ function Skel({ w = '100%', h = 20, isDark }: { w?: string | number; h?: number;
 
 /* ─── main page ───────────────────────────────────────────────────────────── */
 export default function InsightsPage() {
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
 
   const c = {
     bg: isDark ? '#030712' : '#f1f5f9',

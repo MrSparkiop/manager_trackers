@@ -6,12 +6,22 @@ import { CreateTimeEntryDto } from './dto/create-time-entry.dto';
 export class TimeTrackerService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(userId: string) {
-    return this.prisma.timeEntry.findMany({
-      where: { userId },
-      include: { task: { select: { id: true, title: true } } },
-      orderBy: { startTime: 'desc' },
-    });
+  async findAll(userId: string, page = 1, limit = 50) {
+    const take = Math.min(100, Math.max(1, limit))
+    const skip = (Math.max(1, page) - 1) * take
+
+    const [entries, total] = await Promise.all([
+      this.prisma.timeEntry.findMany({
+        where: { userId },
+        include: { task: { select: { id: true, title: true } } },
+        orderBy: { startTime: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.timeEntry.count({ where: { userId } }),
+    ])
+
+    return { entries, total, page, limit: take, totalPages: Math.ceil(total / take) }
   }
 
   async getRunning(userId: string) {

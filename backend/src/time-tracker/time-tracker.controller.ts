@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { TimeTrackerService } from './time-tracker.service';
 import { CreateTimeEntryDto } from './dto/create-time-entry.dto';
@@ -10,8 +10,12 @@ export class TimeTrackerController {
   constructor(private timeTrackerService: TimeTrackerService) {}
 
   @Get()
-  findAll(@CurrentUser() user: AuthUser) {
-    return this.timeTrackerService.findAll(user.id);
+  findAll(
+    @CurrentUser() user: AuthUser,
+    @Query('page') page = '1',
+    @Query('limit') limit = '50',
+  ) {
+    return this.timeTrackerService.findAll(user.id, +page, +limit);
   }
 
   @Get('running')

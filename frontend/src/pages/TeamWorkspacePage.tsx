@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useOutletContext, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
+import { useThemeStore } from '../store/themeStore'
+import { useIsMobile } from '../lib/useIsMobile'
 import { Users, Plus, X, Crown, FolderKanban, ArrowLeft, Trash2, Copy, Check, RefreshCw, CheckCircle2, MessageSquare, UserPlus, Zap } from 'lucide-react'
 import api from '../lib/axios'
 import toast from 'react-hot-toast'
@@ -31,7 +33,8 @@ const getOnlineStatus = (lastSeenAt: string | null) => {
 
 export default function TeamWorkspacePage() {
   const { id } = useParams()
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
   const { user } = useAuthStore()
   const navigate = useNavigate()
   const queryClient = useQueryClient()

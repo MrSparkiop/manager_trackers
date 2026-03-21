@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useOutletContext, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
+import { useThemeStore } from '../store/themeStore'
+import { useIsMobile } from '../lib/useIsMobile'
 import { Plus, X, ArrowLeft, MessageSquare, Trash2, LayoutList, LayoutDashboard, CheckSquare, Send } from 'lucide-react'
 import api from '../lib/axios'
 import toast from 'react-hot-toast'
@@ -154,7 +156,8 @@ function MentionCommentInput({ members, colors, isDark, value, onChange, onSend,
 
 export default function TeamProjectPage() {
   const { id: teamId, projectId } = useParams()
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
   const { user } = useAuthStore()
   const navigate = useNavigate()
   const queryClient = useQueryClient()

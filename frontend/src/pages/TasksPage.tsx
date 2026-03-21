@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, X, CheckCircle2, Circle, Clock, Trash2, Edit2, Play,
@@ -11,7 +11,8 @@ import {
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import api from '../lib/axios'
-import { useOutletContext } from 'react-router-dom'
+import { useThemeStore } from '../store/themeStore'
+import { useIsMobile } from '../lib/useIsMobile'
 import { TaskRowSkeleton } from '../components/Skeleton'
 import EmptyState from '../components/EmptyState'
 import RecurrenceSelector, { RecurrenceBadge } from '../components/RecurrenceSelector'
@@ -22,6 +23,7 @@ import toast from 'react-hot-toast'
 import type { Task, Project } from '../types'
 import { priorityColors, PRIORITIES, STATUSES } from '../lib/constants'
 import { useColors } from '../lib/useColors'
+import { getInputStyle, getLabelStyle } from '../lib/formStyles'
 
 const statusConfig: Record<string, { color: string; icon: any; label: string }> = {
   TODO:        { color: '#64748b', icon: Circle,       label: 'To Do' },
@@ -34,7 +36,8 @@ const statusConfig: Record<string, { color: string; icon: any; label: string }> 
 // ── Main Page ─────────────────────────────────────────────────────────
 export default function TasksPage() {
   const queryClient = useQueryClient()
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
   const [showModal, setShowModal]           = useState(false)
   const [editTask, setEditTask]             = useState<Task | null>(null)
   const [filterStatus, setFilterStatus]       = useState('')
@@ -260,18 +263,18 @@ export default function TasksPage() {
     quickInputRef.current?.focus()
   }
 
-  const toggleSelect = (id: string) => {
+  const toggleSelect = useCallback((id: string) => {
     setSelected(prev => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
-  }
+  }, [])
 
-  const selectAll = () => {
+  const selectAll = useCallback(() => {
     if (selected.size === filteredTasks.length) setSelected(new Set())
     else setSelected(new Set(filteredTasks.map(t => t.id)))
-  }
+  }, [selected.size, filteredTasks])
 
   const bulkDelete = async () => {
     const toastId = toast.loading(`Deleting ${selected.size} tasks...`)
@@ -285,12 +288,12 @@ export default function TasksPage() {
     }
   }
 
-  const handleDragStart = (event: DragStartEvent) => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     const task = tasks.find(t => t.id === event.active.id)
     setActiveTask(task || null)
-  }
+  }, [tasks])
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     setActiveTask(null)
     const { active, over } = event
     if (!over || active.id === over.id) return
@@ -300,25 +303,23 @@ export default function TasksPage() {
     if (draggedTask.status !== overTask.status) {
       updateMutation.mutate({ id: draggedTask.id, data: { status: overTask.status } })
     }
-  }
+  }, [tasks, updateMutation])
 
-  const filteredTasks = tasks.filter(t => {
+  const filteredTasks = useMemo(() => tasks.filter(t => {
     if (t.parentId) return false
     if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
     if (filterRecurring && (!t.recurrence || t.recurrence === 'NONE')) return false
     return true
-  })
+  }), [tasks, search, filterRecurring])
 
-  const grouped: Record<string, Task[]> = { TODO: [], IN_PROGRESS: [], IN_REVIEW: [], DONE: [], CANCELLED: [] }
-  filteredTasks.forEach(t => { if (grouped[t.status]) grouped[t.status].push(t) })
+  const grouped = useMemo(() => {
+    const g: Record<string, Task[]> = { TODO: [], IN_PROGRESS: [], IN_REVIEW: [], DONE: [], CANCELLED: [] }
+    filteredTasks.forEach(t => { if (g[t.status]) g[t.status].push(t) })
+    return g
+  }, [filteredTasks])
 
-  const inputStyle = {
-    width: '100%', backgroundColor: colors.input, border: `1px solid ${colors.inputBorder}`,
-    borderRadius: '10px', padding: '10px 14px', color: colors.text,
-    fontSize: '14px', outline: 'none', boxSizing: 'border-box' as const
-  }
-
-  const labelStyle = { display: 'block' as const, fontSize: '13px', color: colors.textMuted, marginBottom: '6px' }
+  const inputStyle = getInputStyle(colors)
+  const labelStyle = getLabelStyle(colors)
 
   return (
     <div style={{ padding: isMobile ? '16px' : '32px', fontFamily: 'Inter, sans-serif', minHeight: '100vh', backgroundColor: colors.bg }}>

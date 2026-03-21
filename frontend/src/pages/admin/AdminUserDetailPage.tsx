@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useOutletContext } from 'react-router-dom'
+import { useThemeStore } from '../../store/themeStore'
+import { useIsMobile } from '../../lib/useIsMobile'
 import { ArrowLeft, Crown, Ban, CheckSquare, FolderKanban, Clock, Calendar, Tag, Shield, Trash2 } from 'lucide-react'
 import api from '../../lib/axios'
 import toast from 'react-hot-toast'
@@ -9,7 +10,8 @@ export default function AdminUserDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
 
   const colors = {
     card:      isDark ? '#0f172a' : '#ffffff',

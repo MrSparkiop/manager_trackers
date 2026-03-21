@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { User, Moon, Sun, Save } from 'lucide-react'
 import { useColors } from '../lib/useColors'
+import { getInputStyle } from '../lib/formStyles'
 
 export default function SettingsPage() {
   const { isDark } = useThemeStore()
@@ -17,13 +18,7 @@ export default function SettingsPage() {
 
   const colors = useColors(isDark)
 
-  const inputStyle = {
-    width: '100%', backgroundColor: colors.input,
-    border: `1px solid ${colors.inputBorder}`,
-    borderRadius: '10px', padding: '10px 14px',
-    color: colors.text, fontSize: '14px', outline: 'none',
-    boxSizing: 'border-box' as const
-  }
+  const inputStyle = getInputStyle(colors)
 
   const card = {
     backgroundColor: colors.card, borderRadius: '16px',

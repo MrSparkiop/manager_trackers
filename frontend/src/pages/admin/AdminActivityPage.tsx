@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useOutletContext } from 'react-router-dom'
+import { useThemeStore } from '../../store/themeStore'
+import { useIsMobile } from '../../lib/useIsMobile'
 import { CheckSquare, FolderKanban, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react'
 import api from '../../lib/axios'
 
 export default function AdminActivityPage() {
-  const { isDark, isMobile } = useOutletContext<{ isDark: boolean; isMobile: boolean }>()
+  const { isDark } = useThemeStore()
+  const isMobile = useIsMobile()
   const [page, setPage] = useState(1)
 
   const colors = {

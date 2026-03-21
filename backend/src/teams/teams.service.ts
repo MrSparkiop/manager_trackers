@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationsService } from '../notifications/notifications.service'
-import { getNextDueDate } from '../common/date.utils'
+import { createNextOccurrence as createNext, skipNextOccurrence as skipNext } from '../common/recurrence.utils'
 import { TaskStatus, Priority, Recurrence, ProjectStatus, TeamRole } from '@prisma/client'
 
 @Injectable()
@@ -416,32 +416,7 @@ export class TeamsService {
     })
     if (!task) throw new NotFoundException('Task not found')
     await this.requireAtLeast(task.project!.teamId!, userId, 'EDITOR')
-    if (task.recurrence === 'NONE') throw new NotFoundException('Task is not recurring')
-
-    const nextDueDate = getNextDueDate(task.dueDate, task.recurrence)
-
-    if (task.recurrenceEndDate && nextDueDate > task.recurrenceEndDate) {
-      return { message: 'Recurrence has ended', created: false }
-    }
-
-    const nextTask = await this.prisma.task.create({
-      data: {
-        projectId: task.projectId!,
-        userId: task.userId,
-        teamId: task.teamId,
-        title: task.title,
-        description: task.description,
-        priority: task.priority,
-        status: 'TODO',
-        assigneeId: task.assigneeId,
-        recurrence: task.recurrence,
-        recurrenceEndDate: task.recurrenceEndDate,
-        parentTaskId: task.parentTaskId || task.id,
-        dueDate: nextDueDate,
-      },
-    })
-
-    return { message: 'Next occurrence created', created: true, task: nextTask }
+    return createNext(this.prisma, task)
   }
 
   async skipNextTeamOccurrence(taskId: string, userId: string) {
@@ -451,32 +426,7 @@ export class TeamsService {
     })
     if (!task) throw new NotFoundException('Task not found')
     await this.requireAtLeast(task.project!.teamId!, userId, 'EDITOR')
-
-    const skippedDate = getNextDueDate(task.dueDate, task.recurrence)
-    const nextDueDate = getNextDueDate(skippedDate, task.recurrence)
-
-    if (task.recurrenceEndDate && nextDueDate > task.recurrenceEndDate) {
-      return { message: 'Recurrence has ended', created: false }
-    }
-
-    const nextTask = await this.prisma.task.create({
-      data: {
-        projectId: task.projectId!,
-        userId: task.userId,
-        teamId: task.teamId,
-        title: task.title,
-        description: task.description,
-        priority: task.priority,
-        status: 'TODO',
-        assigneeId: task.assigneeId,
-        recurrence: task.recurrence,
-        recurrenceEndDate: task.recurrenceEndDate,
-        parentTaskId: task.parentTaskId || task.id,
-        dueDate: nextDueDate,
-      },
-    })
-
-    return { message: 'Occurrence skipped', created: true, task: nextTask }
+    return skipNext(this.prisma, task)
   }
 
   // ── Activity Feed ────────────────────────────────────────────────

@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskStatus, Priority, Prisma } from '@prisma/client';
-import { getNextDueDate } from '../common/date.utils';
+import { createNextOccurrence as createNext, skipNextOccurrence as skipNext } from '../common/recurrence.utils';
 
 export interface TaskFilters {
   status?: string
@@ -171,35 +171,7 @@ export class TasksService {
       include: { tags: true },
     })
     if (!task) throw new NotFoundException('Task not found')
-    if (task.recurrence === 'NONE') throw new NotFoundException('Task is not recurring')
-
-    const nextDueDate = getNextDueDate(task.dueDate, task.recurrence)
-
-    if (task.recurrenceEndDate && nextDueDate > task.recurrenceEndDate) {
-      return { message: 'Recurrence has ended', created: false }
-    }
-
-    const nextTask = await this.prisma.task.create({
-      data: {
-        userId,
-        title: task.title,
-        description: task.description,
-        priority: task.priority,
-        status: 'TODO',
-        projectId: task.projectId,
-        recurrence: task.recurrence,
-        recurrenceEndDate: task.recurrenceEndDate,
-        parentTaskId: task.parentTaskId || task.id,
-        dueDate: nextDueDate,
-        tags: { connect: task.tags.map(t => ({ id: t.id })) },
-      },
-      include: {
-        project: { select: { name: true, color: true } },
-        tags: true,
-      },
-    })
-
-    return { message: 'Next occurrence created', created: true, task: nextTask }
+    return createNext(this.prisma, task, { connectTags: true })
   }
 
   async skipNextOccurrence(id: string, userId: string) {
@@ -208,36 +180,7 @@ export class TasksService {
       include: { tags: true },
     })
     if (!task) throw new NotFoundException('Task not found')
-    if (task.recurrence === 'NONE') throw new NotFoundException('Task is not recurring')
-
-    const skippedDate = getNextDueDate(task.dueDate, task.recurrence)
-    const nextDueDate = getNextDueDate(skippedDate, task.recurrence)
-
-    if (task.recurrenceEndDate && nextDueDate > task.recurrenceEndDate) {
-      return { message: 'Recurrence has ended', created: false }
-    }
-
-    const nextTask = await this.prisma.task.create({
-      data: {
-        userId,
-        title: task.title,
-        description: task.description,
-        priority: task.priority,
-        status: 'TODO',
-        projectId: task.projectId,
-        recurrence: task.recurrence,
-        recurrenceEndDate: task.recurrenceEndDate,
-        parentTaskId: task.parentTaskId || task.id,
-        dueDate: nextDueDate,
-        tags: { connect: task.tags.map(t => ({ id: t.id })) },
-      },
-      include: {
-        project: { select: { name: true, color: true } },
-        tags: true,
-      },
-    })
-
-    return { message: 'Occurrence skipped', created: true, task: nextTask }
+    return skipNext(this.prisma, task, { connectTags: true })
   }
 
 }

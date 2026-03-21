@@ -6,6 +6,7 @@ import { useThemeStore } from '../store/themeStore'
 import { TimeEntrySkeleton } from '../components/Skeleton'
 import type { Task, TimeEntry } from '../types'
 import { useColors } from '../lib/useColors'
+import { getInputStyle } from '../lib/formStyles'
 
 function formatDuration(seconds: number) {
   const h = Math.floor(seconds / 3600)
@@ -61,10 +62,11 @@ export default function TimeTrackerPage() {
     refetchInterval: 5000,
   })
 
-  const { data: entries = [], isLoading } = useQuery<TimeEntry[]>({
+  const { data: _entriesRaw, isLoading } = useQuery<any>({
     queryKey: ['time-entries'],
-    queryFn: () => api.get('/time-tracker').then(r => r.data),
+    queryFn: () => api.get('/time-tracker?limit=100').then(r => r.data),
   })
+  const entries: TimeEntry[] = Array.isArray(_entriesRaw) ? _entriesRaw : (_entriesRaw?.entries ?? [])
 
   const { data: summary } = useQuery<{ todaySeconds: number; weekSeconds: number; totalSeconds: number }>({
     queryKey: ['time-summary'],
@@ -147,11 +149,7 @@ export default function TimeTrackerPage() {
     grouped[key].push(e)
   })
 
-  const inputStyle = {
-    width: '100%', backgroundColor: colors.input, border: `1px solid ${colors.inputBorder}`,
-    borderRadius: '10px', padding: '10px 14px', color: colors.text,
-    fontSize: '14px', outline: 'none', boxSizing: 'border-box' as const
-  }
+  const inputStyle = getInputStyle(colors)
 
   return (
     <div style={{ padding: '32px', fontFamily: 'Inter, sans-serif', minHeight: '100vh', backgroundColor: colors.bg }}>

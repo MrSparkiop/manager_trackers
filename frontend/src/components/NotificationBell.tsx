@@ -28,10 +28,11 @@ export default function NotificationBell({ isDark }: { isDark: boolean }) {
     hover:     isDark ? '#1e293b' : '#f8fafc',
   }
 
-  const { data: notifications = [], isLoading } = useQuery({
+  const { data: _notifRaw, isLoading } = useQuery<any>({
     queryKey: ['notifications'],
     queryFn: () => api.get('/notifications').then(r => r.data),
   })
+  const notifications = Array.isArray(_notifRaw) ? _notifRaw : (_notifRaw?.notifications ?? [])
 
   const { data: unreadData } = useQuery({
     queryKey: ['notifications-unread'],
