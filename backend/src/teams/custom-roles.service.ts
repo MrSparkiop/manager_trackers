@@ -30,6 +30,12 @@ export class CustomRolesService {
     canManageSettings?: boolean
   }) {
     await this.requireOwner(teamId, actorId)
+
+    const count = await this.prisma.customTeamRole.count({ where: { teamId } })
+    if (count >= 20) {
+      throw new ConflictException('Maximum of 20 custom roles per team')
+    }
+
     try {
       return await this.prisma.customTeamRole.create({
         data: {

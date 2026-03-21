@@ -83,7 +83,7 @@ model CustomTeamRole {
 
 model TeamMember {
   id        String     @id @default(cuid())
-  role      TeamRole   @default(EDITOR)
+  role      TeamRole   @default(VIEWER)
   joinedAt  DateTime   @default(now())
 
   teamId    String

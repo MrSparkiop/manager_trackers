@@ -125,7 +125,7 @@ export class TeamsService {
     // Catch race conditions at DB level
     try {
       await this.prisma.teamMember.create({
-        data: { teamId: team.id, userId, role: 'EDITOR' }
+        data: { teamId: team.id, userId, role: 'VIEWER' }
       })
     } catch (e: any) {
       if (e?.code === 'P2002') throw new BadRequestException('You are already a member of this team')
