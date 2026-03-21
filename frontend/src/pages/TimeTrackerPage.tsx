@@ -4,17 +4,8 @@ import { Play, Square, Trash2, Clock, Plus, X } from 'lucide-react'
 import api from '../lib/axios'
 import { useThemeStore } from '../store/themeStore'
 import { TimeEntrySkeleton } from '../components/Skeleton'
-
-interface Task { id: string; title: string; project?: { name: string; color: string } }
-interface TimeEntry {
-  id: string
-  description?: string
-  startTime: string
-  endTime?: string
-  duration?: number
-  taskId?: string
-  task?: { id: string; title: string }
-}
+import type { Task, TimeEntry } from '../types'
+import { useColors } from '../lib/useColors'
 
 function formatDuration(seconds: number) {
   const h = Math.floor(seconds / 3600)
@@ -56,15 +47,9 @@ export default function TimeTrackerPage() {
     startTime: '', endTime: ''
   })
 
+  const baseColors = useColors(isDark)
   const colors = {
-    bg: isDark ? '#030712' : '#f1f5f9',
-    card: isDark ? '#0f172a' : '#ffffff',
-    border: isDark ? '#1e293b' : '#e2e8f0',
-    text: isDark ? '#ffffff' : '#0f172a',
-    textMuted: isDark ? '#64748b' : '#94a3b8',
-    input: isDark ? '#1e293b' : '#f8fafc',
-    inputBorder: isDark ? '#334155' : '#e2e8f0',
-    subBg: isDark ? '#1e293b' : '#f8fafc',
+    ...baseColors,
     timerBg: isDark
       ? 'linear-gradient(135deg, #0f172a 0%, #1a1040 100%)'
       : 'linear-gradient(135deg, #f8fafc 0%, #ede9fe 100%)',

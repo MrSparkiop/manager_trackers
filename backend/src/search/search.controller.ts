@@ -1,7 +1,8 @@
-import { Controller, Get, Query, UseGuards, Req } from '@nestjs/common'
+import { Controller, Get, Query, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
 import { PrismaService } from '../prisma/prisma.service'
 import { ApiTags } from '@nestjs/swagger'
+import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
 
 @ApiTags('Search')
 @UseGuards(AuthGuard('jwt'))
@@ -10,10 +11,10 @@ export class SearchController {
   constructor(private prisma: PrismaService) {}
 
   @Get()
-  async search(@Query('q') q: string, @Req() req: any) {
+  async search(@Query('q') q: string, @CurrentUser() user: AuthUser) {
     if (!q || q.trim().length < 2) return { tasks: [], projects: [], teams: [], tags: [] }
 
-    const userId = req.user.id
+    const userId = user.id
     const query = q.trim().toLowerCase()
 
     const [tasks, projects, teams, tags] = await Promise.all([

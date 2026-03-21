@@ -5,6 +5,8 @@ import { RequirePermissions } from '../auth/permissions'
 import { AdminService } from './admin.service'
 import { MaintenanceService } from './maintenance.service'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
+import type { Request } from 'express'
+import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
 
 @ApiTags('Admin')
 @UseGuards(AuthGuard('jwt'), PermissionsGuard)
@@ -38,26 +40,26 @@ export class AdminController {
 
   @Put('users/:id')
   @ApiOperation({ summary: 'Update a user (role, name, etc.)' })
-  updateUser(@Req() req: any, @Param('id') id: string, @Body() dto: any) {
-    return this.adminService.updateUser(req.user.id, id, dto)
+  updateUser(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: { role?: string; firstName?: string; lastName?: string }) {
+    return this.adminService.updateUser(user.id, id, dto)
   }
 
   @Put('users/:id/role')
   @ApiOperation({ summary: 'Update a user role' })
-  updateUserRole(@Req() req: any, @Param('id') id: string, @Body() dto: { role: string }) {
-    return this.adminService.updateUser(req.user.id, id, { role: dto.role })
+  updateUserRole(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: { role: string }) {
+    return this.adminService.updateUser(user.id, id, { role: dto.role })
   }
 
   @Put('users/:id/suspend')
   @ApiOperation({ summary: 'Suspend or unsuspend a user' })
-  suspendUser(@Req() req: any, @Param('id') id: string, @Body() dto: any) {
-    return this.adminService.suspendUser(req.user.id, id, dto.suspend)
+  suspendUser(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: { suspend: boolean }) {
+    return this.adminService.suspendUser(user.id, id, dto.suspend)
   }
 
   @Delete('users/:id')
   @ApiOperation({ summary: 'Delete a user' })
-  deleteUser(@Req() req: any, @Param('id') id: string) {
-    return this.adminService.deleteUser(req.user.id, id)
+  deleteUser(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.adminService.deleteUser(user.id, id)
   }
 
   // ── Billing management ───────────────────────────────────────────
@@ -67,14 +69,14 @@ export class AdminController {
 
   @Post('billing/:userId/grant-pro')
   @ApiOperation({ summary: 'Manually grant PRO to a user' })
-  grantPro(@Req() req: any, @Param('userId') userId: string) {
-    return this.adminService.setUserRole(req.user.id, userId, 'PRO')
+  grantPro(@CurrentUser() user: AuthUser, @Param('userId') userId: string) {
+    return this.adminService.setUserRole(user.id, userId, 'PRO')
   }
 
   @Post('billing/:userId/revoke-pro')
   @ApiOperation({ summary: 'Revoke PRO from a user' })
-  revokePro(@Req() req: any, @Param('userId') userId: string) {
-    return this.adminService.setUserRole(req.user.id, userId, 'USER')
+  revokePro(@CurrentUser() user: AuthUser, @Param('userId') userId: string) {
+    return this.adminService.setUserRole(user.id, userId, 'USER')
   }
 
   @Get('activity')
@@ -108,13 +110,13 @@ export class AdminController {
 
   @Post('announcements')
   @ApiOperation({ summary: 'Create announcement' })
-  createAnnouncement(@Body() dto: any) {
+  createAnnouncement(@Body() dto: { title: string; message: string; type?: string; targetRole?: string; expiresAt?: string }) {
     return this.adminService.createAnnouncement(dto)
   }
 
   @Put('announcements/:id')
   @ApiOperation({ summary: 'Update announcement' })
-  updateAnnouncement(@Param('id') id: string, @Body() dto: any) {
+  updateAnnouncement(@Param('id') id: string, @Body() dto: { title?: string; message?: string; type?: string; isActive?: boolean; targetRole?: string; expiresAt?: string }) {
     return this.adminService.updateAnnouncement(id, dto)
   }
 
@@ -133,13 +135,13 @@ export class AdminController {
 
   @Post('maintenance')
   @ApiOperation({ summary: 'Schedule a maintenance window' })
-  createMaintenance(@Body() dto: any) {
+  createMaintenance(@Body() dto: { title: string; message?: string; startsAt: string; endsAt: string }) {
     return this.maintenanceService.create(dto)
   }
 
   @Put('maintenance/:id')
   @ApiOperation({ summary: 'Update a maintenance window' })
-  updateMaintenance(@Param('id') id: string, @Body() dto: any) {
+  updateMaintenance(@Param('id') id: string, @Body() dto: { title?: string; message?: string; startsAt?: string; endsAt?: string; isActive?: boolean }) {
     return this.maintenanceService.update(id, dto)
   }
 
@@ -152,9 +154,9 @@ export class AdminController {
   // ── Impersonation ─────────────────────────────────────────────────
   @Post('impersonate/:userId')
   @ApiOperation({ summary: 'Generate a 1-hour token scoped as the target user (logged to audit trail)' })
-  impersonateUser(@Param('userId') userId: string, @Req() req: any) {
-    const ip = req.headers['x-forwarded-for'] ?? req.socket?.remoteAddress
-    return this.adminService.impersonateUser(req.user.id, userId, ip)
+  impersonateUser(@Param('userId') userId: string, @Req() req: Request, @CurrentUser() user: AuthUser) {
+    const ip = req.headers['x-forwarded-for'] as string ?? req.socket?.remoteAddress
+    return this.adminService.impersonateUser(user.id, userId, ip)
   }
 
   // ── Audit Log ─────────────────────────────────────────────────────

@@ -45,7 +45,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user } = useAuthStore()
   if (!isAuthenticated) return <Navigate to="/login" />
-  if ((user as any)?.role !== 'ADMIN') return <Navigate to="/app/dashboard" />
+  if (user?.role !== 'ADMIN') return <Navigate to="/app/dashboard" />
   return <>{children}</>
 }
 

@@ -4,6 +4,9 @@ import { ApiOperation } from '@nestjs/swagger'
 import { Throttle, SkipThrottle } from '@nestjs/throttler'
 import { AuthService } from './auth.service'
 import type { Response, Request } from 'express'
+import { RegisterDto } from './dto/register.dto'
+import { LoginDto } from './dto/login.dto'
+import { CurrentUser, type AuthUser } from './current-user.decorator'
 
 @Controller('auth')
 export class AuthController {
@@ -12,14 +15,14 @@ export class AuthController {
   // 3 register attempts per minute
   @Throttle({ medium: { ttl: 60000, limit: 3 } })
   @Post('register')
-  register(@Body() dto: any, @Res({ passthrough: true }) res: Response) {
+  register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     return this.authService.register(dto, res)
   }
 
   // 5 login attempts per minute
   @Throttle({ medium: { ttl: 60000, limit: 5 } })
   @Post('login')
-  login(@Body() dto: any, @Res({ passthrough: true }) res: Response) {
+  login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     return this.authService.login(dto, res)
   }
 
@@ -34,28 +37,28 @@ export class AuthController {
   @SkipThrottle()
   @Post('logout')
   @UseGuards(AuthGuard('jwt'))
-  logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
-    return this.authService.logout(res, req.user?.id)
+  logout(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response) {
+    return this.authService.logout(res, user?.id)
   }
 
   @SkipThrottle()
   @Get('me')
   @UseGuards(AuthGuard('jwt'))
-  getMe(@Req() req: any) {
-    return this.authService.getMe(req.user.id)
+  getMe(@CurrentUser() user: AuthUser) {
+    return this.authService.getMe(user.id)
   }
 
   // 3 forgot password attempts per minute
   @Throttle({ medium: { ttl: 60000, limit: 3 } })
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request a password reset email' })
-  forgotPassword(@Body() body: any) {
+  forgotPassword(@Body() body: { email: string }) {
     return this.authService.forgotPassword(body.email)
   }
 
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset password using token from email' })
-  resetPassword(@Body() body: any) {
+  resetPassword(@Body() body: { token: string; password: string }) {
     return this.authService.resetPassword(body.token, body.password)
   }
 }

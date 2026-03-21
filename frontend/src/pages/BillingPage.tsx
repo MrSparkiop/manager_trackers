@@ -33,8 +33,8 @@ interface Subscription {
 export default function BillingPage() {
   const { user } = useAuthStore()
   const { isDark } = useThemeStore()
-  const isPro   = (user as any)?.role === 'PRO'
-  const isAdmin = (user as any)?.role === 'ADMIN'
+  const isPro   = user?.role === 'PRO'
+  const isAdmin = user?.role === 'ADMIN'
 
   const c = {
     bg:        isDark ? '#030712' : '#f1f5f9',

@@ -15,28 +15,9 @@ import { useOutletContext } from 'react-router-dom'
 import { CardSkeleton } from '../components/Skeleton'
 import EmptyState from '../components/EmptyState'
 import toast from 'react-hot-toast'
-
-
-interface Project {
-  id: string
-  name: string
-  description?: string
-  color: string
-  status: string
-  deadline?: string
-  createdAt: string
-  _count?: { tasks: number }
-  tasks?: Task[]
-}
-
-interface Task {
-  id: string
-  title: string
-  status: string
-  priority: string
-  projectId?: string
-  project?: { id: string; name: string; color: string }
-}
+import type { Task, Project } from '../types'
+import { priorityColors } from '../lib/constants'
+import { useColors } from '../lib/useColors'
 
 const COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -60,12 +41,6 @@ const KANBAN_COLUMNS = [
   { id: 'DONE',        label: 'Done',        color: '#4ade80' },
 ]
 
-const priorityColors: Record<string, { bg: string; color: string }> = {
-  URGENT: { bg: 'rgba(239,68,68,0.15)',   color: '#f87171' },
-  HIGH:   { bg: 'rgba(249,115,22,0.15)',  color: '#fb923c' },
-  MEDIUM: { bg: 'rgba(234,179,8,0.15)',   color: '#facc15' },
-  LOW:    { bg: 'rgba(34,197,94,0.15)',   color: '#4ade80' },
-}
 
 // Sortable Task Card for Kanban
 function SortableTaskCard({ task, colors }: { task: Task; colors: any }) {
@@ -174,17 +149,7 @@ export default function ProjectsPage() {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [form, setForm] = useState({ name: '', description: '', color: '#6366f1', status: 'ACTIVE', deadline: '' })
 
-  const colors = {
-    bg: isDark ? '#030712' : '#f1f5f9',
-    card: isDark ? '#0f172a' : '#ffffff',
-    border: isDark ? '#1e293b' : '#e2e8f0',
-    text: isDark ? '#ffffff' : '#0f172a',
-    textMuted: isDark ? '#64748b' : '#94a3b8',
-    input: isDark ? '#1e293b' : '#f8fafc',
-    inputBorder: isDark ? '#334155' : '#e2e8f0',
-    subBg: isDark ? '#0d1829' : '#f8fafc',
-    modalBg: isDark ? '#0f172a' : '#ffffff',
-  }
+  const colors = useColors(isDark)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 

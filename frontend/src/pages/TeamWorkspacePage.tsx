@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'
 import { CardSkeleton } from '../components/Skeleton'
 import EmptyState from '../components/EmptyState'
+import { useColors } from '../lib/useColors'
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#22c55e', '#14b8a6', '#3b82f6']
 
@@ -40,15 +41,7 @@ export default function TeamWorkspacePage() {
   const [copied, setCopied] = useState(false)
   const [activeTab, setActiveTab] = useState<'projects' | 'members' | 'activity'>('projects')
 
-  const colors = {
-    card:        isDark ? '#0f172a' : '#ffffff',
-    border:      isDark ? '#1e293b' : '#e2e8f0',
-    text:        isDark ? '#ffffff' : '#0f172a',
-    textMuted:   isDark ? '#64748b' : '#94a3b8',
-    subBg:       isDark ? '#1e293b' : '#f8fafc',
-    input:       isDark ? '#1e293b' : '#f8fafc',
-    inputBorder: isDark ? '#334155' : '#e2e8f0',
-  }
+  const colors = useColors(isDark)
 
   const { data: team, isLoading } = useQuery({
     queryKey: ['team', id],
@@ -347,7 +340,7 @@ export default function TeamWorkspacePage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <p style={{ fontSize: '14px', fontWeight: '600', color: colors.text, margin: 0 }}>
                       {member.user.firstName} {member.user.lastName}
-                      {member.user.id === (user as any)?.id && <span style={{ fontSize: '11px', color: colors.textMuted, fontWeight: '400' }}> (you)</span>}
+                      {member.user.id === user?.id && <span style={{ fontSize: '11px', color: colors.textMuted, fontWeight: '400' }}> (you)</span>}
                     </p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                       {member.role === 'OWNER' && <Crown size={11} color="#f59e0b" />}
@@ -385,7 +378,7 @@ export default function TeamWorkspacePage() {
                   <span style={{ fontSize: '11px', color: colors.textMuted }}>
                     Joined {new Date(member.joinedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
-                  {isOwner && member.user.id !== (user as any)?.id && member.role !== 'OWNER' && (
+                  {isOwner && member.user.id !== user?.id && member.role !== 'OWNER' && (
                     <select
                       value={member.role}
                       onChange={e => updateRoleMutation.mutate({ memberId: member.user.id, role: e.target.value })}
@@ -400,7 +393,7 @@ export default function TeamWorkspacePage() {
                       <option value="VIEWER">Viewer</option>
                     </select>
                   )}
-                  {isAdmin && member.user.id !== (user as any)?.id && member.role !== 'OWNER' && (
+                  {isAdmin && member.user.id !== user?.id && member.role !== 'OWNER' && (
                     <button onClick={() => removeMemberMutation.mutate(member.user.id)} style={{
                       padding: '5px', background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, borderRadius: '6px'
                     }}

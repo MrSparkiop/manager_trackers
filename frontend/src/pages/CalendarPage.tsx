@@ -4,28 +4,8 @@ import { ChevronLeft, ChevronRight, Plus, X, Trash2, CheckCircle2, Clock, Refres
 import api from '../lib/axios'
 import { useOutletContext } from 'react-router-dom'
 import toast from 'react-hot-toast'
-
-
-interface CalendarEvent {
-  id: string
-  title: string
-  description?: string
-  startTime: string
-  endTime: string
-  allDay: boolean
-  color: string
-  taskId?: string
-  task?: { id: string; title: string }
-}
-
-interface Task {
-  id: string
-  title: string
-  dueDate?: string
-  status?: string
-  priority?: string
-  recurrence?: string
-}
+import type { CalendarEvent, Task } from '../types'
+import { useColors } from '../lib/useColors'
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6']
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -44,14 +24,9 @@ export default function CalendarPage() {
     allDay: false, taskId: ''
   })
 
+  const baseColors = useColors(isDark)
   const colors = {
-    bg: isDark ? '#030712' : '#f1f5f9',
-    card: isDark ? '#0f172a' : '#ffffff',
-    border: isDark ? '#1e293b' : '#e2e8f0',
-    text: isDark ? '#ffffff' : '#0f172a',
-    textMuted: isDark ? '#64748b' : '#94a3b8',
-    input: isDark ? '#1e293b' : '#f8fafc',
-    inputBorder: isDark ? '#334155' : '#e2e8f0',
+    ...baseColors,
     cellBg: isDark ? '#0f172a' : '#ffffff',
     cellHover: isDark ? '#1e293b' : '#f8fafc',
     sidePanelBg: isDark ? '#0f172a' : '#ffffff',

@@ -7,6 +7,7 @@ import type { RawBodyRequest } from '@nestjs/common'
 import type { Request } from 'express'
 import { BillingService } from './billing.service'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
+import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
 
 @ApiTags('Billing')
 @Controller('billing')
@@ -24,24 +25,24 @@ export class BillingController {
   @Get('subscription')
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: 'Get subscription status and invoice history' })
-  getSubscription(@Req() req: any) {
-    return this.billingService.getSubscription(req.user.id)
+  getSubscription(@CurrentUser() user: AuthUser) {
+    return this.billingService.getSubscription(user.id)
   }
 
   /** Authenticated — start a Stripe Checkout session */
   @Post('checkout')
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: 'Create a Stripe Checkout session' })
-  createCheckout(@Req() req: any) {
-    return this.billingService.createCheckoutSession(req.user.id, req.user.email)
+  createCheckout(@CurrentUser() user: AuthUser) {
+    return this.billingService.createCheckoutSession(user.id, user.email)
   }
 
   /** Authenticated — open customer portal to manage/cancel subscription */
   @Post('portal')
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: 'Open Stripe customer portal' })
-  createPortal(@Req() req: any) {
-    return this.billingService.createPortalSession(req.user.id)
+  createPortal(@CurrentUser() user: AuthUser) {
+    return this.billingService.createPortalSession(user.id)
   }
 
   /** Public — Stripe webhook (needs raw body) */

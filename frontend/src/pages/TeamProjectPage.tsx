@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'
 import { TaskRowSkeleton } from '../components/Skeleton'
 import EmptyState from '../components/EmptyState'
+import { useColors } from '../lib/useColors'
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
 const STATUSES   = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE', 'CANCELLED']
@@ -168,15 +169,10 @@ export default function TeamProjectPage() {
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
   const dragTaskId = useRef<string | null>(null)
 
+  const baseColors = useColors(isDark)
   const colors = {
-    card:        isDark ? '#0f172a' : '#ffffff',
-    border:      isDark ? '#1e293b' : '#e2e8f0',
-    text:        isDark ? '#ffffff' : '#0f172a',
-    textMuted:   isDark ? '#64748b' : '#94a3b8',
-    subBg:       isDark ? '#1e293b' : '#f8fafc',
-    input:       isDark ? '#1e293b' : '#f8fafc',
-    inputBorder: isDark ? '#334155' : '#e2e8f0',
-    kanbanCol:   isDark ? '#0b1120' : '#f1f5f9',
+    ...baseColors,
+    kanbanCol: isDark ? '#0b1120' : '#f1f5f9',
   }
 
   const { data: tasks = [], isLoading } = useQuery({
@@ -420,7 +416,7 @@ export default function TeamProjectPage() {
                         <span style={{ fontSize: '10px', color: colors.textMuted }}>
                           {new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </span>
-                        {c.authorId === (user as any)?.id && (
+                        {c.authorId === user?.id && (
                           <button onClick={() => deleteCommentMutation.mutate(c.id)} style={{ padding: '2px', background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted }}
                             onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
                             onMouseLeave={e => e.currentTarget.style.color = colors.textMuted}

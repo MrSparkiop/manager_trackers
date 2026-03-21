@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import { useAuthStore } from '../store/authStore'
 import { CardSkeleton } from '../components/Skeleton'
 import EmptyState from '../components/EmptyState'
+import { useColors } from '../lib/useColors'
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#22c55e', '#14b8a6', '#3b82f6']
 
@@ -25,23 +26,15 @@ export default function TeamsPage() {
   const [inviteCode, setInviteCode] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
 
-  const colors = {
-    card:        isDark ? '#0f172a' : '#ffffff',
-    border:      isDark ? '#1e293b' : '#e2e8f0',
-    text:        isDark ? '#ffffff' : '#0f172a',
-    textMuted:   isDark ? '#64748b' : '#94a3b8',
-    subBg:       isDark ? '#1e293b' : '#f8fafc',
-    input:       isDark ? '#1e293b' : '#f8fafc',
-    inputBorder: isDark ? '#334155' : '#e2e8f0',
-  }
+  const colors = useColors(isDark)
 
   const { data: teams = [], isLoading } = useQuery({
     queryKey: ['teams'],
     queryFn: () => api.get('/teams').then(r => r.data),
   })
 
-  const isPro = (user as any)?.role === 'PRO'
-             || (user as any)?.role === 'ADMIN'
+  const isPro = user?.role === 'PRO'
+             || user?.role === 'ADMIN'
              || teams.length > 0
 
   const createMutation = useMutation({

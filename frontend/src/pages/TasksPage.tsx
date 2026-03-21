@@ -19,35 +19,9 @@ import RecurrenceSelector, { RecurrenceBadge } from '../components/RecurrenceSel
 import RecurringTaskModal from '../components/RecurringTaskModal'
 import TaskDetailDrawer from '../components/TaskDetailDrawer'
 import toast from 'react-hot-toast'
-
-interface Project { id: string; name: string; color: string }
-interface Task {
-  id: string
-  title: string
-  description?: string
-  status: string
-  priority: string
-  dueDate?: string
-  estimatedTime?: number
-  projectId?: string
-  project?: Project
-  parentId?: string
-  subtasks?: Task[]
-  recurrence?: string
-  recurrenceEndDate?: string
-  tags?: { id: string; name: string; color: string }[]
-  timeEntries?: { duration: number | null }[]
-}
-
-const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
-const STATUSES   = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE', 'CANCELLED']
-
-const priorityColors: Record<string, { bg: string; color: string }> = {
-  URGENT: { bg: 'rgba(239,68,68,0.15)',   color: '#f87171' },
-  HIGH:   { bg: 'rgba(249,115,22,0.15)',  color: '#fb923c' },
-  MEDIUM: { bg: 'rgba(234,179,8,0.15)',   color: '#facc15' },
-  LOW:    { bg: 'rgba(34,197,94,0.15)',   color: '#4ade80' },
-}
+import type { Task, Project } from '../types'
+import { priorityColors, PRIORITIES, STATUSES } from '../lib/constants'
+import { useColors } from '../lib/useColors'
 
 const statusConfig: Record<string, { color: string; icon: any; label: string }> = {
   TODO:        { color: '#64748b', icon: Circle,       label: 'To Do' },
@@ -393,19 +367,7 @@ export default function TasksPage() {
     recurrence: 'NONE', recurrenceEndDate: '',
   })
 
-  const colors = {
-    bg:        isDark ? '#030712' : '#f1f5f9',
-    card:      isDark ? '#0f172a' : '#ffffff',
-    border:    isDark ? '#1e293b' : '#e2e8f0',
-    text:      isDark ? '#ffffff' : '#0f172a',
-    textMuted: isDark ? '#64748b' : '#94a3b8',
-    input:     isDark ? '#1e293b' : '#f8fafc',
-    inputBorder: isDark ? '#334155' : '#e2e8f0',
-    subBg:     isDark ? '#0d1117' : '#f1f5f9',
-    modalBg:   isDark ? '#0f172a' : '#ffffff',
-    filterBg:  isDark ? '#0f172a' : '#ffffff',
-    searchBg:  isDark ? '#0f172a' : '#ffffff',
-  }
+  const colors = useColors(isDark)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 

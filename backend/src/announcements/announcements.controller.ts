@@ -1,7 +1,8 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common'
+import { Controller, Get, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
 import { AdminService } from '../admin/admin.service'
 import { ApiTags } from '@nestjs/swagger'
+import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
 
 @ApiTags('Announcements')
 @Controller('announcements')
@@ -10,7 +11,7 @@ export class AnnouncementsController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get('active')
-  getActive(@Req() req: any) {
-    return this.adminService.getActiveAnnouncements(req.user?.role || 'USER')
+  getActive(@CurrentUser() user: AuthUser) {
+    return this.adminService.getActiveAnnouncements(user?.role || 'USER')
   }
 }

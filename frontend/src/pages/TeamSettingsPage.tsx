@@ -4,6 +4,7 @@ import { useOutletContext, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, Trash2, RefreshCw, Copy, Check, AlertTriangle } from 'lucide-react'
 import api from '../lib/axios'
 import toast from 'react-hot-toast'
+import { useColors } from '../lib/useColors'
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#22c55e', '#14b8a6', '#3b82f6']
 
@@ -17,16 +18,11 @@ export default function TeamSettingsPage() {
   const [copied, setCopied] = useState(false)
   const [inviteCode, setInviteCode] = useState('')
 
+  const baseColors = useColors(isDark)
   const colors = {
-    card:        isDark ? '#0f172a' : '#ffffff',
-    border:      isDark ? '#1e293b' : '#e2e8f0',
-    text:        isDark ? '#ffffff' : '#0f172a',
-    textMuted:   isDark ? '#64748b' : '#94a3b8',
-    subBg:       isDark ? '#1e293b' : '#f8fafc',
-    input:       isDark ? '#1e293b' : '#f8fafc',
-    inputBorder: isDark ? '#334155' : '#e2e8f0',
-    danger:      'rgba(248,113,113,0.1)',
-    dangerBorder:'rgba(248,113,113,0.3)',
+    ...baseColors,
+    danger:       'rgba(248,113,113,0.1)',
+    dangerBorder: 'rgba(248,113,113,0.3)',
   }
 
   const { data: team, isLoading } = useQuery({

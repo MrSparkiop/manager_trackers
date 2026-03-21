@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Req } from '@nestjs/common'
+import { Controller, Get, Post, Put, Body, Param, Query, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
 import { PermissionsGuard } from '../auth/permissions.guard'
 import { RequirePermissions } from '../auth/permissions'
 import { SupportService } from './support.service'
+import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
 
 // ── User-facing support endpoints ────────────────────────────────
 @UseGuards(AuthGuard('jwt'))
@@ -11,28 +12,28 @@ export class SupportController {
   constructor(private service: SupportService) {}
 
   @Post('tickets')
-  createTicket(@Req() req: any, @Body() body: any) {
-    return this.service.createTicket(req.user.id, body)
+  createTicket(@CurrentUser() user: AuthUser, @Body() body: any) {
+    return this.service.createTicket(user.id, body)
   }
 
   @Get('tickets')
-  getMyTickets(@Req() req: any) {
-    return this.service.getMyTickets(req.user.id)
+  getMyTickets(@CurrentUser() user: AuthUser) {
+    return this.service.getMyTickets(user.id)
   }
 
   @Get('tickets/:id')
-  getMyTicket(@Param('id') id: string, @Req() req: any) {
-    return this.service.getMyTicket(id, req.user.id)
+  getMyTicket(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.getMyTicket(id, user.id)
   }
 
   @Post('tickets/:id/replies')
-  replyToTicket(@Param('id') id: string, @Req() req: any, @Body() body: { content: string }) {
-    return this.service.replyToTicket(id, req.user.id, body.content)
+  replyToTicket(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() body: { content: string }) {
+    return this.service.replyToTicket(id, user.id, body.content)
   }
 
   @Put('tickets/:id/close')
-  closeMyTicket(@Param('id') id: string, @Req() req: any) {
-    return this.service.closeMyTicket(id, req.user.id)
+  closeMyTicket(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.closeMyTicket(id, user.id)
   }
 }
 
@@ -63,8 +64,8 @@ export class AdminSupportController {
   }
 
   @Post('tickets/:id/replies')
-  adminReply(@Param('id') id: string, @Req() req: any, @Body() body: { content: string }) {
-    return this.service.adminReply(id, req.user.id, body.content)
+  adminReply(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() body: { content: string }) {
+    return this.service.adminReply(id, user.id, body.content)
   }
 
   @Put('tickets/:id')

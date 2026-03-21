@@ -6,6 +6,7 @@ import api from '../lib/axios'
 import toast from 'react-hot-toast'
 import { CardSkeleton } from '../components/Skeleton'
 import EmptyState from '../components/EmptyState'
+import { useColors } from '../lib/useColors'
 
 interface Tag {
   id: string
@@ -27,16 +28,7 @@ export default function TagsPage() {
   const [editTag, setEditTag]     = useState<Tag | null>(null)
   const [form, setForm]           = useState({ name: '', color: '#6366f1' })
 
-  const colors = {
-    bg: isDark ? '#030712' : '#f1f5f9',
-    card: isDark ? '#0f172a' : '#ffffff',
-    border: isDark ? '#1e293b' : '#e2e8f0',
-    text: isDark ? '#ffffff' : '#0f172a',
-    textMuted: isDark ? '#64748b' : '#94a3b8',
-    input: isDark ? '#1e293b' : '#f8fafc',
-    inputBorder: isDark ? '#334155' : '#e2e8f0',
-    subBg: isDark ? '#1e293b' : '#f8fafc',
-  }
+  const colors = useColors(isDark)
 
   const { data: tags = [], isLoading } = useQuery<Tag[]>({
     queryKey: ['tags'],

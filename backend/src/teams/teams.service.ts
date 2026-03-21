@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationsService } from '../notifications/notifications.service'
+import { getNextDueDate } from '../common/date.utils'
 
 @Injectable()
 export class TeamsService {
@@ -399,7 +400,7 @@ export class TeamsService {
     await this.requireAtLeast(task.project!.teamId!, userId, 'EDITOR')
     if (task.recurrence === 'NONE') throw new NotFoundException('Task is not recurring')
 
-    const nextDueDate = this.getNextDueDate(task.dueDate, task.recurrence)
+    const nextDueDate = getNextDueDate(task.dueDate, task.recurrence)
 
     if (task.recurrenceEndDate && nextDueDate > task.recurrenceEndDate) {
       return { message: 'Recurrence has ended', created: false }
@@ -433,8 +434,8 @@ export class TeamsService {
     if (!task) throw new NotFoundException('Task not found')
     await this.requireAtLeast(task.project!.teamId!, userId, 'EDITOR')
 
-    const skippedDate = this.getNextDueDate(task.dueDate, task.recurrence)
-    const nextDueDate = this.getNextDueDate(skippedDate, task.recurrence)
+    const skippedDate = getNextDueDate(task.dueDate, task.recurrence)
+    const nextDueDate = getNextDueDate(skippedDate, task.recurrence)
 
     if (task.recurrenceEndDate && nextDueDate > task.recurrenceEndDate) {
       return { message: 'Recurrence has ended', created: false }
@@ -582,15 +583,4 @@ export class TeamsService {
     return this.requireAtLeast(teamId, userId, 'OWNER')
   }
 
-  private getNextDueDate(currentDue: Date | null, recurrence: string): Date {
-    const base = currentDue ? new Date(currentDue) : new Date()
-    switch (recurrence) {
-      case 'DAILY':    base.setDate(base.getDate() + 1);         break
-      case 'WEEKLY':   base.setDate(base.getDate() + 7);         break
-      case 'BIWEEKLY': base.setDate(base.getDate() + 14);        break
-      case 'MONTHLY':  base.setMonth(base.getMonth() + 1);       break
-      case 'YEARLY':   base.setFullYear(base.getFullYear() + 1); break
-    }
-    return base
-  }
 }

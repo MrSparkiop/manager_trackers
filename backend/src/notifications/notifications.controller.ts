@@ -1,7 +1,8 @@
-import { Controller, Get, Put, Delete, Param, UseGuards, Req } from '@nestjs/common'
+import { Controller, Get, Put, Delete, Param, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
 import { NotificationsService } from './notifications.service'
 import { ApiTags } from '@nestjs/swagger'
+import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
 
 @ApiTags('Notifications')
 @UseGuards(AuthGuard('jwt'))
@@ -10,27 +11,27 @@ export class NotificationsController {
   constructor(private notificationsService: NotificationsService) {}
 
   @Get()
-  getMyNotifications(@Req() req: any) {
-    return this.notificationsService.getMyNotifications(req.user.id)
+  getMyNotifications(@CurrentUser() user: AuthUser) {
+    return this.notificationsService.getMyNotifications(user.id)
   }
 
   @Get('unread-count')
-  getUnreadCount(@Req() req: any) {
-    return this.notificationsService.getUnreadCount(req.user.id)
+  getUnreadCount(@CurrentUser() user: AuthUser) {
+    return this.notificationsService.getUnreadCount(user.id)
   }
 
   @Put(':id/read')
-  markAsRead(@Req() req: any, @Param('id') id: string) {
-    return this.notificationsService.markAsRead(req.user.id, id)
+  markAsRead(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.notificationsService.markAsRead(user.id, id)
   }
 
   @Put('read-all')
-  markAllAsRead(@Req() req: any) {
-    return this.notificationsService.markAllAsRead(req.user.id)
+  markAllAsRead(@CurrentUser() user: AuthUser) {
+    return this.notificationsService.markAllAsRead(user.id)
   }
 
   @Delete(':id')
-  deleteNotification(@Req() req: any, @Param('id') id: string) {
-    return this.notificationsService.deleteNotification(req.user.id, id)
+  deleteNotification(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.notificationsService.deleteNotification(user.id, id)
   }
 }

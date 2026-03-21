@@ -5,7 +5,9 @@ import { MailService } from '../mail/mail.service'
 import * as bcrypt from 'bcrypt'
 import { createHash, timingSafeEqual } from 'crypto'
 import * as crypto from 'crypto'
-import type { Response } from 'express'
+import type { Response, Request } from 'express'
+import { RegisterDto } from './dto/register.dto'
+import { LoginDto } from './dto/login.dto'
 
 /** Fast, constant-time-safe SHA-256 hash for refresh tokens */
 function hashRefreshToken(token: string): string {
@@ -61,7 +63,7 @@ export class AuthService {
     })
   }
 
-  async register(dto: any, res: Response) {
+  async register(dto: RegisterDto, res: Response) {
     const regConfig = await this.prisma.systemConfig.findUnique({
       where: { key: 'disableRegistrations' }
     })
@@ -94,7 +96,7 @@ export class AuthService {
     return { user }
   }
 
-  async login(dto: any, res: Response) {
+  async login(dto: LoginDto, res: Response) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } })
     if (!user) throw new UnauthorizedException('Invalid credentials')
 
@@ -122,7 +124,7 @@ export class AuthService {
     }
   }
 
-  async refresh(req: any, res: Response) {
+  async refresh(req: Request, res: Response) {
     const refreshToken = req.cookies?.refresh_token
     if (!refreshToken) throw new UnauthorizedException('No refresh token')
 

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskStatus } from '@prisma/client';
+import { getNextDueDate } from '../common/date.utils';
 
 @Injectable()
 export class TasksService {
@@ -144,7 +145,7 @@ export class TasksService {
     if (!task) throw new NotFoundException('Task not found')
     if (task.recurrence === 'NONE') throw new NotFoundException('Task is not recurring')
 
-    const nextDueDate = this.getNextDueDate(task.dueDate, task.recurrence)
+    const nextDueDate = getNextDueDate(task.dueDate, task.recurrence)
 
     if (task.recurrenceEndDate && nextDueDate > task.recurrenceEndDate) {
       return { message: 'Recurrence has ended', created: false }
@@ -181,8 +182,8 @@ export class TasksService {
     if (!task) throw new NotFoundException('Task not found')
     if (task.recurrence === 'NONE') throw new NotFoundException('Task is not recurring')
 
-    const skippedDate = this.getNextDueDate(task.dueDate, task.recurrence)
-    const nextDueDate = this.getNextDueDate(skippedDate, task.recurrence)
+    const skippedDate = getNextDueDate(task.dueDate, task.recurrence)
+    const nextDueDate = getNextDueDate(skippedDate, task.recurrence)
 
     if (task.recurrenceEndDate && nextDueDate > task.recurrenceEndDate) {
       return { message: 'Recurrence has ended', created: false }
@@ -211,15 +212,4 @@ export class TasksService {
     return { message: 'Occurrence skipped', created: true, task: nextTask }
   }
 
-  private getNextDueDate(currentDue: Date | null, recurrence: string): Date {
-    const base = currentDue ? new Date(currentDue) : new Date()
-    switch (recurrence) {
-      case 'DAILY':    base.setDate(base.getDate() + 1);       break
-      case 'WEEKLY':   base.setDate(base.getDate() + 7);       break
-      case 'BIWEEKLY': base.setDate(base.getDate() + 14);      break
-      case 'MONTHLY':  base.setMonth(base.getMonth() + 1);     break
-      case 'YEARLY':   base.setFullYear(base.getFullYear() + 1); break
-    }
-    return base
-  }
 }

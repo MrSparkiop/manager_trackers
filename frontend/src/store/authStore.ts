@@ -4,13 +4,7 @@ import * as Sentry from '@sentry/react'
 import api from '../lib/axios'
 import { connectSocket, disconnectSocket } from '../lib/socket'
 
-interface User {
-  id: string
-  email: string
-  firstName: string
-  lastName: string
-  role: string
-}
+import type { User } from '../types'
 
 interface AuthState {
   user: User | null

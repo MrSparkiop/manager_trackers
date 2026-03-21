@@ -1,6 +1,7 @@
-import { Controller, Get, UseGuards, Req } from '@nestjs/common'
+import { Controller, Get, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
 import { AnalyticsService } from './analytics.service'
+import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('analytics')
@@ -8,7 +9,7 @@ export class AnalyticsController {
   constructor(private analyticsService: AnalyticsService) {}
 
   @Get('insights')
-  getInsights(@Req() req: any) {
-    return this.analyticsService.getInsights(req.user.id)
+  getInsights(@CurrentUser() user: AuthUser) {
+    return this.analyticsService.getInsights(user.id)
   }
 }

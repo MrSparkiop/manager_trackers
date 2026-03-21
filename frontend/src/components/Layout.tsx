@@ -134,7 +134,7 @@ export default function Layout() {
         ))}
 
         {/* Admin link - only for admins */}
-        {(user as any)?.role === 'ADMIN' && (
+        {user?.role === 'ADMIN' && (
           <NavLink to="/admin" style={({ isActive }) => ({
             display: 'flex', alignItems: 'center', gap: '10px',
             padding: '9px 10px', borderRadius: '9px',
@@ -173,8 +173,8 @@ export default function Layout() {
         }}>
           <div style={{
             width: '30px', height: '30px', borderRadius: '50%', flexShrink: 0,
-            background: (user as any)?.role === 'ADMIN' ? 'linear-gradient(135deg, #ef4444, #dc2626)' :
-                        (user as any)?.role === 'PRO'   ? 'linear-gradient(135deg, #f59e0b, #f97316)' :
+            background: user?.role === 'ADMIN' ? 'linear-gradient(135deg, #ef4444, #dc2626)' :
+                        user?.role === 'PRO'   ? 'linear-gradient(135deg, #f59e0b, #f97316)' :
                         'linear-gradient(135deg, #6366f1, #8b5cf6)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '11px', fontWeight: '700', color: '#fff'
@@ -186,13 +186,13 @@ export default function Layout() {
               <p style={{ fontSize: '12px', fontWeight: '600', color: colors.text, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {user?.firstName} {user?.lastName}
               </p>
-              {(user as any)?.role === 'ADMIN' && (
+              {user?.role === 'ADMIN' && (
                 <span style={{
                   fontSize: '9px', padding: '1px 6px', borderRadius: '999px', fontWeight: '800',
                   backgroundColor: 'rgba(239,68,68,0.15)', color: '#f87171', flexShrink: 0
                 }}>ADMIN</span>
               )}
-              {(user as any)?.role === 'PRO' && (
+              {user?.role === 'PRO' && (
                 <span style={{
                   fontSize: '9px', padding: '1px 6px', borderRadius: '999px', fontWeight: '800',
                   background: 'linear-gradient(135deg, #f59e0b, #f97316)',

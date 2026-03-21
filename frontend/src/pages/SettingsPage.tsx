@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { User, Moon, Sun, Save } from 'lucide-react'
+import { useColors } from '../lib/useColors'
 
 export default function SettingsPage() {
   const { isDark } = useThemeStore()
@@ -14,15 +15,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const { toggle } = useThemeStore()
 
-  const colors = {
-    bg: isDark ? '#030712' : '#f1f5f9',
-    card: isDark ? '#0f172a' : '#ffffff',
-    border: isDark ? '#1e293b' : '#e2e8f0',
-    text: isDark ? '#ffffff' : '#0f172a',
-    textMuted: isDark ? '#64748b' : '#94a3b8',
-    input: isDark ? '#1e293b' : '#f8fafc',
-    inputBorder: isDark ? '#334155' : '#e2e8f0',
-  }
+  const colors = useColors(isDark)
 
   const inputStyle = {
     width: '100%', backgroundColor: colors.input,
@@ -143,15 +136,15 @@ export default function SettingsPage() {
               <span style={{ fontSize: '14px', color: colors.textMuted }}>Account type</span>
               <span style={{
                 padding: '2px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: '700',
-                background: (user as any)?.role === 'ADMIN' ? 'rgba(239,68,68,0.15)' :
-                            (user as any)?.role === 'PRO'   ? 'linear-gradient(135deg, #f59e0b, #f97316)' :
+                background: user?.role === 'ADMIN' ? 'rgba(239,68,68,0.15)' :
+                            user?.role === 'PRO'   ? 'linear-gradient(135deg, #f59e0b, #f97316)' :
                             'rgba(99,102,241,0.15)',
-                color: (user as any)?.role === 'ADMIN' ? '#f87171' :
-                       (user as any)?.role === 'PRO'   ? '#fff' :
+                color: user?.role === 'ADMIN' ? '#f87171' :
+                       user?.role === 'PRO'   ? '#fff' :
                        '#818cf8',
               }}>
-                {(user as any)?.role === 'ADMIN' ? '👑 Admin' :
-                 (user as any)?.role === 'PRO'   ? '✨ Pro' :
+                {user?.role === 'ADMIN' ? '👑 Admin' :
+                 user?.role === 'PRO'   ? '✨ Pro' :
                  'Personal'}
               </span>
             </div>
