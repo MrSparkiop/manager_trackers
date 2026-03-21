@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { getNextDueDate } from '../common/date.utils'
+import { TaskStatus, Priority, Recurrence, ProjectStatus, TeamRole } from '@prisma/client'
 
 @Injectable()
 export class TeamsService {
@@ -198,7 +199,7 @@ export class TeamsService {
         name: dto.name,
         description: dto.description,
         color: dto.color,
-        status: dto.status as any,
+        status: dto.status as ProjectStatus,
         deadline: dto.deadline ? new Date(dto.deadline) : undefined,
       }
     })
@@ -258,7 +259,7 @@ export class TeamsService {
         teamId: project.teamId!,
         title: dto.title,
         description: dto.description,
-        priority: dto.priority as any || 'MEDIUM',
+        priority: (dto.priority as Priority) || 'MEDIUM',
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
         assigneeId: dto.assigneeId || null,
       }
@@ -295,11 +296,11 @@ export class TeamsService {
       data: {
         title: dto.title,
         description: dto.description,
-        status: dto.status as any,
-        priority: dto.priority as any,
+        status: dto.status as TaskStatus,
+        priority: dto.priority as Priority,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
         assigneeId: dto.assigneeId,
-        recurrence: dto.recurrence as any,
+        recurrence: dto.recurrence as Recurrence,
         completedAt: dto.status === 'DONE' ? new Date() : dto.status ? null : undefined,
       }
     })
@@ -333,7 +334,13 @@ export class TeamsService {
   }
 
   // ── Comments ─────────────────────────────────────────────────────
-  async addComment(taskId: string, userId: string, content: string) {
+  async addComment(taskId: string, userId: string, rawContent: string) {
+    const content = rawContent
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/javascript:/gi, '')
+      .replace(/on\w+\s*=/gi, '')
+
     const task = await this.prisma.task.findUnique({
       where: { id: taskId },
       include: { project: { include: { team: true } } }
@@ -504,7 +511,7 @@ export class TeamsService {
       }),
     ])
 
-    const events: any[] = []
+    const events: Array<{ type: string; id: string; timestamp: Date; [key: string]: unknown }> = []
 
     for (const task of tasks) {
       events.push({ type: 'task_created', id: `tc_${task.id}`, title: task.title, projectName: projectMap[task.projectId!], priority: task.priority, timestamp: task.createdAt })
@@ -526,22 +533,38 @@ export class TeamsService {
 
   // ── Team Workload ────────────────────────────────────────────────
   async getTeamWorkload(teamId: string, userId: string) {
-    const [members, projects] = await Promise.all([
-      this.prisma.teamMember.findMany({
-        where: { teamId },
-        include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } }
-      }),
-      this.prisma.project.findMany({ where: { teamId }, select: { id: true } })
-    ])
-    const projectIds = projects.map(p => p.id)
+    const members = await this.prisma.teamMember.findMany({
+      where: { teamId },
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } }
+    })
 
-    const workload = await Promise.all(members.map(async (m) => {
-      const [open, done] = await Promise.all([
-        this.prisma.task.count({ where: { projectId: { in: projectIds }, teamId, assigneeId: m.userId, status: { not: 'DONE' } } }),
-        this.prisma.task.count({ where: { projectId: { in: projectIds }, teamId, assigneeId: m.userId, status: 'DONE' } }),
-      ])
-      return { userId: m.userId, name: `${m.user.firstName} ${m.user.lastName}`, email: m.user.email, role: m.role, openTasks: open, completedTasks: done }
-    }))
+    // Single groupBy query instead of 2 queries per member (N+1 fix)
+    const taskCounts = await this.prisma.task.groupBy({
+      by: ['assigneeId', 'status'],
+      where: { teamId, assigneeId: { not: null } },
+      _count: { id: true },
+    })
+
+    const countMap = new Map<string, { open: number; done: number }>()
+    for (const row of taskCounts) {
+      if (!row.assigneeId) continue
+      if (!countMap.has(row.assigneeId)) countMap.set(row.assigneeId, { open: 0, done: 0 })
+      const entry = countMap.get(row.assigneeId)!
+      if (row.status === 'DONE') entry.done += row._count.id
+      else entry.open += row._count.id
+    }
+
+    const workload = members.map(m => {
+      const counts = countMap.get(m.userId) ?? { open: 0, done: 0 }
+      return {
+        userId: m.userId,
+        name: `${m.user.firstName} ${m.user.lastName}`,
+        email: m.user.email,
+        role: m.role,
+        openTasks: counts.open,
+        completedTasks: counts.done,
+      }
+    })
 
     return workload.sort((a, b) => b.openTasks - a.openTasks)
   }
@@ -562,7 +585,7 @@ export class TeamsService {
 
     return this.prisma.teamMember.update({
       where: { teamId_userId: { teamId, userId: memberId } },
-      data: { role: newRole as any },
+      data: { role: newRole as TeamRole },
     })
   }
 

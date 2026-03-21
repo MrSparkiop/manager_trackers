@@ -2,30 +2,50 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
-import { TaskStatus } from '@prisma/client';
+import { TaskStatus, Priority, Prisma } from '@prisma/client';
 import { getNextDueDate } from '../common/date.utils';
+
+export interface TaskFilters {
+  status?: string
+  priority?: string
+  projectId?: string
+  tagId?: string
+  page?: string
+  limit?: string
+}
 
 @Injectable()
 export class TasksService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(userId: string, filters?: any) {
-    const where: any = { userId, teamId: null, parentId: null };
-    if (filters?.status) where.status = filters.status;
-    if (filters?.priority) where.priority = filters.priority;
+  async findAll(userId: string, filters?: TaskFilters) {
+    const where: Prisma.TaskWhereInput = { userId, teamId: null, parentId: null };
+    if (filters?.status) where.status = filters.status as TaskStatus;
+    if (filters?.priority) where.priority = filters.priority as Priority;
     if (filters?.projectId) where.projectId = filters.projectId;
     if (filters?.tagId) where.tags = { some: { id: filters.tagId } };
 
-    return this.prisma.task.findMany({
-      where,
-      include: {
-        project: { select: { id: true, name: true, color: true } },
-        subtasks: { select: { id: true, title: true, status: true } },
-        timeEntries: { select: { duration: true } },
-        tags: true,
-      },
-      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
-    });
+    const page = Math.max(1, parseInt(filters?.page || '1', 10) || 1)
+    const limit = Math.min(100, Math.max(1, parseInt(filters?.limit || '50', 10) || 50))
+    const skip = (page - 1) * limit
+
+    const [tasks, total] = await Promise.all([
+      this.prisma.task.findMany({
+        where,
+        include: {
+          project: { select: { id: true, name: true, color: true } },
+          subtasks: { select: { id: true, title: true, status: true } },
+          timeEntries: { select: { duration: true } },
+          tags: true,
+        },
+        orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.task.count({ where }),
+    ])
+
+    return { tasks, total, page, limit, totalPages: Math.ceil(total / limit) }
   }
 
   async findOne(id: string, userId: string) {
@@ -43,7 +63,7 @@ export class TasksService {
   }
 
   async create(userId: string, dto: CreateTaskDto) {
-    const { tagIds, ...rest } = dto as any
+    const { tagIds, ...rest } = dto
 
     // Fetch actor first so the $use middleware can log the creation
     const actor = await this.prisma.user.findUnique({
@@ -70,11 +90,11 @@ export class TasksService {
 
   async update(id: string, userId: string, dto: UpdateTaskDto, actor?: { id: string; firstName: string; lastName: string; email: string }) {
     await this.findOne(id, userId)
-    const { tagIds, ...rest } = dto as any
-    const data: any = {
+    const { tagIds, ...rest } = dto
+    const data: Prisma.TaskUpdateInput = {
       ...rest,
       dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
-      recurrenceEndDate: (dto as any).recurrenceEndDate ? new Date((dto as any).recurrenceEndDate) : undefined,
+      recurrenceEndDate: dto.recurrenceEndDate ? new Date(dto.recurrenceEndDate) : undefined,
     }
     if (dto.status === TaskStatus.DONE) {
       data.completedAt = new Date()
@@ -102,6 +122,14 @@ export class TasksService {
   async remove(id: string, userId: string) {
     await this.findOne(id, userId);
     return this.prisma.task.delete({ where: { id } });
+  }
+
+  async bulkRemove(ids: string[], userId: string) {
+    if (!ids?.length) return { count: 0 }
+    const result = await this.prisma.task.deleteMany({
+      where: { id: { in: ids }, userId, teamId: null },
+    })
+    return { count: result.count }
   }
 
   async getTodayTasks(userId: string) {

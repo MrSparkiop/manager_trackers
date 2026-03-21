@@ -73,18 +73,18 @@ export class TimeTrackerService {
     const weekStart = new Date(today);
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
 
-    const [todayEntries, weekEntries, allEntries] = await Promise.all([
-      this.prisma.timeEntry.findMany({ where: { userId, startTime: { gte: today }, duration: { not: null } } }),
-      this.prisma.timeEntry.findMany({ where: { userId, startTime: { gte: weekStart }, duration: { not: null } } }),
-      this.prisma.timeEntry.findMany({ where: { userId, duration: { not: null } } }),
+    const baseWhere = { userId, duration: { not: null } } as const;
+
+    const [todayAgg, weekAgg, totalAgg] = await Promise.all([
+      this.prisma.timeEntry.aggregate({ where: { ...baseWhere, startTime: { gte: today } }, _sum: { duration: true } }),
+      this.prisma.timeEntry.aggregate({ where: { ...baseWhere, startTime: { gte: weekStart } }, _sum: { duration: true } }),
+      this.prisma.timeEntry.aggregate({ where: baseWhere, _sum: { duration: true } }),
     ]);
 
-    const sum = (entries: any[]) => entries.reduce((acc, e) => acc + (e.duration || 0), 0);
-
     return {
-      todaySeconds: sum(todayEntries),
-      weekSeconds: sum(weekEntries),
-      totalSeconds: sum(allEntries),
+      todaySeconds: todayAgg._sum.duration ?? 0,
+      weekSeconds: weekAgg._sum.duration ?? 0,
+      totalSeconds: totalAgg._sum.duration ?? 0,
     };
   }
 }

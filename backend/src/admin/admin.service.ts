@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { PrismaService } from '../prisma/prisma.service'
+import { AnnouncementType, TargetRole, Role } from '@prisma/client'
 
 @Injectable()
 export class AdminService {
@@ -62,7 +63,7 @@ export class AdminService {
         isActive: true,
         OR: [
           { targetRole: 'ALL' },
-          { targetRole: userRole as any },
+          { targetRole: userRole as TargetRole },
         ],
       },
       orderBy: { createdAt: 'desc' },
@@ -74,8 +75,8 @@ export class AdminService {
       data: {
         title:      dto.title || '',
         message:    dto.message,
-        type:       (dto.type || 'INFO') as any,
-        targetRole: (dto.targetRole || 'ALL') as any,
+        type:       (dto.type || 'INFO') as AnnouncementType,
+        targetRole: (dto.targetRole || 'ALL') as TargetRole,
         isActive:   dto.isActive ?? true,
       },
     })
@@ -89,8 +90,8 @@ export class AdminService {
       data: {
         title:      dto.title,
         message:    dto.message,
-        type:       dto.type as any,
-        targetRole: dto.targetRole as any,
+        type:       dto.type as AnnouncementType,
+        targetRole: dto.targetRole as TargetRole,
         isActive:   dto.isActive,
       },
     })
@@ -140,7 +141,7 @@ export class AdminService {
 
   async getUsers(page = 1, limit = 20, search = '') {
     const skip = (page - 1) * limit
-    const where: any = search ? {
+    const where: Record<string, unknown> = search ? {
       OR: [
         { email:     { contains: search, mode: 'insensitive' } },
         { firstName: { contains: search, mode: 'insensitive' } },
@@ -192,7 +193,7 @@ export class AdminService {
     return this.prisma.user.update({
       where: { id: userId },
       data: {
-        role: dto.role as any,
+        role: dto.role as Role,
         firstName: dto.firstName,
         lastName: dto.lastName,
       },
@@ -352,7 +353,7 @@ export class AdminService {
     if (adminId === userId) throw new ForbiddenException('Cannot change your own role')
     return this.prisma.user.update({
       where: { id: userId },
-      data: { role: role as any },
+      data: { role: role as Role },
       select: { id: true, email: true, firstName: true, lastName: true, role: true },
     })
   }

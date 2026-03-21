@@ -1,0 +1,13 @@
+# Local development overrides — applied automatically by docker-compose.
+# Exposes DB/Redis ports to localhost so the native NestJS process (preview_start)
+# can connect without running inside Docker.
+# Never commit secrets here; use .env for credentials.
+
+services:
+  postgres:
+    ports:
+      - '5432:5432'
+
+  redis:
+    ports:
+      - '6379:6379'

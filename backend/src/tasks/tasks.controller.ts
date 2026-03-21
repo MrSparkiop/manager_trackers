@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
-import { TasksService } from './tasks.service'
+import { TasksService, type TaskFilters } from './tasks.service'
 import { TaskOwnerGuard } from './task-owner.guard'
 import { CreateTaskDto } from './dto/create-task.dto'
 import { UpdateTaskDto } from './dto/update-task.dto'
@@ -12,7 +12,7 @@ export class TasksController {
   constructor(private tasksService: TasksService) {}
 
   @Get()
-  findAll(@CurrentUser() user: AuthUser, @Query() query: any) {
+  findAll(@CurrentUser() user: AuthUser, @Query() query: TaskFilters) {
     return this.tasksService.findAll(user.id, query)
   }
 
@@ -39,6 +39,11 @@ export class TasksController {
   @Put(':id')
   update(@Param('id') id: string, @Body() dto: UpdateTaskDto, @CurrentUser() user: AuthUser) {
     return this.tasksService.update(id, user.id, dto, user)
+  }
+
+  @Delete('bulk')
+  bulkRemove(@Body() body: { ids: string[] }, @CurrentUser() user: AuthUser) {
+    return this.tasksService.bulkRemove(body.ids, user.id)
   }
 
   @Delete(':id')
