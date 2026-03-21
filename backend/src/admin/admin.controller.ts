@@ -7,6 +7,11 @@ import { MaintenanceService } from './maintenance.service'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import type { Request } from 'express'
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
+import { CreateAnnouncementDto } from './dto/create-announcement.dto'
+import { UpdateAnnouncementDto } from './dto/update-announcement.dto'
+import { AdminUpdateUserDto } from './dto/update-user.dto'
+import { CreateMaintenanceDto } from './dto/create-maintenance.dto'
+import { UpdateMaintenanceDto } from './dto/update-maintenance.dto'
 
 @ApiTags('Admin')
 @UseGuards(AuthGuard('jwt'), PermissionsGuard)
@@ -40,7 +45,7 @@ export class AdminController {
 
   @Put('users/:id')
   @ApiOperation({ summary: 'Update a user (role, name, etc.)' })
-  updateUser(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: { role?: string; firstName?: string; lastName?: string }) {
+  updateUser(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: AdminUpdateUserDto) {
     return this.adminService.updateUser(user.id, id, dto)
   }
 
@@ -110,13 +115,13 @@ export class AdminController {
 
   @Post('announcements')
   @ApiOperation({ summary: 'Create announcement' })
-  createAnnouncement(@Body() dto: { title: string; message: string; type?: string; targetRole?: string; expiresAt?: string }) {
+  createAnnouncement(@Body() dto: CreateAnnouncementDto) {
     return this.adminService.createAnnouncement(dto)
   }
 
   @Put('announcements/:id')
   @ApiOperation({ summary: 'Update announcement' })
-  updateAnnouncement(@Param('id') id: string, @Body() dto: { title?: string; message?: string; type?: string; isActive?: boolean; targetRole?: string; expiresAt?: string }) {
+  updateAnnouncement(@Param('id') id: string, @Body() dto: UpdateAnnouncementDto) {
     return this.adminService.updateAnnouncement(id, dto)
   }
 
@@ -135,13 +140,13 @@ export class AdminController {
 
   @Post('maintenance')
   @ApiOperation({ summary: 'Schedule a maintenance window' })
-  createMaintenance(@Body() dto: { title: string; message?: string; startsAt: string; endsAt: string }) {
+  createMaintenance(@Body() dto: CreateMaintenanceDto) {
     return this.maintenanceService.create(dto)
   }
 
   @Put('maintenance/:id')
   @ApiOperation({ summary: 'Update a maintenance window' })
-  updateMaintenance(@Param('id') id: string, @Body() dto: { title?: string; message?: string; startsAt?: string; endsAt?: string; isActive?: boolean }) {
+  updateMaintenance(@Param('id') id: string, @Body() dto: UpdateMaintenanceDto) {
     return this.maintenanceService.update(id, dto)
   }
 

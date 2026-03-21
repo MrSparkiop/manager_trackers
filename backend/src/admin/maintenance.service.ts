@@ -23,11 +23,11 @@ export class MaintenanceService {
     })
   }
 
-  async create(dto: any) {
+  async create(dto: { title?: string; message?: string; startTime: string; endTime: string }) {
     return this.prisma.maintenanceWindow.create({
       data: {
         title: dto.title || 'Scheduled Maintenance',
-        message: dto.message,
+        message: dto.message ?? '',
         startTime: new Date(dto.startTime),
         endTime: new Date(dto.endTime),
         isActive: true,
@@ -35,7 +35,7 @@ export class MaintenanceService {
     })
   }
 
-  async update(id: string, dto: any) {
+  async update(id: string, dto: { title?: string; message?: string; startTime?: string; endTime?: string; isActive?: boolean }) {
     return this.prisma.maintenanceWindow.update({
       where: { id },
       data: {

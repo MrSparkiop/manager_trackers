@@ -13,6 +13,6 @@ Sentry.init({
   integrations,
   tracesSampleRate: 1.0,
   profilesSampleRate: 1.0,
-  sendDefaultPii: true,
+  sendDefaultPii: false,
   environment: process.env.NODE_ENV || 'development',
 })

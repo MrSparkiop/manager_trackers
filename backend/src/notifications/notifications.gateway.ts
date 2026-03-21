@@ -5,8 +5,21 @@ import {
 import { Server, Socket } from 'socket.io'
 import { JwtService } from '@nestjs/jwt'
 
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
+  .split(',')
+  .map(o => o.trim())
+
 @WebSocketGateway({
-  cors: { origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true },
+  cors: {
+    origin: (origin: string, callback: (err: Error | null, allow?: boolean) => void) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true)
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`))
+      }
+    },
+    credentials: true,
+  },
   namespace: '/notifications'
 })
 export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -17,7 +30,10 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
 
   async handleConnection(client: Socket) {
     try {
-      const token = client.handshake.auth?.token || client.handshake.headers?.authorization?.split(' ')[1]
+      // Token is sent as an HttpOnly cookie via withCredentials — read from cookie header
+      const cookieHeader = client.handshake.headers?.cookie ?? ''
+      const match = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/)
+      const token = match?.[1]
       if (!token) { client.disconnect(); return }
       const payload = this.jwtService.verify(token, { secret: process.env.JWT_SECRET })
       client.data.userId = payload.sub

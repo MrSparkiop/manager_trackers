@@ -1,0 +1,42 @@
+# Production overrides — usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    environment:
+      NODE_ENV: production
+    command: node dist/main
+    volumes: []
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/api/health || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    volumes: []
+
+  backup:
+    image: postgres:15-alpine
+    container_name: client_tracker_backup
+    restart: "no"
+    environment:
+      PGPASSWORD: "${POSTGRES_PASSWORD}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backups:/backups
+    entrypoint: >
+      sh -c 'pg_dump -h postgres -U postgres client_tracker |
+             gzip > /backups/client_tracker_$$(date +%Y%m%d_%H%M%S).sql.gz &&
+             find /backups -name "*.sql.gz" -mtime +7 -delete'
+    profiles:
+      - backup

@@ -5,14 +5,9 @@ let socket: Socket | null = null
 export const connectSocket = (): Socket => {
   if (socket?.connected) return socket
 
-  // Get token from cookie
-  const token = document.cookie
-    .split('; ')
-    .find(row => row.startsWith('accessToken='))
-    ?.split('=')[1]
-
+  // The HttpOnly access_token cookie is sent automatically via withCredentials.
+  // Reading it via document.cookie is impossible (blocked by the browser by design).
   socket = io(`${import.meta.env.VITE_SOCKET_URL ?? 'http://localhost:3000'}/notifications`, {
-    auth: { token },
     transports: ['websocket'],
     withCredentials: true,
   })

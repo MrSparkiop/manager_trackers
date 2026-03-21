@@ -69,19 +69,19 @@ export class AdminService {
     })
   }
 
-  async createAnnouncement(dto: any) {
+  async createAnnouncement(dto: { title: string; message: string; type?: string; targetRole?: string; isActive?: boolean }) {
     return this.prisma.announcement.create({
       data: {
         title:      dto.title || '',
         message:    dto.message,
-        type:       dto.type || 'INFO',
-        targetRole: dto.targetRole || 'ALL',
+        type:       (dto.type || 'INFO') as any,
+        targetRole: (dto.targetRole || 'ALL') as any,
         isActive:   dto.isActive ?? true,
       },
     })
   }
 
-  async updateAnnouncement(id: string, dto: any) {
+  async updateAnnouncement(id: string, dto: { title?: string; message?: string; type?: string; targetRole?: string; isActive?: boolean }) {
     const announcement = await this.prisma.announcement.findUnique({ where: { id } })
     if (!announcement) throw new NotFoundException('Announcement not found')
     return this.prisma.announcement.update({
@@ -89,8 +89,8 @@ export class AdminService {
       data: {
         title:      dto.title,
         message:    dto.message,
-        type:       dto.type,
-        targetRole: dto.targetRole,
+        type:       dto.type as any,
+        targetRole: dto.targetRole as any,
         isActive:   dto.isActive,
       },
     })
@@ -184,14 +184,18 @@ export class AdminService {
     return user
   }
 
-  async updateUser(adminId: string, userId: string, dto: any) {
+  async updateUser(adminId: string, userId: string, dto: { role?: string; firstName?: string; lastName?: string }) {
     // Prevent admin from changing their own role
     if (adminId === userId && dto.role && dto.role !== 'ADMIN') {
       throw new ForbiddenException('You cannot change your own admin role')
     }
     return this.prisma.user.update({
       where: { id: userId },
-      data: dto,
+      data: {
+        role: dto.role as any,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+      },
       select: {
         id: true, email: true, firstName: true,
         lastName: true, role: true, isSuspended: true, createdAt: true,

@@ -12,7 +12,11 @@ import { MailModule } from '../mail/mail.module'
   imports: [
     PassportModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production',
+      secret: (() => {
+        const secret = process.env.JWT_SECRET
+        if (!secret) throw new Error('FATAL: JWT_SECRET environment variable is not set')
+        return secret
+      })(),
       signOptions: { expiresIn: '15m' },
     }),
     MailModule,

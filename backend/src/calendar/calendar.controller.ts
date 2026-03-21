@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiCookieAuth } from '@nestjs/swagger'
 import { AuthGuard } from '@nestjs/passport'
 import { CalendarService } from './calendar.service'
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
+import { CreateCalendarEventDto } from './dto/create-calendar-event.dto'
 
 @ApiTags('calendar')
 @ApiCookieAuth('access_token')
@@ -19,7 +20,7 @@ export class CalendarController {
 
   @Post()
   @ApiOperation({ summary: 'Create a new calendar event' })
-  create(@CurrentUser() user: AuthUser, @Body() dto: any) {
+  create(@CurrentUser() user: AuthUser, @Body() dto: CreateCalendarEventDto) {
     return this.calendarService.create(user.id, dto)
   }
 

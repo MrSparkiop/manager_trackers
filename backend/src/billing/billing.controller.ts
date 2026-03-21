@@ -8,6 +8,7 @@ import type { Request } from 'express'
 import { BillingService } from './billing.service'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
+import { NotImpersonatedGuard } from '../auth/not-impersonated.guard'
 
 @ApiTags('Billing')
 @Controller('billing')
@@ -31,7 +32,7 @@ export class BillingController {
 
   /** Authenticated — start a Stripe Checkout session */
   @Post('checkout')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), NotImpersonatedGuard)
   @ApiOperation({ summary: 'Create a Stripe Checkout session' })
   createCheckout(@CurrentUser() user: AuthUser) {
     return this.billingService.createCheckoutSession(user.id, user.email)
@@ -39,7 +40,7 @@ export class BillingController {
 
   /** Authenticated — open customer portal to manage/cancel subscription */
   @Post('portal')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), NotImpersonatedGuard)
   @ApiOperation({ summary: 'Open Stripe customer portal' })
   createPortal(@CurrentUser() user: AuthUser) {
     return this.billingService.createPortalSession(user.id)

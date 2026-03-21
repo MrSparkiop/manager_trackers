@@ -188,13 +188,19 @@ export class TeamsService {
     })
   }
 
-  async updateTeamProject(projectId: string, userId: string, dto: any) {
+  async updateTeamProject(projectId: string, userId: string, dto: { name?: string; description?: string; color?: string; status?: string; deadline?: string }) {
     const project = await this.prisma.project.findUnique({ where: { id: projectId } })
     if (!project) throw new NotFoundException('Project not found')
     await this.requireAtLeast(project.teamId!, userId, 'EDITOR')
     return this.prisma.project.update({
       where: { id: projectId },
-      data: { ...dto, deadline: dto.deadline ? new Date(dto.deadline) : undefined }
+      data: {
+        name: dto.name,
+        description: dto.description,
+        color: dto.color,
+        status: dto.status as any,
+        deadline: dto.deadline ? new Date(dto.deadline) : undefined,
+      }
     })
   }
 
@@ -276,7 +282,7 @@ export class TeamsService {
     return task
   }
 
-  async updateTeamTask(taskId: string, userId: string, dto: any) {
+  async updateTeamTask(taskId: string, userId: string, dto: { title?: string; description?: string; status?: string; priority?: string; dueDate?: string; assigneeId?: string; recurrence?: string }) {
     const task = await this.prisma.task.findUnique({
       where: { id: taskId },
       include: { project: { include: { team: true } } }
@@ -287,8 +293,13 @@ export class TeamsService {
     const updated = await this.prisma.task.update({
       where: { id: taskId },
       data: {
-        ...dto,
+        title: dto.title,
+        description: dto.description,
+        status: dto.status as any,
+        priority: dto.priority as any,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+        assigneeId: dto.assigneeId,
+        recurrence: dto.recurrence as any,
         completedAt: dto.status === 'DONE' ? new Date() : dto.status ? null : undefined,
       }
     })

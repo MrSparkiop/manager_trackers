@@ -197,13 +197,13 @@ describe('AuthService', () => {
   // ── refresh ─────────────────────────────────────────────────────
   describe('refresh', () => {
     it('should throw UnauthorizedException if no refresh token cookie', async () => {
-      const req = { cookies: {} }
+      const req = { cookies: {} } as any
       await expect(service.refresh(req, mockRes)).rejects.toThrow(UnauthorizedException)
     })
 
     it('should throw UnauthorizedException if token is invalid', async () => {
       mockJwt.verify.mockImplementationOnce(() => { throw new Error('invalid') })
-      const req = { cookies: { refresh_token: 'bad-token' } }
+      const req = { cookies: { refresh_token: 'bad-token' } } as any
 
       await expect(service.refresh(req, mockRes)).rejects.toThrow(UnauthorizedException)
     })
@@ -211,7 +211,7 @@ describe('AuthService', () => {
     it('should throw UnauthorizedException if user not found', async () => {
       mockJwt.verify.mockReturnValueOnce({ sub: 'user-id-1' })
       mockPrisma.user.findUnique.mockResolvedValue(null)
-      const req = { cookies: { refresh_token: 'valid-token' } }
+      const req = { cookies: { refresh_token: 'valid-token' } } as any
 
       await expect(service.refresh(req, mockRes)).rejects.toThrow(UnauthorizedException)
     })
@@ -226,7 +226,7 @@ describe('AuthService', () => {
       })
       mockPrisma.user.update.mockResolvedValue({})
 
-      const req = { cookies: { refresh_token: refreshToken } }
+      const req = { cookies: { refresh_token: refreshToken } } as any
       const result = await service.refresh(req, mockRes)
 
       expect(mockRes.cookie).toHaveBeenCalledTimes(2)

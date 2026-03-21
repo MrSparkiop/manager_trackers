@@ -6,6 +6,7 @@ export interface AuthUser {
   firstName: string
   lastName: string
   role: 'USER' | 'PRO' | 'ADMIN'
+  isImpersonated?: boolean
 }
 
 export const CurrentUser = createParamDecorator(

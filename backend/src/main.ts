@@ -38,35 +38,37 @@ async function bootstrap() {
     credentials: true,
   })
 
-  // Swagger setup BEFORE global prefix
-  const config = new DocumentBuilder()
-    .setTitle('TrackFlow API')
-    .setDescription('Full API documentation for TrackFlow — schedule and project management app')
-    .setVersion('2.0.0')
-    .addTag('auth', 'Authentication endpoints')
-    .addTag('projects', 'Project management')
-    .addTag('tasks', 'Task management')
-    .addTag('time-tracker', 'Time tracking')
-    .addTag('calendar', 'Calendar events')
-    .addCookieAuth('access_token')
-    .build()
+  // Swagger — only enabled in development
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('TrackFlow API')
+      .setDescription('Full API documentation for TrackFlow — schedule and project management app')
+      .setVersion('2.0.0')
+      .addTag('auth', 'Authentication endpoints')
+      .addTag('projects', 'Project management')
+      .addTag('tasks', 'Task management')
+      .addTag('time-tracker', 'Time tracking')
+      .addTag('calendar', 'Calendar events')
+      .addCookieAuth('access_token')
+      .build()
 
-  const document = SwaggerModule.createDocument(app, config)
-  SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-      tagsSorter: 'alpha',
-      operationsSorter: 'alpha',
-    },
-    customSiteTitle: 'TrackFlow API Docs',
-    customCss: `
-      .topbar { background-color: #0f172a !important; }
-      .topbar-wrapper img { display: none; }
-      .topbar-wrapper::after { content: '📋 TrackFlow API'; color: white; font-size: 18px; font-weight: bold; }
-      body { background-color: #030712; }
-      .swagger-ui { color: #e2e8f0; }
-    `,
-  })
+    const document = SwaggerModule.createDocument(app, config)
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        tagsSorter: 'alpha',
+        operationsSorter: 'alpha',
+      },
+      customSiteTitle: 'TrackFlow API Docs',
+      customCss: `
+        .topbar { background-color: #0f172a !important; }
+        .topbar-wrapper img { display: none; }
+        .topbar-wrapper::after { content: '📋 TrackFlow API'; color: white; font-size: 18px; font-weight: bold; }
+        body { background-color: #030712; }
+        .swagger-ui { color: #e2e8f0; }
+      `,
+    })
+  }
 
   // Global prefix AFTER Swagger
   app.setGlobalPrefix('api')

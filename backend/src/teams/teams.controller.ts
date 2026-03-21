@@ -7,6 +7,8 @@ import { TeamsService } from './teams.service'
 import { CustomRolesService } from './custom-roles.service'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
+import { UpdateTeamProjectDto } from './dto/update-team-project.dto'
+import { UpdateTeamTaskDto } from './dto/update-team-task.dto'
 
 @ApiTags('Teams')
 @UseGuards(AuthGuard('jwt'))
@@ -133,8 +135,8 @@ export class TeamsController {
 
   @Put('projects/:projectId')
   @ApiOperation({ summary: 'Update team project' })
-  updateTeamProject(@Param('projectId') projectId: string, @CurrentUser() user: AuthUser, @Body() body: { name?: string; description?: string; color?: string; status?: string }) {
-    return this.teamsService.updateTeamProject(projectId, user.id, body)
+  updateTeamProject(@Param('projectId') projectId: string, @CurrentUser() user: AuthUser, @Body() dto: UpdateTeamProjectDto) {
+    return this.teamsService.updateTeamProject(projectId, user.id, dto)
   }
 
   @Delete('projects/:projectId')
@@ -158,8 +160,8 @@ export class TeamsController {
 
   @Put('tasks/:taskId')
   @ApiOperation({ summary: 'Update team task' })
-  updateTeamTask(@Param('taskId') taskId: string, @CurrentUser() user: AuthUser, @Body() body: { title?: string; description?: string; status?: string; priority?: string; dueDate?: string; assigneeId?: string; recurrence?: string }) {
-    return this.teamsService.updateTeamTask(taskId, user.id, body)
+  updateTeamTask(@Param('taskId') taskId: string, @CurrentUser() user: AuthUser, @Body() dto: UpdateTeamTaskDto) {
+    return this.teamsService.updateTeamTask(taskId, user.id, dto)
   }
 
   @Delete('tasks/:taskId')
