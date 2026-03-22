@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common'
+import { Prisma, TicketPriority } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationsService } from '../notifications/notifications.service'
 
@@ -22,7 +23,7 @@ export class SupportService {
         subject: dto.subject,
         description: dto.description,
         category: dto.category || 'general',
-        priority: (dto.priority as any) || 'NORMAL',
+        priority: (dto.priority as TicketPriority) || 'NORMAL',
       },
       include: { replies: { include: { author: { select: { id: true, firstName: true, lastName: true, role: true } } } } },
     })
@@ -93,9 +94,9 @@ export class SupportService {
 
   // ── ADMIN: get all tickets ───────────────────────────────────────
   async getAllTickets(filters?: { status?: string; priority?: string; search?: string }) {
-    const where: any = {}
-    if (filters?.status) where.status = filters.status
-    if (filters?.priority) where.priority = filters.priority
+    const where: Prisma.SupportTicketWhereInput = {}
+    if (filters?.status) where.status = filters.status as Prisma.EnumTicketStatusFilter
+    if (filters?.priority) where.priority = filters.priority as TicketPriority
     if (filters?.search) {
       where.OR = [
         { subject: { contains: filters.search, mode: 'insensitive' } },
@@ -174,9 +175,9 @@ export class SupportService {
     const ticket = await this.prisma.supportTicket.findUnique({ where: { id: ticketId } })
     if (!ticket) throw new NotFoundException('Ticket not found')
 
-    const data: any = {}
-    if (dto.status) data.status = dto.status
-    if (dto.priority) data.priority = dto.priority
+    const data: Prisma.SupportTicketUpdateInput = {}
+    if (dto.status) data.status = dto.status as Prisma.EnumTicketStatusFieldUpdateOperationsInput['set']
+    if (dto.priority) data.priority = dto.priority as TicketPriority
     if (dto.status === 'CLOSED' || dto.status === 'RESOLVED') data.closedAt = new Date()
 
     const updated = await this.prisma.supportTicket.update({ where: { id: ticketId }, data })

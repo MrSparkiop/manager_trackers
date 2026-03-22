@@ -4,9 +4,11 @@ import { Play, Square, Trash2, Clock, Plus, X } from 'lucide-react'
 import api from '../lib/axios'
 import { useThemeStore } from '../store/themeStore'
 import { TimeEntrySkeleton } from '../components/Skeleton'
-import type { Task, TimeEntry } from '../types'
+import type { TimeEntry } from '../types'
 import { useColors } from '../lib/useColors'
 import { getInputStyle } from '../lib/formStyles'
+import { queryKeys } from '../lib/queryKeys'
+import { useTasks, useTimeSummary } from '../hooks/useApi'
 
 function formatDuration(seconds: number) {
   const h = Math.floor(seconds / 3600)
@@ -57,27 +59,20 @@ export default function TimeTrackerPage() {
   }
 
   const { data: running, refetch: refetchRunning } = useQuery<TimeEntry | null>({
-    queryKey: ['time-running'],
+    queryKey: queryKeys.timeTracker.running,
     queryFn: () => api.get('/time-tracker/running').then(r => r.data),
     refetchInterval: 5000,
   })
 
   const { data: _entriesRaw, isLoading } = useQuery<any>({
-    queryKey: ['time-entries'],
+    queryKey: queryKeys.timeTracker.entries,
     queryFn: () => api.get('/time-tracker?limit=100').then(r => r.data),
   })
   const entries: TimeEntry[] = Array.isArray(_entriesRaw) ? _entriesRaw : (_entriesRaw?.entries ?? [])
 
-  const { data: summary } = useQuery<{ todaySeconds: number; weekSeconds: number; totalSeconds: number }>({
-    queryKey: ['time-summary'],
-    queryFn: () => api.get('/time-tracker/summary').then(r => r.data),
-  })
+  const { data: summary } = useTimeSummary()
 
-  const { data: _tasksRaw } = useQuery<any>({
-    queryKey: ['tasks'],
-    queryFn: () => api.get('/tasks?limit=200').then(r => r.data.tasks ?? r.data),
-  })
-  const tasks: Task[] = Array.isArray(_tasksRaw) ? _tasksRaw : (_tasksRaw?.tasks ?? [])
+  const { tasks } = useTasks()
 
   useEffect(() => {
     if (!running) { setElapsed(0); return }
@@ -97,9 +92,9 @@ export default function TimeTrackerPage() {
       taskId: selectedTaskId || undefined,
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['time-running'] })
-      queryClient.invalidateQueries({ queryKey: ['time-entries'] })
-      queryClient.invalidateQueries({ queryKey: ['time-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.timeTracker.running })
+      queryClient.invalidateQueries({ queryKey: queryKeys.timeTracker.entries })
+      queryClient.invalidateQueries({ queryKey: queryKeys.timeTracker.summary })
       refetchRunning()
     }
   })
@@ -107,9 +102,9 @@ export default function TimeTrackerPage() {
   const stopMutation = useMutation({
     mutationFn: () => api.post(`/time-tracker/stop/${running?.id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['time-running'] })
-      queryClient.invalidateQueries({ queryKey: ['time-entries'] })
-      queryClient.invalidateQueries({ queryKey: ['time-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.timeTracker.running })
+      queryClient.invalidateQueries({ queryKey: queryKeys.timeTracker.entries })
+      queryClient.invalidateQueries({ queryKey: queryKeys.timeTracker.summary })
       setDescription(''); setSelectedTaskId('')
       refetchRunning()
     }
@@ -118,8 +113,8 @@ export default function TimeTrackerPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/time-tracker/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['time-entries'] })
-      queryClient.invalidateQueries({ queryKey: ['time-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.timeTracker.entries })
+      queryClient.invalidateQueries({ queryKey: queryKeys.timeTracker.summary })
     }
   })
 
@@ -135,8 +130,8 @@ export default function TimeTrackerPage() {
       })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['time-entries'] })
-      queryClient.invalidateQueries({ queryKey: ['time-summary'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.timeTracker.entries })
+      queryClient.invalidateQueries({ queryKey: queryKeys.timeTracker.summary })
       setShowManual(false)
       setManual({ description: '', taskId: '', date: new Date().toISOString().split('T')[0], startTime: '', endTime: '' })
     }

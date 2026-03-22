@@ -238,18 +238,22 @@ export class AdminService {
     })
   }
 
-  async getActivityLog(page = 1, limit = 30) {
-    const skip = (page - 1) * limit
+  async getActivityLog(page = 1, limit = 50) {
+    const take = Math.min(100, Math.max(1, limit))
+    const skip = (Math.max(1, page) - 1) * take
+
+    // Fetch a reasonable window of recent items to assemble the activity feed
+    const fetchLimit = Math.max(take * 3, 100)
     const [tasks, projects, users] = await Promise.all([
       this.prisma.task.findMany({
-        orderBy: { createdAt: 'desc' }, take: limit,
+        orderBy: { createdAt: 'desc' }, take: fetchLimit,
         select: {
           id: true, title: true, status: true, createdAt: true,
           user: { select: { id: true, firstName: true, lastName: true, email: true } }
         }
       }),
       this.prisma.project.findMany({
-        orderBy: { createdAt: 'desc' }, take: limit,
+        orderBy: { createdAt: 'desc' }, take: fetchLimit,
         select: {
           id: true, name: true, status: true, createdAt: true,
           user: { select: { id: true, firstName: true, lastName: true, email: true } }
@@ -260,7 +264,7 @@ export class AdminService {
         select: { id: true, firstName: true, lastName: true, email: true, createdAt: true, role: true }
       }),
     ])
-    const activity = [
+    const allActivity = [
       ...tasks.map(t => ({
         id: `task-${t.id}`, type: 'task' as const,
         action: 'Created task', title: t.title, meta: t.status,
@@ -280,8 +284,10 @@ export class AdminService {
       })),
     ]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(skip, skip + limit)
-    return { activity, page, limit }
+
+    const total = allActivity.length
+    const activity = allActivity.slice(skip, skip + take)
+    return { activity, total, page, limit: take, totalPages: Math.ceil(total / take) }
   }
 
   async globalSearch(query: string) {

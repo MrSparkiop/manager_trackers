@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useThemeStore } from '../store/themeStore'
@@ -82,13 +82,13 @@ export default function TeamsPage() {
     onError: (e: any) => toast.error(e?.response?.data?.message || 'Failed to leave team'),
   })
 
-  const copyInviteLink = async (teamId: string, inviteCode: string) => {
+  const copyInviteLink = useCallback(async (teamId: string, inviteCode: string) => {
     const link = `${window.location.origin}/app/join?code=${inviteCode}`
     await navigator.clipboard.writeText(link)
     setCopied(teamId)
     setTimeout(() => setCopied(null), 2000)
     toast.success('Invite link copied!')
-  }
+  }, [])
 
   const inputStyle = getInputStyle(colors)
 

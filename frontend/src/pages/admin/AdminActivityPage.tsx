@@ -132,14 +132,14 @@ export default function AdminActivityPage() {
           <ChevronLeft size={14} /> Prev
         </button>
         <span style={{ fontSize: '13px', color: colors.textMuted, padding: '0 8px' }}>
-          Page {page}
+          Page {page}{data?.totalPages ? ` of ${data.totalPages}` : ''}
         </span>
-        <button onClick={() => setPage(p => p + 1)} disabled={data?.activity?.length < 30} style={{
+        <button onClick={() => setPage(p => p + 1)} disabled={data?.totalPages ? page >= data.totalPages : (data?.activity?.length ?? 0) < 30} style={{
           display: 'flex', alignItems: 'center', gap: '6px',
           padding: '8px 14px', backgroundColor: colors.card,
           border: `1px solid ${colors.border}`, borderRadius: '9px',
-          color: data?.activity?.length < 30 ? colors.textMuted : colors.text,
-          cursor: data?.activity?.length < 30 ? 'not-allowed' : 'pointer', fontSize: '13px'
+          color: (data?.totalPages ? page >= data.totalPages : (data?.activity?.length ?? 0) < 30) ? colors.textMuted : colors.text,
+          cursor: (data?.totalPages ? page >= data.totalPages : (data?.activity?.length ?? 0) < 30) ? 'not-allowed' : 'pointer', fontSize: '13px'
         }}>
           Next <ChevronRight size={14} />
         </button>

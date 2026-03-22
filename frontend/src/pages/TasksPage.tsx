@@ -198,7 +198,7 @@ export default function TasksPage() {
     onError: () => toast.error('Failed to skip occurrence')
   })
 
-  const openCreate = () => {
+  const openCreate = useCallback(() => {
     setEditTask(null)
     setForm({
       title: '', description: '', status: 'TODO', priority: 'MEDIUM',
@@ -206,9 +206,9 @@ export default function TasksPage() {
       recurrence: 'NONE', recurrenceEndDate: '',
     })
     setShowModal(true)
-  }
+  }, [])
 
-  const openEdit = (t: Task) => {
+  const openEdit = useCallback((t: Task) => {
     setEditTask(t)
     setForm({
       title: t.title, description: t.description || '',
@@ -221,7 +221,7 @@ export default function TasksPage() {
       recurrenceEndDate: t.recurrenceEndDate ? t.recurrenceEndDate.split('T')[0] : '',
     })
     setShowModal(true)
-  }
+  }, [])
 
   const closeModal = () => { setShowModal(false); setEditTask(null) }
 
@@ -242,7 +242,7 @@ export default function TasksPage() {
   }
 
   // Toggle done — show recurring modal if task is recurring
-  const toggleDone = (task: Task) => {
+  const toggleDone = useCallback((task: Task) => {
     const newStatus = task.status === 'DONE' ? 'TODO' : 'DONE'
     updateMutation.mutate({ id: task.id, data: { status: newStatus } })
 
@@ -250,18 +250,18 @@ export default function TasksPage() {
     if (newStatus === 'DONE' && task.recurrence && task.recurrence !== 'NONE') {
       setTimeout(() => setRecurringTask(task), 400)
     }
-  }
+  }, [updateMutation])
 
-  const handleAddSubtask = (parentId: string, title: string) => {
+  const handleAddSubtask = useCallback((parentId: string, title: string) => {
     createMutation.mutate({ title, status: 'TODO', priority: 'MEDIUM', parentId })
-  }
+  }, [createMutation])
 
-  const handleQuickAdd = () => {
+  const handleQuickAdd = useCallback(() => {
     if (!quickTitle.trim()) return
     createMutation.mutate({ title: quickTitle.trim(), status: 'TODO', priority: 'MEDIUM' })
     setQuickTitle('')
     quickInputRef.current?.focus()
-  }
+  }, [quickTitle, createMutation])
 
   const toggleSelect = useCallback((id: string) => {
     setSelected(prev => {
@@ -270,6 +270,19 @@ export default function TasksPage() {
       return next
     })
   }, [])
+
+  const filteredTasks = useMemo(() => tasks.filter(t => {
+    if (t.parentId) return false
+    if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
+    if (filterRecurring && (!t.recurrence || t.recurrence === 'NONE')) return false
+    return true
+  }), [tasks, search, filterRecurring])
+
+  const grouped = useMemo(() => {
+    const g: Record<string, Task[]> = { TODO: [], IN_PROGRESS: [], IN_REVIEW: [], DONE: [], CANCELLED: [] }
+    filteredTasks.forEach(t => { if (g[t.status]) g[t.status].push(t) })
+    return g
+  }, [filteredTasks])
 
   const selectAll = useCallback(() => {
     if (selected.size === filteredTasks.length) setSelected(new Set())
@@ -304,19 +317,6 @@ export default function TasksPage() {
       updateMutation.mutate({ id: draggedTask.id, data: { status: overTask.status } })
     }
   }, [tasks, updateMutation])
-
-  const filteredTasks = useMemo(() => tasks.filter(t => {
-    if (t.parentId) return false
-    if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
-    if (filterRecurring && (!t.recurrence || t.recurrence === 'NONE')) return false
-    return true
-  }), [tasks, search, filterRecurring])
-
-  const grouped = useMemo(() => {
-    const g: Record<string, Task[]> = { TODO: [], IN_PROGRESS: [], IN_REVIEW: [], DONE: [], CANCELLED: [] }
-    filteredTasks.forEach(t => { if (g[t.status]) g[t.status].push(t) })
-    return g
-  }, [filteredTasks])
 
   const inputStyle = getInputStyle(colors)
   const labelStyle = getLabelStyle(colors)

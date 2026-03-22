@@ -88,7 +88,7 @@ export class AdminController {
   @ApiOperation({ summary: 'Get platform activity log' })
   getActivityLog(
     @Query('page')  page  = '1',
-    @Query('limit') limit = '30',
+    @Query('limit') limit = '50',
   ) { return this.adminService.getActivityLog(+page, +limit) }
 
   @Get('search')

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useMemo, useCallback } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Folder, Trash2, Edit2, X, Check, LayoutGrid, Kanban, FolderKanban } from 'lucide-react'
 import {
   DndContext, PointerSensor, useSensor, useSensors,
@@ -16,6 +16,8 @@ import toast from 'react-hot-toast'
 import type { Task, Project } from '../types'
 import { getInputStyle } from '../lib/formStyles'
 import { useColors } from '../lib/useColors'
+import { queryKeys } from '../lib/queryKeys'
+import { useTasks, useProjects } from '../hooks/useApi'
 
 const COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -55,21 +57,14 @@ export default function ProjectsPage() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
-  const { data: projects = [], isLoading } = useQuery<Project[]>({
-    queryKey: ['projects'],
-    queryFn: () => api.get('/projects').then(r => r.data)
-  })
+  const { data: projects = [], isLoading } = useProjects()
 
-  const { data: _allTasksRaw } = useQuery<any>({
-    queryKey: ['tasks'],
-    queryFn: () => api.get('/tasks?limit=200').then(r => r.data.tasks ?? r.data)
-  })
-  const allTasks: Task[] = Array.isArray(_allTasksRaw) ? _allTasksRaw : (_allTasksRaw?.tasks ?? [])
+  const { tasks: allTasks } = useTasks()
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/projects', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all })
       closeModal()
       toast.success('Project created!')
     },
@@ -79,7 +74,7 @@ export default function ProjectsPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: any) => api.put(`/projects/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all })
       closeModal()
       toast.success('Project updated!')
     },
@@ -89,7 +84,7 @@ export default function ProjectsPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/projects/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.all })
       toast.success('Project deleted')
     },
     onError: () => toast.error('Failed to delete project')
@@ -97,7 +92,7 @@ export default function ProjectsPage() {
 
   const updateTaskMutation = useMutation({
     mutationFn: ({ id, data }: any) => api.put(`/tasks/${id}`, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all })
   })
 
   const openCreate = () => {
@@ -125,25 +120,31 @@ export default function ProjectsPage() {
     else createMutation.mutate(payload)
   }
 
-  const getProgress = (project: Project) => {
+  const getProgress = useCallback((project: Project) => {
     if (!project.tasks || project.tasks.length === 0) return 0
     const done = project.tasks.filter(t => t.status === 'DONE').length
     return Math.round((done / project.tasks.length) * 100)
-  }
+  }, [])
 
   // Kanban: filter tasks by selected project
-  const kanbanTasks = selectedProject
-    ? allTasks.filter(t => t.projectId === selectedProject)
-    : allTasks
+  const kanbanTasks = useMemo(() =>
+    selectedProject
+      ? allTasks.filter(t => t.projectId === selectedProject)
+      : allTasks,
+    [allTasks, selectedProject]
+  )
 
-  const getColumnTasks = (status: string) => kanbanTasks.filter(t => t.status === status)
+  const getColumnTasks = useCallback(
+    (status: string) => kanbanTasks.filter(t => t.status === status),
+    [kanbanTasks]
+  )
 
-  const handleDragStart = (event: DragStartEvent) => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     const task = allTasks.find(t => t.id === event.active.id)
     setActiveTask(task || null)
-  }
+  }, [allTasks])
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
     setActiveTask(null)
     if (!over) return
@@ -163,7 +164,7 @@ export default function ProjectsPage() {
     if (overTask && overTask.status !== activeTask?.status) {
       updateTaskMutation.mutate({ id: taskId, data: { status: overTask.status } })
     }
-  }
+  }, [allTasks, activeTask, updateTaskMutation])
 
   const inputStyle = getInputStyle(colors)
 

@@ -14,7 +14,7 @@ export class NotificationsController {
   getMyNotifications(
     @CurrentUser() user: AuthUser,
     @Query('page') page = '1',
-    @Query('limit') limit = '30',
+    @Query('limit') limit = '50',
   ) {
     return this.notificationsService.getMyNotifications(user.id, +page, +limit)
   }

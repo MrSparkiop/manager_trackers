@@ -31,7 +31,7 @@ export class NotificationsService {
     return notification
   }
 
-  async getMyNotifications(userId: string, page = 1, limit = 30) {
+  async getMyNotifications(userId: string, page = 1, limit = 50) {
     const take = Math.min(100, Math.max(1, limit))
     const skip = (Math.max(1, page) - 1) * take
 

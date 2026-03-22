@@ -1,21 +1,14 @@
 import { useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { useThemeStore } from '../store/themeStore'
 import { useIsMobile } from '../lib/useIsMobile'
 import { CheckSquare, FolderKanban, Timer, AlertCircle, Clock, TrendingUp } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import api from '../lib/axios'
 import { useAuthStore } from '../store/authStore'
 import { StatCardSkeleton, TaskRowSkeleton } from '../components/Skeleton'
-import type { Task } from '../types'
 import { useColors } from '../lib/useColors'
 import { priorityColors } from '../lib/constants'
+import { useTasks, useTodayTasks, useOverdueTasks, useProjects, useTimeSummary } from '../hooks/useApi'
 
-interface TimeSummary {
-  todaySeconds: number
-  weekSeconds: number
-  totalSeconds: number
-}
 
 function formatDuration(seconds: number) {
   const h = Math.floor(seconds / 3600)
@@ -43,31 +36,15 @@ export default function DashboardPage() {
 
   const colors = useColors(isDark)
 
-  const { data: todayTasks = [], isLoading: loadingToday } = useQuery<Task[]>({
-    queryKey: ['tasks', 'today'],
-    queryFn: () => api.get('/tasks/today').then(r => r.data),
-  })
+  const { data: todayTasks = [], isLoading: loadingToday } = useTodayTasks()
 
-  const { data: overdueTasks = [] } = useQuery<Task[]>({
-    queryKey: ['tasks', 'overdue'],
-    queryFn: () => api.get('/tasks/overdue').then(r => r.data),
-  })
+  const { data: overdueTasks = [] } = useOverdueTasks()
 
-  const { data: projects = [], isLoading: loadingProjects } = useQuery<any[]>({
-    queryKey: ['projects'],
-    queryFn: () => api.get('/projects').then(r => r.data),
-  })
+  const { data: projects = [], isLoading: loadingProjects } = useProjects()
 
-  const { data: _allTasksRaw, isLoading: loadingAll } = useQuery<any>({
-    queryKey: ['tasks'],
-    queryFn: () => api.get('/tasks?limit=200').then(r => r.data.tasks ?? r.data),
-  })
-  const allTasks: Task[] = Array.isArray(_allTasksRaw) ? _allTasksRaw : (_allTasksRaw?.tasks ?? [])
+  const { tasks: allTasks, isLoading: loadingAll } = useTasks()
 
-  const { data: timeSummary } = useQuery<TimeSummary>({
-    queryKey: ['time-summary'],
-    queryFn: () => api.get('/time-tracker/summary').then(r => r.data),
-  })
+  const { data: timeSummary } = useTimeSummary()
 
   const isLoading = loadingToday || loadingProjects || loadingAll
 
@@ -91,12 +68,12 @@ export default function DashboardPage() {
     done: p.tasks?.filter((t: any) => t.status === 'DONE').length || 0,
   })), [projects])
 
-  const stats = [
+  const stats = useMemo(() => [
     { label: "Today's Tasks", value: todayTasks.length,   icon: CheckSquare, color: '#60a5fa', bg: 'rgba(96,165,250,0.1)' },
     { label: 'Overdue',       value: overdueTasks.length, icon: AlertCircle, color: '#f87171', bg: 'rgba(248,113,113,0.1)' },
     { label: 'Projects',      value: projects.length,     icon: FolderKanban, color: '#a78bfa', bg: 'rgba(167,139,250,0.1)' },
     { label: 'Time Today',    value: timeSummary ? formatDuration(timeSummary.todaySeconds) : '0h 0m', icon: Clock, color: '#34d399', bg: 'rgba(52,211,153,0.1)' },
-  ]
+  ], [todayTasks.length, overdueTasks.length, projects.length, timeSummary])
 
   const card: React.CSSProperties = {
     backgroundColor: colors.card,

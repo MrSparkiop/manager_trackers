@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Plus, X, Trash2, CheckCircle2, Clock, RefreshCw } from 'lucide-react'
 import api from '../lib/axios'
@@ -8,6 +8,8 @@ import toast from 'react-hot-toast'
 import type { CalendarEvent, Task } from '../types'
 import { useColors } from '../lib/useColors'
 import { getInputStyle } from '../lib/formStyles'
+import { queryKeys } from '../lib/queryKeys'
+import { useTasks } from '../hooks/useApi'
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6']
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -45,16 +47,12 @@ export default function CalendarPage() {
     queryFn: () => api.get('/calendar').then(r => r.data),
   })
 
-  const { data: _tasksRaw } = useQuery<any>({
-    queryKey: ['tasks'],
-    queryFn: () => api.get('/tasks?limit=200').then(r => r.data.tasks ?? r.data),
-  })
-  const tasks: Task[] = Array.isArray(_tasksRaw) ? _tasksRaw : (_tasksRaw?.tasks ?? [])
+  const { tasks } = useTasks()
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/calendar', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.events })
       closeModal()
       toast.success('Event created!')
     },
@@ -64,7 +62,7 @@ export default function CalendarPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/calendar/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.events })
       toast.success('Event deleted')
     },
     onError: () => toast.error('Failed to delete event')
@@ -110,32 +108,39 @@ export default function CalendarPage() {
   }
 
   // Build calendar grid
-  const firstDay     = new Date(year, month, 1).getDay()
-  const daysInMonth  = new Date(year, month + 1, 0).getDate()
-  const daysInPrev   = new Date(year, month, 0).getDate()
-  const cells: { date: Date; isCurrentMonth: boolean }[] = []
+  const cells = useMemo(() => {
+    const firstDay     = new Date(year, month, 1).getDay()
+    const daysInMonth  = new Date(year, month + 1, 0).getDate()
+    const daysInPrev   = new Date(year, month, 0).getDate()
+    const result: { date: Date; isCurrentMonth: boolean }[] = []
 
-  for (let i = firstDay - 1; i >= 0; i--)
-    cells.push({ date: new Date(year, month - 1, daysInPrev - i), isCurrentMonth: false })
-  for (let i = 1; i <= daysInMonth; i++)
-    cells.push({ date: new Date(year, month, i), isCurrentMonth: true })
-  const remaining = 42 - cells.length
-  for (let i = 1; i <= remaining; i++)
-    cells.push({ date: new Date(year, month + 1, i), isCurrentMonth: false })
+    for (let i = firstDay - 1; i >= 0; i--)
+      result.push({ date: new Date(year, month - 1, daysInPrev - i), isCurrentMonth: false })
+    for (let i = 1; i <= daysInMonth; i++)
+      result.push({ date: new Date(year, month, i), isCurrentMonth: true })
+    const remaining = 42 - result.length
+    for (let i = 1; i <= remaining; i++)
+      result.push({ date: new Date(year, month + 1, i), isCurrentMonth: false })
+    return result
+  }, [year, month])
 
   const sameDay = (a: Date, b: Date) =>
     a.getFullYear() === b.getFullYear() &&
     a.getMonth()    === b.getMonth() &&
     a.getDate()     === b.getDate()
 
-  const getEventsForDay = (date: Date) =>
-    events.filter(e => sameDay(new Date(e.startTime), date))
+  const getEventsForDay = useCallback((date: Date) =>
+    events.filter(e => sameDay(new Date(e.startTime), date)),
+    [events]
+  )
 
-  const getTasksForDay = (date: Date) =>
+  const getTasksForDay = useCallback((date: Date) =>
     (tasks as Task[]).filter(t =>
       t.dueDate && t.status !== 'DONE' && t.status !== 'CANCELLED' &&
       sameDay(new Date(t.dueDate), date)
-    )
+    ),
+    [tasks]
+  )
 
   const isToday = (date: Date) => sameDay(date, today)
 
@@ -144,11 +149,11 @@ export default function CalendarPage() {
     return new Date(e.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
-  const selectedDayEvents = selectedDay ? getEventsForDay(selectedDay) : []
-  const selectedDayTasks  = selectedDay ? getTasksForDay(selectedDay) : []
+  const selectedDayEvents = useMemo(() => selectedDay ? getEventsForDay(selectedDay) : [], [selectedDay, getEventsForDay])
+  const selectedDayTasks  = useMemo(() => selectedDay ? getTasksForDay(selectedDay) : [], [selectedDay, getTasksForDay])
 
   // Upcoming: next 14 days of events + task deadlines
-  const upcomingItems = (() => {
+  const upcomingItems = useMemo(() => {
     const items: { date: Date; label: string; color: string; type: 'event' | 'task'; isRecurring?: boolean }[] = []
     const start = new Date(today); start.setHours(0, 0, 0, 0)
     const end   = new Date(today); end.setDate(end.getDate() + 14)
@@ -162,7 +167,7 @@ export default function CalendarPage() {
       if (d >= start && d <= end) items.push({ date: d, label: t.title, color: '#22c55e', type: 'task', isRecurring: t.recurrence !== 'NONE' && !!t.recurrence })
     })
     return items.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 10)
-  })()
+  }, [events, tasks])
 
   const inputStyle = getInputStyle(colors)
 

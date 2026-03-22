@@ -44,27 +44,42 @@ export const queryKeys = {
   // ── Teams ──────────────────────────────────────────────────────
   teams: {
     all:         ['teams']                                    as const,
-    detail:      (id: string) => ['teams', id]                as const,
-    projects:    (id: string) => ['teams', id, 'projects']    as const,
-    tasks:       (teamId: string, projectId: string) =>
-                   ['teams', teamId, 'tasks', projectId]      as const,
-    workload:    (id: string) => ['teams', id, 'workload']    as const,
-    activity:    (id: string) => ['teams', id, 'activity']    as const,
+    detail:      (id: string) => ['team', id]                 as const,
+    invite:      (id: string) => ['team-invite', id]          as const,
+    tasks:       (projectId: string) =>
+                   ['team-tasks', projectId]                   as const,
+    workload:    (id: string) => ['team-workload', id]        as const,
+    activity:    (id: string) => ['team-activity', id]        as const,
   },
 
   // ── Analytics ──────────────────────────────────────────────────
   analytics: {
-    insights: ['analytics', 'insights'] as const,
+    insights: ['analytics-insights'] as const,
   },
 
   // ── Admin ──────────────────────────────────────────────────────
   admin: {
-    stats:         ['admin', 'stats']         as const,
-    users:         ['admin', 'users']         as const,
-    activity:      ['admin', 'activity']      as const,
-    config:        ['admin', 'config']        as const,
-    announcements: ['admin', 'announcements'] as const,
-    billing:       ['admin', 'billing']       as const,
-    search:        ['admin', 'search']        as const,
+    stats:          ['admin-stats']           as const,
+    activeUsers:    ['admin-active-users']    as const,
+    users:          ['admin-users']           as const,
+    activity:       ['admin-activity']        as const,
+    config:         ['admin-config']          as const,
+    maintenance:    ['admin-maintenance']     as const,
+    announcements:  ['admin-announcements']   as const,
+    billing:        ['admin-billing']         as const,
+    search:         ['admin-search']          as const,
+    supportStats:   ['admin-support-stats']   as const,
+    supportTickets: ['admin-support-tickets'] as const,
+    userDetail:     (id: string) => ['admin-user', id] as const,
+  },
+
+  // ── Support ──────────────────────────────────────────────────
+  support: {
+    tickets: ['support-tickets'] as const,
+  },
+
+  // ── Billing ──────────────────────────────────────────────────
+  billing: {
+    subscription: ['billing-subscription'] as const,
   },
 } as const
