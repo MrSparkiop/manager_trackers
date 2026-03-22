@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Cron } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
-import * as archiver from 'archiver'
+import archiver from 'archiver'
 
 @Injectable()
 export class GdprService {
@@ -125,7 +125,7 @@ export class GdprService {
     // Create ZIP buffer using archiver
     return new Promise<Buffer>((resolve, reject) => {
       const chunks: Buffer[] = []
-      const archive = archiver.default('zip', { zlib: { level: 9 } })
+      const archive = archiver('zip', { zlib: { level: 9 } })
 
       archive.on('data', (chunk: Buffer) => chunks.push(chunk))
       archive.on('end', () => resolve(Buffer.concat(chunks)))
