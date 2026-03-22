@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, Timer, CheckSquare, BarChart3, Calendar } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 
@@ -17,13 +17,15 @@ export default function RegisterPage() {
   const [loading, setLoading]   = useState(false)
   const { register }            = useAuthStore()
   const navigate                = useNavigate()
+  const [searchParams]          = useSearchParams()
+  const referralCode            = searchParams.get('ref') || undefined
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      await register(form.email, form.password, form.firstName, form.lastName)
+      await register(form.email, form.password, form.firstName, form.lastName, referralCode)
       navigate('/app/dashboard')
     } catch (err: any) {
       const status = err?.response?.status

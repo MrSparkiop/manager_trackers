@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
-import { User, Moon, Sun, Save } from 'lucide-react'
+import { User, Moon, Sun, Save, Download, Trash2, ShieldCheck, XCircle, Gift, Copy, Check } from 'lucide-react'
 import { useColors } from '../lib/useColors'
 import { getInputStyle } from '../lib/formStyles'
+import api from '../lib/axios'
 
 export default function SettingsPage() {
   const { isDark } = useThemeStore()
@@ -15,6 +16,14 @@ export default function SettingsPage() {
   })
   const [saved, setSaved] = useState(false)
   const { toggle } = useThemeStore()
+
+  // GDPR state
+  const [exporting, setExporting] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deletionPending, setDeletionPending] = useState(!!user?.deletionScheduledFor)
+  const [scheduledFor, setScheduledFor] = useState(user?.deletionScheduledFor || '')
+  const [gdprLoading, setGdprLoading] = useState(false)
 
   const colors = useColors(isDark)
 
@@ -30,6 +39,59 @@ export default function SettingsPage() {
     e.preventDefault()
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  const handleExportData = async () => {
+    setExporting(true)
+    try {
+      const res = await api.get('/gdpr/export', { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([res.data]))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'trackflow-data-export.zip'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch {
+      alert('Failed to export data. Please try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleRequestDeletion = async () => {
+    setGdprLoading(true)
+    try {
+      const res = await api.post('/gdpr/delete-account')
+      setDeletionPending(true)
+      setScheduledFor(res.data.scheduledFor)
+      setShowDeleteModal(false)
+      setDeleteConfirmText('')
+    } catch {
+      alert('Failed to request account deletion.')
+    } finally {
+      setGdprLoading(false)
+    }
+  }
+
+  const handleCancelDeletion = async () => {
+    setGdprLoading(true)
+    try {
+      await api.post('/gdpr/cancel-deletion')
+      setDeletionPending(false)
+      setScheduledFor('')
+    } catch {
+      alert('Failed to cancel deletion.')
+    } finally {
+      setGdprLoading(false)
+    }
+  }
+
+  const getDaysRemaining = () => {
+    if (!scheduledFor) return 0
+    const diff = new Date(scheduledFor).getTime() - Date.now()
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
   }
 
   return (
@@ -145,7 +207,172 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+
+        {/* Referral */}
+        {user?.referralCode && (
+          <div style={card}>
+            <h2 style={{ fontSize: '16px', fontWeight: '600', color: colors.text, margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Gift size={16} color="#6366f1" /> Refer a Friend
+            </h2>
+            <p style={{ fontSize: '13px', color: colors.textMuted, margin: '0 0 16px' }}>
+              Share your referral link. When a friend signs up, you both get 1 month of PRO free.
+            </p>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                readOnly
+                value={`${window.location.origin}/register?ref=${user.referralCode}`}
+                style={{ ...inputStyle, flex: 1, fontSize: '13px' }}
+              />
+              <CopyButton text={`${window.location.origin}/register?ref=${user.referralCode}`} colors={colors} />
+            </div>
+          </div>
+        )}
+
+        {/* GDPR / Data Privacy */}
+        <div style={card}>
+          <h2 style={{ fontSize: '16px', fontWeight: '600', color: colors.text, margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ShieldCheck size={16} color="#6366f1" /> Data &amp; Privacy
+          </h2>
+          <p style={{ fontSize: '13px', color: colors.textMuted, margin: '0 0 20px' }}>
+            Export your data or request account deletion per GDPR regulations.
+          </p>
+
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleExportData}
+              disabled={exporting}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                backgroundColor: 'rgba(99,102,241,0.1)', color: '#6366f1',
+                border: '1px solid rgba(99,102,241,0.3)', borderRadius: '10px',
+                padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+              }}
+            >
+              <Download size={14} />
+              {exporting ? 'Exporting...' : 'Export My Data'}
+            </button>
+
+            {!deletionPending ? (
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  backgroundColor: 'rgba(239,68,68,0.08)', color: '#ef4444',
+                  border: '1px solid rgba(239,68,68,0.3)', borderRadius: '10px',
+                  padding: '10px 20px', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                }}
+              >
+                <Trash2 size={14} />
+                Delete My Account
+              </button>
+            ) : (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '12px', flex: 1,
+                padding: '12px 16px', borderRadius: '10px',
+                backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+              }}>
+                <XCircle size={16} color="#ef4444" />
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: '13px', fontWeight: '600', color: '#ef4444', margin: 0 }}>
+                    Account deletion scheduled
+                  </p>
+                  <p style={{ fontSize: '12px', color: colors.textMuted, margin: '2px 0 0' }}>
+                    {getDaysRemaining()} days remaining. All data will be permanently deleted.
+                  </p>
+                </div>
+                <button
+                  onClick={handleCancelDeletion}
+                  disabled={gdprLoading}
+                  style={{
+                    padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '600',
+                    backgroundColor: 'transparent', border: '1px solid rgba(239,68,68,0.4)',
+                    color: '#ef4444', cursor: 'pointer',
+                  }}
+                >
+                  {gdprLoading ? '...' : 'Cancel'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Delete account modal */}
+        {showDeleteModal && (
+          <div style={{
+            position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          }} onClick={() => setShowDeleteModal(false)}>
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                backgroundColor: colors.card, borderRadius: '16px',
+                border: `1px solid ${colors.border}`, padding: '28px',
+                maxWidth: '420px', width: '90%',
+              }}
+            >
+              <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#ef4444', margin: '0 0 8px' }}>
+                Delete Account
+              </h3>
+              <p style={{ fontSize: '13px', color: colors.textMuted, margin: '0 0 20px', lineHeight: '1.6' }}>
+                This will schedule your account for permanent deletion in 30 days.
+                All your data (tasks, projects, time entries) will be removed. This cannot be undone.
+              </p>
+              <label style={{ display: 'block', fontSize: '13px', color: colors.textMuted, marginBottom: '6px' }}>
+                Type <strong style={{ color: colors.text }}>DELETE</strong> to confirm
+              </label>
+              <input
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder="DELETE"
+                style={{ ...inputStyle, marginBottom: '16px' }}
+              />
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => { setShowDeleteModal(false); setDeleteConfirmText('') }}
+                  style={{
+                    padding: '9px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: '600',
+                    backgroundColor: 'transparent', border: `1px solid ${colors.border}`,
+                    color: colors.text, cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRequestDeletion}
+                  disabled={deleteConfirmText !== 'DELETE' || gdprLoading}
+                  style={{
+                    padding: '9px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: '700',
+                    backgroundColor: deleteConfirmText === 'DELETE' ? '#ef4444' : 'rgba(239,68,68,0.3)',
+                    border: 'none', color: '#fff', cursor: deleteConfirmText === 'DELETE' ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  {gdprLoading ? 'Deleting...' : 'Delete Account'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
+  )
+}
+
+function CopyButton({ text, colors }: { text: string; colors: Record<string, string> }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <button onClick={handleCopy} style={{
+      display: 'flex', alignItems: 'center', gap: '6px',
+      padding: '10px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: '600',
+      backgroundColor: copied ? 'rgba(34,197,94,0.15)' : 'rgba(99,102,241,0.1)',
+      border: `1px solid ${copied ? 'rgba(34,197,94,0.3)' : 'rgba(99,102,241,0.3)'}`,
+      color: copied ? '#22c55e' : '#6366f1', cursor: 'pointer',
+    }}>
+      {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
+    </button>
   )
 }

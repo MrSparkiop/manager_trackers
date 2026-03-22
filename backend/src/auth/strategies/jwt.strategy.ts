@@ -24,7 +24,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: any) {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, firstName: true, lastName: true, role: true, isSuspended: true },
+      select: { id: true, email: true, firstName: true, lastName: true, role: true, isSuspended: true, onboardingCompleted: true, trialEndsAt: true, referralCode: true, lastSeenChangelog: true, deletionRequestedAt: true, deletionScheduledFor: true },
     })
     if (!user) throw new UnauthorizedException()
     if (user.isSuspended) throw new UnauthorizedException('Account suspended')
@@ -36,6 +36,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: user.role,
       isSuspended: user.isSuspended,
       isImpersonated: !!payload.impersonatedBy,
+      onboardingCompleted: user.onboardingCompleted,
+      trialEndsAt: user.trialEndsAt,
+      referralCode: user.referralCode,
+      lastSeenChangelog: user.lastSeenChangelog,
+      deletionRequestedAt: user.deletionRequestedAt,
+      deletionScheduledFor: user.deletionScheduledFor,
     }
   }
 }

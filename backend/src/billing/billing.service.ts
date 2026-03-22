@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common'
+import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import Stripe from 'stripe'
 import { PrismaService } from '../prisma/prisma.service'
@@ -173,6 +173,20 @@ export class BillingService {
         hostedUrl: inv.hosted_invoice_url,
       })),
     }
+  }
+
+  /** Start a 14-day free trial of PRO */
+  async startTrial(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } })
+    if (!user) throw new NotFoundException('User not found')
+    if (user.role === 'PRO' || user.role === 'ADMIN') throw new ConflictException('Already on PRO or higher')
+    if (user.trialEndsAt) throw new ConflictException('Trial already used')
+    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { role: 'PRO', trialEndsAt },
+    })
+    return { trialEndsAt }
   }
 
   /** Return the publishable key so the frontend can init Stripe.js */

@@ -8,6 +8,13 @@ export interface User {
   firstName: string
   lastName: string
   role: UserRole
+  onboardingCompleted?: boolean
+  trialEndsAt?: string | null
+  referralCode?: string | null
+  lastSeenChangelog?: string | null
+  deletionRequestedAt?: string | null
+  deletionScheduledFor?: string | null
+  createdAt?: string
 }
 
 export interface Task {

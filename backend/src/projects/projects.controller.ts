@@ -28,7 +28,7 @@ export class ProjectsController {
 
   @Post()
   create(@Body() dto: CreateProjectDto, @CurrentUser() user: AuthUser) {
-    return this.projectsService.create(user.id, dto)
+    return this.projectsService.create(user.id, dto, user.role)
   }
 
   @Put(':id')

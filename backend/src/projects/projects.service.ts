@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PlanLimitsService } from '../common/plan-limits.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 
 @Injectable()
 export class ProjectsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private planLimits: PlanLimitsService,
+  ) {}
 
   async findAll(userId: string) {
     return this.prisma.project.findMany({
@@ -36,7 +40,8 @@ export class ProjectsService {
     return project;
   }
 
-  async create(userId: string, dto: CreateProjectDto) {
+  async create(userId: string, dto: CreateProjectDto, userRole?: string) {
+    if (userRole) await this.planLimits.checkProjectLimit(userId, userRole)
     return this.prisma.project.create({
       data: {
         ...dto,

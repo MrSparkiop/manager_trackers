@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationsService } from '../notifications/notifications.service'
+import { PlanLimitsService } from '../common/plan-limits.service'
 import { createNextOccurrence as createNext, skipNextOccurrence as skipNext } from '../common/recurrence.utils'
 import { TaskStatus, Priority, Recurrence, ProjectStatus, TeamRole } from '@prisma/client'
 
@@ -9,6 +10,7 @@ export class TeamsService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private planLimits: PlanLimitsService,
   ) {}
 
   // ── Teams CRUD ───────────────────────────────────────────────────
@@ -58,7 +60,8 @@ export class TeamsService {
     return { ...team, myRole: member?.role ?? null }
   }
 
-  async createTeam(userId: string, dto: { name: string; description?: string; color?: string }) {
+  async createTeam(userId: string, dto: { name: string; description?: string; color?: string }, userRole?: string) {
+    if (userRole) await this.planLimits.checkTeamLimit(userId, userRole)
     const team = await this.prisma.team.create({
       data: {
         name: dto.name,
@@ -119,10 +122,16 @@ export class TeamsService {
   }
 
   async joinTeam(inviteCode: string, userId: string) {
-    const team = await this.prisma.team.findUnique({ where: { inviteCode } })
+    const team = await this.prisma.team.findUnique({
+      where: { inviteCode },
+      include: { owner: { select: { role: true } } },
+    })
     if (!team) throw new NotFoundException('Invalid invite code')
 
     if (team.ownerId === userId) throw new BadRequestException('You are already the owner of this team')
+
+    // Check team member limit based on owner's plan
+    await this.planLimits.checkTeamMemberLimit(team.id, team.owner.role)
 
     // Catch race conditions at DB level
     try {

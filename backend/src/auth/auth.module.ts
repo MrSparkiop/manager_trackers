@@ -7,6 +7,7 @@ import { JwtStrategy } from './strategies/jwt.strategy'
 import { RolesGuard } from './roles.guard'
 import { PermissionsGuard } from './permissions.guard'
 import { MailModule } from '../mail/mail.module'
+import { ReferralModule } from '../referral/referral.module'
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { MailModule } from '../mail/mail.module'
       signOptions: { expiresIn: '15m' },
     }),
     MailModule,
+    ReferralModule,
   ],
   providers: [AuthService, JwtStrategy, RolesGuard, PermissionsGuard],
   controllers: [AuthController],

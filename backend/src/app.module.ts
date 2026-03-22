@@ -21,6 +21,9 @@ import { TaskActivityModule } from './task-activity/task-activity.module'
 import { SupportModule } from './support/support.module'
 import { BillingModule } from './billing/billing.module'
 import { HealthModule } from './health/health.module'
+import { ReferralModule } from './referral/referral.module'
+import { ChangelogModule } from './changelog/changelog.module'
+import { GdprModule } from './gdpr/gdpr.module'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { ScheduleModule } from '@nestjs/schedule'
 import { APP_GUARD } from '@nestjs/core'
@@ -55,6 +58,9 @@ import { APP_GUARD } from '@nestjs/core'
     SupportModule,
     BillingModule,
     HealthModule,
+    ReferralModule,
+    ChangelogModule,
+    GdprModule,
   ],
   providers: [
     {

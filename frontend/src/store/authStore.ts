@@ -12,7 +12,7 @@ interface AuthState {
   isLoading: boolean
   error: string | null
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string, firstName: string, lastName: string) => Promise<void>
+  register: (email: string, password: string, firstName: string, lastName: string, referralCode?: string) => Promise<void>
   logout: () => Promise<void>
   fetchMe: () => Promise<void>
   clearError: () => void
@@ -45,10 +45,12 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      register: async (email, password, firstName, lastName) => {
+      register: async (email, password, firstName, lastName, referralCode?) => {
         set({ isLoading: true, error: null })
         try {
-          const res = await api.post('/auth/register', { email, password, firstName, lastName })
+          const body: Record<string, string> = { email, password, firstName, lastName }
+          if (referralCode) body.referralCode = referralCode
+          const res = await api.post('/auth/register', body)
           set({ user: res.data.user, isAuthenticated: true, isLoading: false })
           Sentry.setUser({ id: res.data.user.id, email: res.data.user.email, username: `${res.data.user.firstName} ${res.data.user.lastName}` })
         } catch (err: any) {

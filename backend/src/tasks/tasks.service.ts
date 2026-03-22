@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PlanLimitsService } from '../common/plan-limits.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskStatus, Priority, Prisma } from '@prisma/client';
@@ -16,7 +17,10 @@ export interface TaskFilters {
 
 @Injectable()
 export class TasksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private planLimits: PlanLimitsService,
+  ) {}
 
   async findAll(userId: string, filters?: TaskFilters) {
     const where: Prisma.TaskWhereInput = { userId, teamId: null, parentId: null };
@@ -62,7 +66,8 @@ export class TasksService {
     return task;
   }
 
-  async create(userId: string, dto: CreateTaskDto) {
+  async create(userId: string, dto: CreateTaskDto, userRole?: string) {
+    if (userRole) await this.planLimits.checkTaskLimit(userId, userRole)
     const { tagIds, ...rest } = dto
 
     // Fetch actor first so the $use middleware can log the creation

@@ -5,7 +5,7 @@ import api from '../lib/axios'
 import toast from 'react-hot-toast'
 import {
   Zap, CreditCard, Check, ExternalLink, Star,
-  FileText, AlertCircle, RefreshCw, Download,
+  FileText, AlertCircle, RefreshCw, Download, Clock,
 } from 'lucide-react'
 
 interface Invoice {
@@ -73,6 +73,26 @@ export default function BillingPage() {
     onSuccess: (data) => { if (data.url) window.location.href = data.url },
     onError: (e: any) => toast.error(e?.response?.data?.message || 'Could not open portal'),
   })
+
+  // ── Trial ──────────────────────────────────────────────────────────
+  const { fetchMe } = useAuthStore()
+  const trialMutation = useMutation({
+    mutationFn: () => api.post('/billing/start-trial').then(r => r.data),
+    onSuccess: () => {
+      toast.success('Trial started! Enjoy 14 days of PRO.')
+      fetchMe()
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Could not start trial'),
+  })
+
+  const trialEndsAt = user?.trialEndsAt ? new Date(user.trialEndsAt) : null
+  const trialActive = isPro && trialEndsAt && trialEndsAt.getTime() > Date.now()
+  const trialExpired = !isPro && trialEndsAt && trialEndsAt.getTime() <= Date.now()
+  const canStartTrial = !isPro && !isAdmin && !trialEndsAt
+
+  const trialDaysLeft = trialActive
+    ? Math.max(0, Math.ceil((trialEndsAt!.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0
 
   const FREE_FEATURES = ['Up to 3 projects', '50 tasks', '1 team', 'Basic analytics']
   const PRO_FEATURES  = ['Unlimited projects', 'Unlimited tasks', 'Unlimited teams', 'Advanced analytics', 'Priority support', 'Early access to new features']
@@ -187,6 +207,86 @@ export default function BillingPage() {
             </div>
           )}
         </div>
+
+        {/* ── Trial Section ────────────────────────────────────────────── */}
+        {canStartTrial && (
+          <div style={{
+            ...card,
+            background: isDark
+              ? 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.08))'
+              : 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.05))',
+            border: '1px solid rgba(99,102,241,0.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Clock size={20} color="#6366f1" />
+              </div>
+              <div>
+                <p style={{ fontSize: '15px', fontWeight: '700', color: c.text, margin: 0 }}>Try PRO free for 14 days</p>
+                <p style={{ fontSize: '13px', color: c.muted, margin: '2px 0 0' }}>No credit card required. Full PRO access.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => trialMutation.mutate()}
+              disabled={trialMutation.isPending}
+              style={{
+                padding: '10px 24px',
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                color: '#fff', border: 'none', borderRadius: '10px',
+                fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px',
+              }}
+            >
+              <Zap size={14} />
+              {trialMutation.isPending ? 'Starting...' : 'Start 14-Day Free Trial'}
+            </button>
+          </div>
+        )}
+
+        {trialActive && (
+          <div style={{
+            ...card,
+            background: isDark
+              ? 'linear-gradient(135deg, rgba(34,197,94,0.12), rgba(16,185,129,0.08))'
+              : 'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(16,185,129,0.05))',
+            border: '1px solid rgba(34,197,94,0.3)',
+            display: 'flex', alignItems: 'center', gap: '12px',
+          }}>
+            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(34,197,94,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Clock size={20} color="#22c55e" />
+            </div>
+            <div>
+              <p style={{ fontSize: '15px', fontWeight: '700', color: c.text, margin: 0 }}>
+                Trial active &mdash; {trialDaysLeft} day{trialDaysLeft !== 1 ? 's' : ''} remaining
+              </p>
+              <p style={{ fontSize: '13px', color: c.muted, margin: '2px 0 0' }}>
+                Ends {trialEndsAt!.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}. Upgrade to keep PRO access.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {trialExpired && (
+          <div style={{
+            ...card,
+            background: isDark
+              ? 'rgba(239,68,68,0.08)'
+              : 'rgba(239,68,68,0.05)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            display: 'flex', alignItems: 'center', gap: '12px',
+          }}>
+            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AlertCircle size={20} color="#ef4444" />
+            </div>
+            <div>
+              <p style={{ fontSize: '15px', fontWeight: '700', color: c.text, margin: 0 }}>Trial expired</p>
+              <p style={{ fontSize: '13px', color: c.muted, margin: '2px 0 0' }}>
+                Your free trial has ended. Upgrade to PRO to unlock all features again.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* ── Plan Cards ────────────────────────────────────────────────── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>

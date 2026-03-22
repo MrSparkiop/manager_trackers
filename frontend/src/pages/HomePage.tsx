@@ -670,6 +670,64 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── Testimonials ── */}
+      <section style={{ padding: 'clamp(60px, 10vw, 120px) 24px', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '56px' }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              backgroundColor: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
+              borderRadius: '999px', padding: '5px 14px', marginBottom: '20px'
+            }}>
+              <span style={{ fontSize: '12px', color: '#818cf8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Testimonials
+              </span>
+            </div>
+            <h2 style={{
+              fontSize: 'clamp(28px, 5vw, 44px)', fontWeight: '800',
+              color: '#fff', margin: '0 0 12px', letterSpacing: '-0.02em',
+              fontFamily: "'DM Serif Display', serif",
+            }}>
+              Loved by productive teams
+            </h2>
+            <p style={{ fontSize: '17px', color: '#64748b', maxWidth: '520px', margin: '0 auto', lineHeight: '1.6' }}>
+              See what our users are saying about TrackFlow.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+            {[
+              { name: 'Sarah M.', role: 'Product Manager', text: 'TrackFlow replaced three different tools for our team. The Kanban boards and time tracking in one place is exactly what we needed.', avatar: 'SM' },
+              { name: 'James L.', role: 'Freelance Developer', text: 'The free tier is genuinely useful unlike most project tools. I upgraded to PRO after a week because the analytics insights were so valuable.', avatar: 'JL' },
+              { name: 'Elena K.', role: 'Design Lead', text: 'Clean interface, fast, and the calendar view keeps our design sprints on track. Best project tracker I have used so far.', avatar: 'EK' },
+            ].map(t => (
+              <div key={t.name} style={{
+                backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: '16px', padding: '28px',
+              }}>
+                <p style={{ fontSize: '15px', color: '#94a3b8', lineHeight: '1.7', margin: '0 0 20px' }}>
+                  &ldquo;{t.text}&rdquo;
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '40px', height: '40px', borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '13px', fontWeight: '700', color: '#fff',
+                  }}>
+                    {t.avatar}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '14px', fontWeight: '600', color: '#e2e8f0', margin: 0 }}>{t.name}</p>
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0' }}>{t.role}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── FAQ ── */}
       <section id="faq" style={{ padding: 'clamp(60px, 10vw, 120px) 24px' }}>
         <div style={{ maxWidth: '720px', margin: '0 auto' }}>

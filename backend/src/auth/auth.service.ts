@@ -2,9 +2,11 @@ import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/co
 import { JwtService } from '@nestjs/jwt'
 import { PrismaService } from '../prisma/prisma.service'
 import { MailService } from '../mail/mail.service'
+import { ReferralService } from '../referral/referral.service'
 import * as bcrypt from 'bcrypt'
 import { createHash, timingSafeEqual } from 'crypto'
 import * as crypto from 'crypto'
+import { nanoid } from 'nanoid'
 import type { Response, Request } from 'express'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
@@ -27,6 +29,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private mailService: MailService,
+    private referralService: ReferralService,
   ) {}
 
   private generateTokens(userId: string) {
@@ -81,8 +84,12 @@ export class AuthService {
         password: hashedPassword,
         firstName: dto.firstName,
         lastName: dto.lastName,
+        referralCode: nanoid(8),
       },
-      select: { id: true, email: true, firstName: true, lastName: true, role: true }
+      select: {
+        id: true, email: true, firstName: true, lastName: true, role: true,
+        onboardingCompleted: true, trialEndsAt: true, referralCode: true,
+      }
     })
 
     const { accessToken, refreshToken } = this.generateTokens(user.id)
@@ -93,6 +100,14 @@ export class AuthService {
     })
 
     this.setAuthCookies(res, accessToken, refreshToken)
+
+    // Process referral if a referral code was provided
+    if (dto.referralCode) {
+      await this.referralService.processReferral(dto.referralCode, user.id).catch(() => {
+        // Silently ignore referral processing errors - registration should still succeed
+      })
+    }
+
     return { user }
   }
 
@@ -185,8 +200,21 @@ export class AuthService {
   async getMe(userId: string) {
     return this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, firstName: true, lastName: true, role: true }
+      select: {
+        id: true, email: true, firstName: true, lastName: true, role: true,
+        onboardingCompleted: true, trialEndsAt: true, referralCode: true,
+        lastSeenChangelog: true, deletionRequestedAt: true, deletionScheduledFor: true,
+        createdAt: true,
+      }
     })
+  }
+
+  async completeOnboarding(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { onboardingCompleted: true },
+    })
+    return { success: true }
   }
 
   async forgotPassword(email: string) {

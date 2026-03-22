@@ -33,7 +33,7 @@ export class TasksController {
 
   @Post()
   create(@Body() dto: CreateTaskDto, @CurrentUser() user: AuthUser) {
-    return this.tasksService.create(user.id, dto)
+    return this.tasksService.create(user.id, dto, user.role)
   }
 
   @Put(':id')

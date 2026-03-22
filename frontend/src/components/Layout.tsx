@@ -11,6 +11,8 @@ import AnnouncementBanner from './AnnouncementBanner'
 import MaintenanceBanner from './MaintenanceBanner'
 import NotificationBell from './NotificationBell'
 import GlobalSearch from './GlobalSearch'
+import ChangelogModal from './ChangelogModal'
+import OnboardingModal from './OnboardingModal'
 import { Search } from 'lucide-react'
 
 const navItems = [
@@ -307,6 +309,8 @@ export default function Layout() {
         </main>
       </div>
       <GlobalSearch />
+      <ChangelogModal />
+      {user && !user.onboardingCompleted && <OnboardingModal />}
     </div>
   )
 }

@@ -61,4 +61,10 @@ export class AuthController {
   resetPassword(@Body() body: { token: string; password: string }) {
     return this.authService.resetPassword(body.token, body.password)
   }
+
+  @Post('complete-onboarding')
+  @UseGuards(AuthGuard('jwt'))
+  completeOnboarding(@CurrentUser() user: AuthUser) {
+    return this.authService.completeOnboarding(user.id)
+  }
 }

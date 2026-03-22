@@ -10,22 +10,28 @@ datasource db {
 }
 
 model User {
-  id                  String    @id @default(cuid())
-  email               String    @unique
-  password            String
-  firstName           String
-  lastName            String
-  avatar              String?
-  role                Role      @default(USER)
-  isSuspended         Boolean   @default(false)
-  lastSeenAt          DateTime?
-  refreshToken        String?
-  resetPasswordToken  String?
-  resetPasswordExpiry DateTime?
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  password             String
+  firstName            String
+  lastName             String
+  avatar               String?
+  role                 Role      @default(USER)
+  isSuspended          Boolean   @default(false)
+  lastSeenAt           DateTime?
+  refreshToken         String?
+  resetPasswordToken   String?
+  resetPasswordExpiry  DateTime?
   stripeCustomerId     String?   @unique
   stripeSubscriptionId String?   @unique
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  onboardingCompleted  Boolean   @default(false)
+  trialEndsAt          DateTime?
+  referralCode         String?   @unique
+  lastSeenChangelog    DateTime?
+  deletionRequestedAt  DateTime?
+  deletionScheduledFor DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   tags                Tag[]
   projects            Project[]
@@ -39,6 +45,8 @@ model User {
   taskActivities      TaskActivity[]
   supportTickets      SupportTicket[]
   ticketReplies       TicketReply[]
+  referralsMade       Referral[]    @relation("ReferralsMade")
+  referralsReceived   Referral[]    @relation("ReferralsReceived")
 
   @@map("users")
 }
@@ -466,4 +474,37 @@ model AdminAuditLog {
   @@index([adminId])
   @@index([targetUserId])
   @@map("admin_audit_logs")
+}
+
+model Changelog {
+  id          String   @id @default(cuid())
+  version     String
+  title       String
+  content     String
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@map("changelogs")
+}
+
+model Referral {
+  id             String         @id @default(cuid())
+  referrerId     String
+  referrer       User           @relation("ReferralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredUserId String?
+  referredUser   User?          @relation("ReferralsReceived", fields: [referredUserId], references: [id], onDelete: SetNull)
+  status         ReferralStatus @default(PENDING)
+  rewardApplied  Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  completedAt    DateTime?
+
+  @@index([referrerId])
+  @@index([referredUserId])
+  @@map("referrals")
+}
+
+enum ReferralStatus {
+  PENDING
+  COMPLETED
+  EXPIRED
 }

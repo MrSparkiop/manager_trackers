@@ -46,6 +46,14 @@ export class BillingController {
     return this.billingService.createPortalSession(user.id)
   }
 
+  /** Authenticated — start a 14-day free trial */
+  @Post('start-trial')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: 'Start a 14-day free trial of PRO' })
+  startTrial(@CurrentUser() user: AuthUser) {
+    return this.billingService.startTrial(user.id)
+  }
+
   /** Public — Stripe webhook (needs raw body) */
   @Post('webhook')
   @HttpCode(200)

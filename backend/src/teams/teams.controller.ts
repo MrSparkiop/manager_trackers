@@ -31,7 +31,7 @@ export class TeamsController {
   @RequirePermissions('create:team')
   @ApiOperation({ summary: 'Create a team' })
   createTeam(@CurrentUser() user: AuthUser, @Body() body: { name: string; description?: string; color?: string }) {
-    return this.teamsService.createTeam(user.id, body)
+    return this.teamsService.createTeam(user.id, body, user.role)
   }
 
   @Get('join')
