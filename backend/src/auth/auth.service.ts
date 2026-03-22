@@ -6,7 +6,6 @@ import { ReferralService } from '../referral/referral.service'
 import * as bcrypt from 'bcrypt'
 import { createHash, timingSafeEqual } from 'crypto'
 import * as crypto from 'crypto'
-import { nanoid } from 'nanoid'
 import type { Response, Request } from 'express'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
@@ -84,7 +83,7 @@ export class AuthService {
         password: hashedPassword,
         firstName: dto.firstName,
         lastName: dto.lastName,
-        referralCode: nanoid(8),
+        referralCode: crypto.randomBytes(6).toString('base64url').slice(0, 8),
       },
       select: {
         id: true, email: true, firstName: true, lastName: true, role: true,
