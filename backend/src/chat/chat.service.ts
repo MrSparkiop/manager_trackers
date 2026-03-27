@@ -41,14 +41,15 @@ export class ChatService {
     }
     if (otherUser.isSuspended) throw new ForbiddenException('User is suspended')
 
-    // Find existing conversation where both users are participants
-    const existing = await this.prisma.conversation.findFirst({
+    // Find existing 1-on-1 conversation between the two users.
+    // We look for conversations where BOTH users are participants and
+    // the conversation has exactly 2 participants (prevents matching group chats).
+    const candidates = await this.prisma.conversation.findMany({
       where: {
         AND: [
           { participants: { some: { userId } } },
           { participants: { some: { userId: otherUserId } } },
         ],
-        participants: { every: { userId: { in: [userId, otherUserId] } } },
       },
       include: {
         participants: {
@@ -56,6 +57,7 @@ export class ChatService {
         },
       },
     })
+    const existing = candidates.find(c => c.participants.length === 2)
     if (existing) return existing
 
     return this.prisma.conversation.create({

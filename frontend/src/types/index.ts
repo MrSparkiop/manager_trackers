@@ -96,6 +96,7 @@ export interface ChatMessage {
   audioData?: string
   audioDuration?: number
   createdAt: string
+  conversationId: string
   senderId: string
   sender: { id: string; firstName: string; lastName: string }
 }

@@ -36,6 +36,8 @@ export default function ChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const activeConvIdRef = useRef<string | null>(null)
+  activeConvIdRef.current = activeConvId  // keep ref in sync for socket handlers
 
   // ── Queries ────────────────────────────────────────────────────
 
@@ -67,16 +69,18 @@ export default function ChatPage() {
     },
   })
 
-  // ── Socket connection ──────────────────────────────────────────
+  // ── Socket connection (connect once on mount, disconnect on unmount) ──
 
   useEffect(() => {
     const socket = connectChatSocket()
 
     socket.on('new_message', (msg: ChatMessage) => {
+      // Use the message's own conversationId — never a stale closure
       queryClient.setQueryData<{ messages: ChatMessage[] }>(
-        queryKeys.chat.messages(activeConvId || ''),
+        queryKeys.chat.messages(msg.conversationId ?? activeConvIdRef.current ?? ''),
         (old) => old ? { ...old, messages: [...old.messages, msg] } : old,
       )
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
     })
 
     socket.on('conversation_updated', () => {
@@ -90,9 +94,9 @@ export default function ChatPage() {
     socket.on('user_stop_typing', () => setTypingUser(null))
 
     return () => { disconnectChatSocket() }
-  }, [activeConvId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Join conversation room when active changes
+  // Join/leave conversation room when active changes
   useEffect(() => {
     const socket = getChatSocket()
     if (!socket || !activeConvId) return
