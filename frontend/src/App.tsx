@@ -27,6 +27,7 @@ const TeamWorkspacePage = lazy(() => import('./pages/TeamWorkspacePage'))
 const TeamProjectPage = lazy(() => import('./pages/TeamProjectPage'))
 const JoinTeamPage = lazy(() => import('./pages/JoinTeamPage'))
 const TeamSettingsPage = lazy(() => import('./pages/TeamSettingsPage'))
+const ChatPage = lazy(() => import('./pages/ChatPage'))
 const SupportPage = lazy(() => import('./pages/SupportPage'))
 const BillingPage = lazy(() => import('./pages/BillingPage'))
 const BillingSuccessPage = lazy(() => import('./pages/BillingSuccessPage'))
@@ -156,6 +157,7 @@ export default function App() {
             <Route path="teams/:id/settings" element={<LazyPage><TeamSettingsPage /></LazyPage>} />
             <Route path="teams/:id/projects/:projectId" element={<LazyPage><TeamProjectPage /></LazyPage>} />
             <Route path="join" element={<LazyPage><JoinTeamPage /></LazyPage>} />
+            <Route path="chat" element={<LazyPage><ChatPage /></LazyPage>} />
             <Route path="support" element={<LazyPage><SupportPage /></LazyPage>} />
             <Route path="billing" element={<LazyPage><BillingPage /></LazyPage>} />
             <Route path="billing/success" element={<LazyPage><BillingSuccessPage /></LazyPage>} />

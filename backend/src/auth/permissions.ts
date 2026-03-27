@@ -7,14 +7,15 @@ import { Role } from './roles.decorator'
 export type Permission =
   | 'create:team'   // Create a new team
   | 'join:team'     // Join a team via invite code
+  | 'use:chat'      // Use the real-time chat feature
   | 'access:admin'  // Access the admin dashboard and support queues
 
 // ── Role → Permission mapping ─────────────────────────────────────
 // One place to change what each plan/role can do.
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [Role.USER]:  [],
-  [Role.PRO]:   ['create:team', 'join:team'],
-  [Role.ADMIN]: ['create:team', 'join:team', 'access:admin'],
+  [Role.PRO]:   ['create:team', 'join:team', 'use:chat'],
+  [Role.ADMIN]: ['create:team', 'join:team', 'use:chat', 'access:admin'],
 }
 
 export const PERMISSIONS_KEY = 'permissions'

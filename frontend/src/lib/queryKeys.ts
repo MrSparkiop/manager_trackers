@@ -82,4 +82,12 @@ export const queryKeys = {
   billing: {
     subscription: ['billing-subscription'] as const,
   },
+
+  // ── Chat ────────────────────────────────────────────────────
+  chat: {
+    conversations: ['chat-conversations'] as const,
+    messages:      (id: string) => ['chat-messages', id] as const,
+    users:         ['chat-users'] as const,
+    unread:        ['chat-unread'] as const,
+  },
 } as const

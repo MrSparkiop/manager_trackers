@@ -24,6 +24,7 @@ import { HealthModule } from './health/health.module'
 import { ReferralModule } from './referral/referral.module'
 import { ChangelogModule } from './changelog/changelog.module'
 import { GdprModule } from './gdpr/gdpr.module'
+import { ChatModule } from './chat/chat.module'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { ScheduleModule } from '@nestjs/schedule'
 import { APP_GUARD } from '@nestjs/core'
@@ -61,6 +62,7 @@ import { APP_GUARD } from '@nestjs/core'
     ReferralModule,
     ChangelogModule,
     GdprModule,
+    ChatModule,
   ],
   providers: [
     {

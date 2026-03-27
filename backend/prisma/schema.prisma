@@ -33,35 +33,37 @@ model User {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  tags                Tag[]
-  projects            Project[]
-  tasks               Task[]
-  timeEntries         TimeEntry[]
-  calendarEvents      CalendarEvent[]
-  ownedTeams          Team[]        @relation("TeamOwner")
-  teamMemberships     TeamMember[]
-  notifications       Notification[]
-  taskComments        TaskComment[]
-  taskActivities      TaskActivity[]
-  supportTickets      SupportTicket[]
-  ticketReplies       TicketReply[]
-  referralsMade       Referral[]    @relation("ReferralsMade")
-  referralsReceived   Referral[]    @relation("ReferralsReceived")
+  tags              Tag[]
+  projects          Project[]
+  tasks             Task[]
+  timeEntries       TimeEntry[]
+  calendarEvents    CalendarEvent[]
+  ownedTeams        Team[]                    @relation("TeamOwner")
+  teamMemberships   TeamMember[]
+  notifications     Notification[]
+  taskComments      TaskComment[]
+  taskActivities    TaskActivity[]
+  supportTickets    SupportTicket[]
+  ticketReplies     TicketReply[]
+  referralsMade     Referral[]                @relation("ReferralsMade")
+  referralsReceived Referral[]                @relation("ReferralsReceived")
+  chatParticipants  ConversationParticipant[]
+  chatMessages      ChatMessage[]
 
   @@map("users")
 }
 
 model Team {
-  id          String       @id @default(cuid())
+  id          String   @id @default(cuid())
   name        String
   description String?
-  color       String       @default("#6366f1")
-  inviteCode  String       @unique @default(cuid())
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  color       String   @default("#6366f1")
+  inviteCode  String   @unique @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   ownerId     String
-  owner       User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  owner       User             @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   members     TeamMember[]
   projects    Project[]
   tasks       Task[]
@@ -90,14 +92,14 @@ model CustomTeamRole {
 }
 
 model TeamMember {
-  id        String     @id @default(cuid())
-  role      TeamRole   @default(VIEWER)
-  joinedAt  DateTime   @default(now())
+  id       String   @id @default(cuid())
+  role     TeamRole @default(VIEWER)
+  joinedAt DateTime @default(now())
 
-  teamId    String
-  team      Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Optional custom role - overrides the enum role when set
   customRoleId String?
@@ -120,11 +122,11 @@ model Project {
   updatedAt   DateTime      @updatedAt
   deletedAt   DateTime?
 
-  userId      String
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  teamId      String?
-  team        Team?         @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  tasks       Task[]
+  userId String
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  tasks  Task[]
 
   @@index([userId])
   @@index([teamId])
@@ -133,38 +135,38 @@ model Project {
 }
 
 model Task {
-  id                String      @id @default(cuid())
+  id                String     @id @default(cuid())
   title             String
   description       String?
-  status            TaskStatus  @default(TODO)
-  priority          Priority    @default(MEDIUM)
+  status            TaskStatus @default(TODO)
+  priority          Priority   @default(MEDIUM)
   dueDate           DateTime?
   estimatedTime     Int?
   completedAt       DateTime?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  recurrence        Recurrence  @default(NONE)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  recurrence        Recurrence @default(NONE)
   recurrenceEndDate DateTime?
   parentTaskId      String?
-  parentTask        Task?       @relation("RecurringTask", fields: [parentTaskId], references: [id])
-  childTasks        Task[]      @relation("RecurringTask")
+  parentTask        Task?      @relation("RecurringTask", fields: [parentTaskId], references: [id])
+  childTasks        Task[]     @relation("RecurringTask")
 
-  userId            String
-  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  teamId            String?
-  team              Team?       @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  projectId         String?
-  project           Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  parentId          String?
-  parent            Task?       @relation("SubTasks", fields: [parentId], references: [id])
-  subtasks          Task[]      @relation("SubTasks")
-  timeEntries       TimeEntry[]
-  calendarEvents    CalendarEvent[]
-  tags              Tag[]
-  comments          TaskComment[]
-  activities        TaskActivity[]
-  attachments       TaskAttachment[]
-  assigneeId        String?
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId         String?
+  team           Team?            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  projectId      String?
+  project        Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parentId       String?
+  parent         Task?            @relation("SubTasks", fields: [parentId], references: [id])
+  subtasks       Task[]           @relation("SubTasks")
+  timeEntries    TimeEntry[]
+  calendarEvents CalendarEvent[]
+  tags           Tag[]
+  comments       TaskComment[]
+  activities     TaskActivity[]
+  attachments    TaskAttachment[]
+  assigneeId     String?
 
   @@index([userId])
   @@index([teamId])
@@ -178,15 +180,15 @@ model Task {
 }
 
 model TaskComment {
-  id          String   @id @default(cuid())
-  content     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  taskId      String
-  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  authorId    String
-  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  taskId   String
+  task     Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
   @@index([authorId])
@@ -194,19 +196,19 @@ model TaskComment {
 }
 
 model TaskActivity {
-  id          String   @id @default(cuid())
-  action      String
-  field       String?
-  oldValue    String?
-  newValue    String?
-  actorName   String
-  actorEmail  String
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  action     String
+  field      String?
+  oldValue   String?
+  newValue   String?
+  actorName  String
+  actorEmail String
+  createdAt  DateTime @default(now())
 
-  taskId      String
-  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  actorId     String
-  actor       User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  taskId  String
+  task    Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  actorId String
+  actor   User   @relation(fields: [actorId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
   @@index([actorId])
@@ -214,16 +216,16 @@ model TaskActivity {
 }
 
 model TaskAttachment {
-  id          String   @id @default(cuid())
-  filename    String
-  mimeType    String
-  size        Int
-  url         String
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  filename  String
+  mimeType  String
+  size      Int
+  url       String
+  createdAt DateTime @default(now())
 
-  taskId      String
-  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  uploaderId  String
+  taskId     String
+  task       Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploaderId String
 
   @@index([taskId])
   @@map("task_attachments")
@@ -240,9 +242,9 @@ model SupportTicket {
   updatedAt   DateTime       @updatedAt
   closedAt    DateTime?
 
-  userId      String
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  replies     TicketReply[]
+  userId  String
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies TicketReply[]
 
   @@index([userId])
   @@index([status])
@@ -250,15 +252,15 @@ model SupportTicket {
 }
 
 model TicketReply {
-  id        String        @id @default(cuid())
+  id        String   @id @default(cuid())
   content   String
-  isStaff   Boolean       @default(false)
-  createdAt DateTime      @default(now())
+  isStaff   Boolean  @default(false)
+  createdAt DateTime @default(now())
 
-  ticketId  String
-  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  authorId  String
-  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  ticketId String
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId String
+  author   User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([ticketId])
   @@map("ticket_replies")
@@ -287,10 +289,10 @@ model TimeEntry {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  taskId      String?
-  task        Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  userId String
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId String?
+  task   Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([taskId])
@@ -299,21 +301,21 @@ model TimeEntry {
 }
 
 model CalendarEvent {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   title       String
   description String?
   startTime   DateTime
   endTime     DateTime
-  allDay      Boolean   @default(false)
-  color       String    @default("#6366f1")
+  allDay      Boolean  @default(false)
+  color       String   @default("#6366f1")
   recurrence  String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  taskId      String?
-  task        Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  userId String
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId String?
+  task   Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([taskId])
@@ -327,9 +329,9 @@ model Tag {
   color     String   @default("#6366f1")
   createdAt DateTime @default(now())
 
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tasks     Task[]
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks  Task[]
 
   @@index([userId])
   @@map("tags")
@@ -437,8 +439,8 @@ model Notification {
   link      String?
   createdAt DateTime         @default(now())
 
-  userId    String
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, read])
@@ -451,6 +453,7 @@ enum NotificationType {
   TASK_MENTIONED
   TEAM_JOINED
   TEAM_REMOVED
+  CHAT_MESSAGE
 }
 
 // Stripe webhook idempotency: one row per processed Stripe event ID
@@ -465,10 +468,10 @@ model StripeEvent {
 // Admin audit trail - every sensitive admin action is logged here
 model AdminAuditLog {
   id           String   @id @default(cuid())
-  action       String   // e.g. "IMPERSONATE", "SUSPEND_USER", "DELETE_USER"
+  action       String // e.g. "IMPERSONATE", "SUSPEND_USER", "DELETE_USER"
   adminId      String
   targetUserId String?
-  metadata     Json?    // extra context (IP, reason, etc.)
+  metadata     Json? // extra context (IP, reason, etc.)
   createdAt    DateTime @default(now())
 
   @@index([adminId])
@@ -507,4 +510,56 @@ enum ReferralStatus {
   PENDING
   COMPLETED
   EXPIRED
+}
+
+// -- Chat (PRO feature) --
+
+model Conversation {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants ConversationParticipant[]
+  messages     ChatMessage[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id         String   @id @default(cuid())
+  lastReadAt DateTime @default(now())
+  joinedAt   DateTime @default(now())
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@index([conversationId])
+  @@map("conversation_participants")
+}
+
+model ChatMessage {
+  id            String      @id @default(cuid())
+  content       String?
+  type          MessageType @default(TEXT)
+  audioData     String?
+  audioDuration Int?
+  createdAt     DateTime    @default(now())
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@map("chat_messages")
+}
+
+enum MessageType {
+  TEXT
+  VOICE
 }

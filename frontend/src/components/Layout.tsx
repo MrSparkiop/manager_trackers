@@ -5,7 +5,7 @@ import { useThemeStore } from '../store/themeStore'
 import { useIsMobile } from '../lib/useIsMobile'
 import {
   LayoutDashboard, FolderKanban, CheckSquare,
-  Timer, Calendar, LogOut, Sun, Moon, Settings, Menu, X, Tag, Users, Shield, BarChart2, Headphones, Zap
+  Timer, Calendar, LogOut, Sun, Moon, Settings, Menu, X, Tag, Users, Shield, BarChart2, Headphones, Zap, MessageSquare
 } from 'lucide-react'
 import AnnouncementBanner from './AnnouncementBanner'
 import MaintenanceBanner from './MaintenanceBanner'
@@ -23,6 +23,7 @@ const navItems = [
   { to: '/app/calendar',     icon: Calendar,        label: 'Calendar' },
   { to: '/app/tags',         icon: Tag,             label: 'Tags'  },
   { to: '/app/teams',        icon: Users,           label: 'Teams' },
+  { to: '/app/chat',         icon: MessageSquare,   label: 'Chat' },
   { to: '/app/insights',     icon: BarChart2,        label: 'Insights' },
   { to: '/app/support',     icon: Headphones,       label: 'Support'  },
   { to: '/app/billing',     icon: Zap,              label: 'Billing'  },

@@ -77,3 +77,34 @@ export interface Tag {
   name: string
   color: string
 }
+
+// ── Chat ─────────────────────────────────────────────────────────
+
+export interface ChatUser {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  role: UserRole
+  lastSeenAt?: string | null
+}
+
+export interface ChatMessage {
+  id: string
+  content?: string
+  type: 'TEXT' | 'VOICE'
+  audioData?: string
+  audioDuration?: number
+  createdAt: string
+  senderId: string
+  sender: { id: string; firstName: string; lastName: string }
+}
+
+export interface Conversation {
+  id: string
+  createdAt: string
+  updatedAt: string
+  participants: { id: string; userId: string; lastReadAt: string; user: ChatUser }[]
+  lastMessage?: ChatMessage | null
+  unreadCount: number
+}
