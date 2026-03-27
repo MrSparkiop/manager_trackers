@@ -35,6 +35,22 @@ export class ChatController {
     return this.chatService.getMessages(id, user.id, parseInt(page || '1', 10))
   }
 
+  @Post('conversations/:id/messages')
+  sendMessage(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body: { content?: string; type?: string; audioData?: string; audioDuration?: number },
+  ) {
+    return this.chatService.createMessage({
+      conversationId: id,
+      senderId: user.id,
+      content: body.content,
+      type: (body.type as any) || 'TEXT',
+      audioData: body.audioData,
+      audioDuration: body.audioDuration,
+    })
+  }
+
   @Put('conversations/:id/read')
   markAsRead(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.chatService.markAsRead(id, user.id)

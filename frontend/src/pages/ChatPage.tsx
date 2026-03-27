@@ -51,6 +51,8 @@ export default function ChatPage() {
     queryKey: queryKeys.chat.messages(activeConvId || ''),
     queryFn: () => api.get(`/chat/conversations/${activeConvId}/messages?limit=100`).then(r => r.data),
     enabled: !!activeConvId,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   })
   const messages = messagesData?.messages ?? []
 
@@ -110,18 +112,45 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Poll for new messages every 3s as fallback when socket is unreliable
+  useEffect(() => {
+    if (!activeConvId) return
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.messages(activeConvId) })
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [activeConvId, queryClient])
+
   // ── Send text message ──────────────────────────────────────────
 
-  const sendMessage = useCallback(() => {
-    const socket = getChatSocket()
-    if (!socket || !activeConvId || !message.trim()) return
-    socket.emit('send_message', {
-      conversationId: activeConvId,
-      content: message.trim(),
-      type: 'TEXT',
-    })
+  const sendMessage = useCallback(async () => {
+    if (!activeConvId || !message.trim()) return
+    const text = message.trim()
     setMessage('')
-  }, [activeConvId, message])
+
+    try {
+      // Send via REST (reliable) then notify via socket (real-time push to other user)
+      const { data: newMsg } = await api.post(`/chat/conversations/${activeConvId}/messages`, {
+        content: text,
+        type: 'TEXT',
+      })
+      // Optimistically add to cache
+      queryClient.setQueryData<{ messages: ChatMessage[] }>(
+        queryKeys.chat.messages(activeConvId),
+        (old) => old ? { ...old, messages: [...old.messages, newMsg] } : { messages: [newMsg] },
+      )
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
+
+      // Also push via socket so the other user gets it instantly
+      const socket = getChatSocket()
+      if (socket?.connected) {
+        socket.emit('typing', '') // stop typing indicator
+      }
+    } catch {
+      setMessage(text) // restore message on failure
+      toast.error('Failed to send message')
+    }
+  }, [activeConvId, message, queryClient])
 
   // ── Typing indicator ───────────────────────────────────────────
 
@@ -174,20 +203,27 @@ export default function ChatPage() {
     setIsPlaying(false)
   }
 
-  const sendVoiceMessage = () => {
-    const socket = getChatSocket()
-    if (!socket || !activeConvId || !audioBlob) return
+  const sendVoiceMessage = async () => {
+    if (!activeConvId || !audioBlob) return
 
     const reader = new FileReader()
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
       const base64 = (reader.result as string).split(',')[1]
-      socket.emit('send_message', {
-        conversationId: activeConvId,
-        type: 'VOICE',
-        audioData: base64,
-        audioDuration,
-      })
-      cancelRecording()
+      try {
+        const { data: newMsg } = await api.post(`/chat/conversations/${activeConvId}/messages`, {
+          type: 'VOICE',
+          audioData: base64,
+          audioDuration,
+        })
+        queryClient.setQueryData<{ messages: ChatMessage[] }>(
+          queryKeys.chat.messages(activeConvId),
+          (old) => old ? { ...old, messages: [...old.messages, newMsg] } : { messages: [newMsg] },
+        )
+        queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
+        cancelRecording()
+      } catch {
+        toast.error('Failed to send voice message')
+      }
     }
     reader.readAsDataURL(audioBlob)
   }

@@ -89,7 +89,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }) {
     if (!client.data.userId) return
 
-    // Validate voice message size (max ~500KB base64 ≈ 60s of opus audio)
+    // Validate voice message size (max ~500KB base64, roughly 60s of opus audio)
     if (data.type === 'VOICE' && data.audioData && data.audioData.length > 700_000) {
       client.emit('error', { message: 'Voice message too long (max 60 seconds)' })
       return
