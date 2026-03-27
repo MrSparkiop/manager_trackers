@@ -29,3 +29,15 @@ body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Chat: incoming call ring pulse */
+@keyframes callRingPulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.4); opacity: 0; }
+}
+
+/* Chat: calling state dot pulse */
+@keyframes callDotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}

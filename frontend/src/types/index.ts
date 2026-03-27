@@ -92,7 +92,7 @@ export interface ChatUser {
 export interface ChatMessage {
   id: string
   content?: string
-  type: 'TEXT' | 'VOICE'
+  type: 'TEXT' | 'VOICE' | 'CALL'
   audioData?: string
   audioDuration?: number
   createdAt: string

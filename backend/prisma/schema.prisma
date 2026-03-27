@@ -562,4 +562,5 @@ model ChatMessage {
 enum MessageType {
   TEXT
   VOICE
+  CALL
 }

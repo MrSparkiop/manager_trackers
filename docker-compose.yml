@@ -3,8 +3,8 @@ services:
     image: redis:7-alpine
     container_name: client_tracker_redis
     restart: always
-    expose:
-      - '6379'
+    ports:
+      - '6379:6379'
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
@@ -19,8 +19,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
       POSTGRES_DB: client_tracker
-    expose:
-      - '5432'
+    ports:
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

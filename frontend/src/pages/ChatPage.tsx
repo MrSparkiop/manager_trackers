@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { MessageSquare, Search, Send, Mic, Square, X, Play, Pause, ArrowLeft } from 'lucide-react'
+import {
+  MessageSquare, Search, Send, Mic, Square, X, Play, Pause, ArrowLeft,
+  Phone, PhoneOff, PhoneCall, MicOff,
+} from 'lucide-react'
 import { useThemeStore } from '../store/themeStore'
 import { useAuthStore } from '../store/authStore'
 import { useIsMobile } from '../lib/useIsMobile'
@@ -8,8 +11,24 @@ import { useColors } from '../lib/useColors'
 import { queryKeys } from '../lib/queryKeys'
 import { connectChatSocket, disconnectChatSocket, getChatSocket } from '../lib/chatSocket'
 import api from '../lib/axios'
+import { startRingtone, stopRingtone, startCallingTone, stopCallingTone, playEndCallTone, stopAllCallSounds } from '../lib/callSounds'
 import type { Conversation, ChatMessage, ChatUser } from '../types'
 import toast from 'react-hot-toast'
+
+// ── WebRTC config ─────────────────────────────────────────────────
+const ICE_SERVERS: RTCConfiguration = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ],
+}
+
+type CallState = 'idle' | 'calling' | 'ringing' | 'active'
+
+function formatDuration(s: number) {
+  const m = Math.floor(s / 60)
+  return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+}
 
 export default function ChatPage() {
   const { isDark } = useThemeStore()
@@ -23,8 +42,9 @@ export default function ChatPage() {
   const [searchUsers, setSearchUsers] = useState('')
   const [showNewChat, setShowNewChat] = useState(false)
   const [typingUser, setTypingUser] = useState<string | null>(null)
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
 
-  // Voice recording state
+  // Voice message recording
   const [isRecording, setIsRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [audioDuration, setAudioDuration] = useState(0)
@@ -34,10 +54,61 @@ export default function ChatPage() {
   const recordingStartRef = useRef<number>(0)
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null)
 
+  // ── Voice call state ─────────────────────────────────────────
+  const [callState, setCallState] = useState<CallState>('idle')
+  const [callPeer, setCallPeer] = useState<{ userId: string; userName: string } | null>(null)
+  const [isMuted, setIsMuted] = useState(false)
+  const [callDuration, setCallDuration] = useState(0)
+
+  // Refs — always current even in stale socket closures
+  const callStateRef = useRef<CallState>('idle')
+  callStateRef.current = callState
+  const callPeerRef = useRef<{ userId: string; userName: string } | null>(null)
+  callPeerRef.current = callPeer
+
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
+  const localStreamRef = useRef<MediaStream | null>(null)
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null)
+  const incomingCallRef = useRef<{
+    from: { userId: string; userName: string }
+    conversationId: string
+    offer: RTCSessionDescriptionInit
+  } | null>(null)
+  const callTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const callStartRef = useRef<number>(0)
+  const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([])
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const activeConvIdRef = useRef<string | null>(null)
-  activeConvIdRef.current = activeConvId  // keep ref in sync for socket handlers
+  activeConvIdRef.current = activeConvId
+
+  // Keep a ref to otherUser so startCall always has the current value (typed below after getOtherUser)
+  const otherUserRef = useRef<{ id: string; firstName: string; lastName: string } | undefined>(undefined)
+
+
+  // ── cleanupCall (stored in ref so socket handlers can call it) ─
+  const cleanupCall = useCallback(() => {
+    stopAllCallSounds()
+    if (callStateRef.current === 'active') playEndCallTone()
+    if (callTimerRef.current) { clearInterval(callTimerRef.current); callTimerRef.current = null }
+    if (callTimeoutRef.current) { clearTimeout(callTimeoutRef.current); callTimeoutRef.current = null }
+    localStreamRef.current?.getTracks().forEach(t => t.stop())
+    localStreamRef.current = null
+    peerConnectionRef.current?.close()
+    peerConnectionRef.current = null
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null
+    incomingCallRef.current = null
+    iceCandidateQueueRef.current = []
+    setCallState('idle')
+    setCallPeer(null)
+    setCallDuration(0)
+    setIsMuted(false)
+  }, [])
+
+  const cleanupCallRef = useRef(cleanupCall)
+  cleanupCallRef.current = cleanupCall
 
   // ── Queries ────────────────────────────────────────────────────
 
@@ -71,34 +142,101 @@ export default function ChatPage() {
     },
   })
 
-  // ── Socket connection (connect once on mount, disconnect on unmount) ──
+  // ── Socket (connect once on mount) ────────────────────────────
 
   useEffect(() => {
     const socket = connectChatSocket()
 
+    // On (re)connect: re-join the active conversation room so we keep receiving messages
+    socket.on('connect', () => {
+      const convId = activeConvIdRef.current
+      if (convId) {
+        socket.emit('join_conversation', convId)
+        socket.emit('mark_read', convId)
+      }
+    })
+
+    // ── Presence ──
+    socket.on('online_users_list', (data: { userIds: string[] }) => {
+      setOnlineUsers(new Set(data.userIds))
+    })
+    socket.on('user_online', (data: { userId: string }) => {
+      setOnlineUsers(prev => new Set(prev).add(data.userId))
+    })
+    socket.on('user_offline', (data: { userId: string }) => {
+      setOnlineUsers(prev => { const s = new Set(prev); s.delete(data.userId); return s })
+    })
+
+    // ── Messages ──
     socket.on('new_message', (msg: ChatMessage) => {
-      // Use the message's own conversationId — never a stale closure
       queryClient.setQueryData<{ messages: ChatMessage[] }>(
         queryKeys.chat.messages(msg.conversationId ?? activeConvIdRef.current ?? ''),
         (old) => old ? { ...old, messages: [...old.messages, msg] } : old,
       )
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
     })
-
     socket.on('conversation_updated', () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
     })
-
     socket.on('user_typing', (data: { userId: string; userName: string }) => {
       if (data.userId !== user?.id) setTypingUser(data.userName)
     })
-
     socket.on('user_stop_typing', () => setTypingUser(null))
+
+    // ── Voice call signaling ──
+    socket.on('call_incoming', (data: { from: { userId: string; userName: string }; conversationId: string; offer: RTCSessionDescriptionInit }) => {
+      if (callStateRef.current !== 'idle') {
+        socket.emit('call_reject', { targetUserId: data.from.userId })
+        return
+      }
+      incomingCallRef.current = data
+      setCallState('ringing')
+      setCallPeer(data.from)
+      startRingtone()
+    })
+
+    socket.on('call_answered', async (data: { answer: RTCSessionDescriptionInit }) => {
+      stopCallingTone()
+      const pc = peerConnectionRef.current
+      if (!pc) return
+      try {
+        await pc.setRemoteDescription(data.answer)
+        for (const c of iceCandidateQueueRef.current) {
+          await pc.addIceCandidate(c).catch(() => {})
+        }
+        iceCandidateQueueRef.current = []
+        setCallState('active')
+        callStartRef.current = Date.now()
+        callTimerRef.current = setInterval(() => {
+          setCallDuration(Math.floor((Date.now() - callStartRef.current) / 1000))
+        }, 1000)
+      } catch { /* ignore */ }
+    })
+
+    socket.on('call_rejected', () => {
+      toast('Call was declined', { icon: '📵' })
+      cleanupCallRef.current()
+    })
+
+    socket.on('call_ended', () => {
+      if (callStateRef.current !== 'idle') {
+        cleanupCallRef.current()
+      }
+    })
+
+    socket.on('ice_candidate', async (data: { candidate: RTCIceCandidateInit }) => {
+      const pc = peerConnectionRef.current
+      if (pc?.remoteDescription) {
+        await pc.addIceCandidate(data.candidate).catch(() => {})
+      } else {
+        iceCandidateQueueRef.current.push(data.candidate)
+      }
+    })
 
     return () => { disconnectChatSocket() }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Join/leave conversation room when active changes
+  // Join/leave conversation room
   useEffect(() => {
     const socket = getChatSocket()
     if (!socket || !activeConvId) return
@@ -107,12 +245,12 @@ export default function ChatPage() {
     return () => { socket.emit('leave_conversation', activeConvId) }
   }, [activeConvId])
 
-  // Auto-scroll
+  // Auto-scroll on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Poll for new messages every 3s as fallback when socket is unreliable
+  // Poll messages every 3s as reliability fallback
   useEffect(() => {
     if (!activeConvId) return
     const interval = setInterval(() => {
@@ -121,38 +259,174 @@ export default function ChatPage() {
     return () => clearInterval(interval)
   }, [activeConvId, queryClient])
 
-  // ── Send text message ──────────────────────────────────────────
+  // Cleanup call on unmount
+  useEffect(() => {
+    return () => { cleanupCallRef.current() }
+  }, [])
+
+  // ── Voice call handlers ────────────────────────────────────────
+
+  const buildPeerConnection = useCallback((targetUserId: string) => {
+    const pc = new RTCPeerConnection(ICE_SERVERS)
+    peerConnectionRef.current = pc
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        getChatSocket()?.emit('ice_candidate', { targetUserId, candidate: e.candidate.toJSON() })
+      }
+    }
+
+    pc.ontrack = (e) => {
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = e.streams[0]
+      }
+    }
+
+    pc.onconnectionstatechange = () => {
+      if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
+        cleanupCallRef.current()
+      }
+    }
+
+    return pc
+  }, [])
+
+  const startCall = useCallback(async () => {
+    // Use refs — always current, no stale-closure risk
+    const convId = activeConvIdRef.current
+    const target = otherUserRef.current
+    if (!convId) { toast.error('No conversation selected'); return }
+    if (callStateRef.current !== 'idle') { toast.error('Already in a call'); return }
+    if (!target) { toast.error('Could not find the other user'); return }
+
+    const socket = getChatSocket()
+    if (!socket?.connected) {
+      toast.error('Chat connection lost — please refresh the page')
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      localStreamRef.current = stream
+
+      const pc = buildPeerConnection(target.id)
+      stream.getTracks().forEach(track => pc.addTrack(track, stream))
+
+      const offer = await pc.createOffer()
+      await pc.setLocalDescription(offer)
+
+      socket.emit('call_offer', {
+        conversationId: convId,
+        offer,
+        targetUserId: target.id,
+      })
+
+      setCallState('calling')
+      setCallPeer({ userId: target.id, userName: `${target.firstName} ${target.lastName}` })
+      startCallingTone()
+
+      // Auto-hangup after 30s if nobody answers
+      callTimeoutRef.current = setTimeout(() => {
+        if (callStateRef.current === 'calling') {
+          getChatSocket()?.emit('call_end', { targetUserId: target.id })
+          getChatSocket()?.emit('call_missed', { conversationId: convId, targetUserId: target.id })
+          cleanupCallRef.current()
+          toast('No answer', { icon: '📵' })
+        }
+      }, 30_000)
+    } catch (err) {
+      console.error('[startCall] error:', err)
+      toast.error('Could not start call — check microphone permissions')
+      cleanupCallRef.current()
+    }
+  }, [buildPeerConnection])
+
+  const answerCall = useCallback(async () => {
+    const incoming = incomingCallRef.current
+    if (callStateRef.current !== 'ringing' || !incoming) return
+    stopRingtone()
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      localStreamRef.current = stream
+
+      const pc = buildPeerConnection(incoming.from.userId)
+      stream.getTracks().forEach(track => pc.addTrack(track, stream))
+
+      await pc.setRemoteDescription(incoming.offer)
+      for (const c of iceCandidateQueueRef.current) {
+        await pc.addIceCandidate(c).catch(() => {})
+      }
+      iceCandidateQueueRef.current = []
+
+      const answer = await pc.createAnswer()
+      await pc.setLocalDescription(answer)
+
+      getChatSocket()?.emit('call_answer', {
+        targetUserId: incoming.from.userId,
+        answer,
+      })
+
+      setCallState('active')
+      callStartRef.current = Date.now()
+      callTimerRef.current = setInterval(() => {
+        setCallDuration(Math.floor((Date.now() - callStartRef.current) / 1000))
+      }, 1000)
+    } catch {
+      toast.error('Could not access microphone')
+      rejectCall()
+    }
+  }, [buildPeerConnection]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const rejectCall = useCallback(() => {
+    const incoming = incomingCallRef.current
+    if (incoming) {
+      getChatSocket()?.emit('call_reject', { targetUserId: incoming.from.userId })
+    }
+    cleanupCallRef.current()
+  }, [])
+
+  const hangUp = useCallback(() => {
+    const peer = callPeerRef.current
+    if (peer) {
+      getChatSocket()?.emit('call_end', {
+        targetUserId: peer.userId,
+        conversationId: activeConvIdRef.current,
+        duration: callStateRef.current === 'active' ? Math.floor((Date.now() - callStartRef.current) / 1000) : 0,
+      })
+    }
+    cleanupCallRef.current()
+  }, [])
+
+  const toggleMute = useCallback(() => {
+    const track = localStreamRef.current?.getAudioTracks()[0]
+    if (track) {
+      track.enabled = !track.enabled
+      setIsMuted(!track.enabled)
+    }
+  }, [])
+
+  // ── Text message handlers ──────────────────────────────────────
 
   const sendMessage = useCallback(async () => {
     if (!activeConvId || !message.trim()) return
     const text = message.trim()
     setMessage('')
-
     try {
-      // Send via REST (reliable) then notify via socket (real-time push to other user)
       const { data: newMsg } = await api.post(`/chat/conversations/${activeConvId}/messages`, {
-        content: text,
-        type: 'TEXT',
+        content: text, type: 'TEXT',
       })
-      // Optimistically add to cache
       queryClient.setQueryData<{ messages: ChatMessage[] }>(
         queryKeys.chat.messages(activeConvId),
         (old) => old ? { ...old, messages: [...old.messages, newMsg] } : { messages: [newMsg] },
       )
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
-
-      // Also push via socket so the other user gets it instantly
-      const socket = getChatSocket()
-      if (socket?.connected) {
-        socket.emit('typing', '') // stop typing indicator
-      }
+      getChatSocket()?.emit('stop_typing', activeConvId)
     } catch {
-      setMessage(text) // restore message on failure
+      setMessage(text)
       toast.error('Failed to send message')
     }
   }, [activeConvId, message, queryClient])
-
-  // ── Typing indicator ───────────────────────────────────────────
 
   const handleTyping = useCallback(() => {
     const socket = getChatSocket()
@@ -164,7 +438,7 @@ export default function ChatPage() {
     }, 2000)
   }, [activeConvId])
 
-  // ── Voice recording ────────────────────────────────────────────
+  // ── Voice message recording ────────────────────────────────────
 
   const startRecording = async () => {
     try {
@@ -173,47 +447,29 @@ export default function ChatPage() {
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
       recordingStartRef.current = Date.now()
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data)
-      }
-
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
       mediaRecorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm;codecs=opus' })
         setAudioBlob(blob)
         setAudioDuration(Math.round((Date.now() - recordingStartRef.current) / 1000))
         stream.getTracks().forEach(t => t.stop())
       }
-
       mediaRecorder.start()
       setIsRecording(true)
-    } catch {
-      toast.error('Microphone access denied')
-    }
+    } catch { toast.error('Microphone access denied') }
   }
 
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop()
-    setIsRecording(false)
-  }
-
-  const cancelRecording = () => {
-    setAudioBlob(null)
-    setAudioDuration(0)
-    setIsPlaying(false)
-  }
+  const stopRecording = () => { mediaRecorderRef.current?.stop(); setIsRecording(false) }
+  const cancelRecording = () => { setAudioBlob(null); setAudioDuration(0); setIsPlaying(false) }
 
   const sendVoiceMessage = async () => {
     if (!activeConvId || !audioBlob) return
-
     const reader = new FileReader()
     reader.onloadend = async () => {
       const base64 = (reader.result as string).split(',')[1]
       try {
         const { data: newMsg } = await api.post(`/chat/conversations/${activeConvId}/messages`, {
-          type: 'VOICE',
-          audioData: base64,
-          audioDuration,
+          type: 'VOICE', audioData: base64, audioDuration,
         })
         queryClient.setQueryData<{ messages: ChatMessage[] }>(
           queryKeys.chat.messages(activeConvId),
@@ -221,20 +477,14 @@ export default function ChatPage() {
         )
         queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
         cancelRecording()
-      } catch {
-        toast.error('Failed to send voice message')
-      }
+      } catch { toast.error('Failed to send voice message') }
     }
     reader.readAsDataURL(audioBlob)
   }
 
   const playPreview = () => {
     if (!audioBlob) return
-    if (isPlaying) {
-      audioPlayerRef.current?.pause()
-      setIsPlaying(false)
-      return
-    }
+    if (isPlaying) { audioPlayerRef.current?.pause(); setIsPlaying(false); return }
     const url = URL.createObjectURL(audioBlob)
     const audio = new Audio(url)
     audioPlayerRef.current = audio
@@ -250,6 +500,12 @@ export default function ChatPage() {
 
   const activeConversation = conversations.find(c => c.id === activeConvId)
   const otherUser = activeConversation ? getOtherUser(activeConversation) : null
+  // Keep ref in sync so startCall/hangUp can read the latest value without stale closures
+  otherUserRef.current = otherUser ?? undefined
+
+  // Other participant's lastReadAt — for read receipts
+  const otherLastRead = activeConversation
+    ?.participants.find(p => p.userId !== user?.id)?.lastReadAt
 
   const showList = isMobile ? !activeConvId : true
   const showChat = isMobile ? !!activeConvId : true
@@ -260,7 +516,7 @@ export default function ChatPage() {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        height: 'calc(100vh - 60px)', gap: '16px', color: colors.textMuted, fontFamily: 'Inter, sans-serif',
+        height: '100%', gap: '16px', color: colors.textMuted, fontFamily: 'Inter, sans-serif',
       }}>
         <MessageSquare size={48} style={{ opacity: 0.3 }} />
         <p style={{ fontSize: '18px', fontWeight: '600', color: colors.text }}>Chat is a PRO feature</p>
@@ -279,16 +535,71 @@ export default function ChatPage() {
 
   return (
     <div style={{
-      display: 'flex', height: 'calc(100vh - 60px)', fontFamily: 'Inter, sans-serif',
+      display: 'flex', height: '100%', fontFamily: 'Inter, sans-serif',
       backgroundColor: colors.bg, overflow: 'hidden',
     }}>
+      {/* Hidden remote audio element */}
+      <audio ref={remoteAudioRef} autoPlay style={{ display: 'none' }} />
 
-      {/* ── Conversation List ────────────────────────────── */}
+      {/* ── Incoming call overlay (fixed, top-right) ─────────── */}
+      {callState === 'ringing' && callPeer && (
+        <div style={{
+          position: 'fixed', top: '80px', right: '20px', zIndex: 1000,
+          backgroundColor: isDark ? '#1e293b' : '#fff',
+          borderRadius: '20px', padding: '24px',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+          width: '270px',
+          border: `1px solid ${colors.border}`,
+        }}>
+          {/* Pulsing ring */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+            <div style={{ position: 'relative', width: '64px', height: '64px' }}>
+              <div style={{
+                position: 'absolute', inset: 0, borderRadius: '50%',
+                backgroundColor: 'rgba(34,197,94,0.15)',
+                animation: 'callRingPulse 1.5s infinite',
+              }} />
+              <div style={{
+                width: '64px', height: '64px', borderRadius: '50%',
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '20px', fontWeight: '700', color: '#fff',
+              }}>
+                {callPeer.userName.charAt(0)}
+              </div>
+            </div>
+          </div>
+          <p style={{ textAlign: 'center', fontSize: '16px', fontWeight: '700', color: colors.text, margin: '0 0 4px' }}>
+            {callPeer.userName}
+          </p>
+          <p style={{ textAlign: 'center', fontSize: '13px', color: colors.textMuted, margin: '0 0 20px' }}>
+            Incoming voice call...
+          </p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button onClick={rejectCall} style={{
+              width: '52px', height: '52px', borderRadius: '50%', border: 'none',
+              backgroundColor: '#ef4444', color: '#fff', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }} title="Decline">
+              <PhoneOff size={22} />
+            </button>
+            <button onClick={answerCall} style={{
+              width: '52px', height: '52px', borderRadius: '50%', border: 'none',
+              backgroundColor: '#22c55e', color: '#fff', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }} title="Accept">
+              <PhoneCall size={22} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Conversation List ─────────────────────────────────── */}
       {showList && (
         <div style={{
           width: isMobile ? '100%' : '320px', minWidth: isMobile ? '100%' : '320px',
           backgroundColor: colors.card, display: 'flex', flexDirection: 'column',
-          borderRight: `1px solid ${colors.border}`,
+          borderRight: `1px solid ${colors.border}`, minHeight: 0,
         }}>
           {/* Header */}
           <div style={{ padding: '16px', borderBottom: `1px solid ${colors.border}` }}>
@@ -361,13 +672,22 @@ export default function ChatPage() {
                   borderBottom: `1px solid ${colors.border}`,
                   color: colors.text, transition: 'background 0.1s',
                 }}>
-                  <div style={{
-                    width: '40px', height: '40px', borderRadius: '50%', flexShrink: 0,
-                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '13px', fontWeight: '700', color: '#fff',
-                  }}>
-                    {other.firstName[0]}{other.lastName[0]}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div style={{
+                      width: '40px', height: '40px', borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '13px', fontWeight: '700', color: '#fff',
+                    }}>
+                      {other.firstName[0]}{other.lastName[0]}
+                    </div>
+                    {onlineUsers.has(other.id) && (
+                      <span style={{
+                        position: 'absolute', bottom: '1px', right: '1px',
+                        width: '10px', height: '10px', borderRadius: '50%',
+                        backgroundColor: '#22c55e', border: `2px solid ${colors.card}`,
+                      }} />
+                    )}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -384,11 +704,10 @@ export default function ChatPage() {
                       )}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
-                      <p style={{
-                        fontSize: '12px', color: colors.textMuted, margin: 0,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
-                        {lastMsg?.type === 'VOICE' ? 'Voice message' : lastMsg?.content || 'No messages yet'}
+                      <p style={{ fontSize: '12px', color: colors.textMuted, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {lastMsg?.type === 'CALL' ? '📞 ' + lastMsg.content
+                          : lastMsg?.type === 'VOICE' ? '🎙 Voice message'
+                          : lastMsg?.content || 'No messages yet'}
                       </p>
                       {conv.unreadCount > 0 && (
                         <span style={{
@@ -407,9 +726,9 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* ── Message Area ─────────────────────────────────── */}
+      {/* ── Message Area ─────────────────────────────────────── */}
       {showChat && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
           {!activeConvId ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '8px', color: colors.textMuted }}>
               <MessageSquare size={48} style={{ opacity: 0.3 }} />
@@ -419,28 +738,35 @@ export default function ChatPage() {
             <>
               {/* Chat Header */}
               <div style={{
-                display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 20px',
-                borderBottom: `1px solid ${colors.border}`, backgroundColor: colors.card,
+                position: 'relative', display: 'flex', alignItems: 'center', gap: '12px',
+                padding: '14px 20px', borderBottom: `1px solid ${colors.border}`,
+                backgroundColor: colors.card, flexShrink: 0,
               }}>
+                {/* Normal header content */}
                 {isMobile && (
                   <button onClick={() => setActiveConvId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, padding: 0 }}>
                     <ArrowLeft size={20} />
                   </button>
                 )}
                 <div style={{
-                  width: '36px', height: '36px', borderRadius: '50%',
+                  width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
                   background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '12px', fontWeight: '700', color: '#fff', flexShrink: 0,
+                  fontSize: '12px', fontWeight: '700', color: '#fff',
                 }}>
                   {otherUser?.firstName[0]}{otherUser?.lastName[0]}
                 </div>
-                <div>
+                <div style={{ flex: 1 }}>
                   <p style={{ fontSize: '14px', fontWeight: '600', color: colors.text, margin: 0 }}>
                     {otherUser?.firstName} {otherUser?.lastName}
                   </p>
                   {typingUser ? (
                     <p style={{ fontSize: '11px', color: '#6366f1', margin: 0, fontWeight: '500' }}>typing...</p>
+                  ) : otherUser && onlineUsers.has(otherUser.id) ? (
+                    <p style={{ fontSize: '11px', color: '#22c55e', margin: 0, fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block' }} />
+                      Online
+                    </p>
                   ) : (
                     <p style={{ fontSize: '11px', color: colors.textMuted, margin: 0 }}>
                       {otherUser?.lastSeenAt
@@ -449,12 +775,102 @@ export default function ChatPage() {
                     </p>
                   )}
                 </div>
+
+                {/* Call button (idle only) */}
+                {callState === 'idle' && (
+                  <button onClick={startCall} style={{
+                    width: '36px', height: '36px', borderRadius: '50%', border: 'none',
+                    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+                    color: '#22c55e', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'background 0.15s',
+                  }} title="Start voice call">
+                    <Phone size={17} />
+                  </button>
+                )}
+
+                {/* Calling overlay bar */}
+                {(callState === 'calling' || callState === 'active') && (
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    backgroundColor: callState === 'active' ? '#16a34a' : (isDark ? '#1e293b' : '#f8fafc'),
+                    display: 'flex', alignItems: 'center', gap: '12px', padding: '0 20px',
+                    borderBottom: callState === 'calling' ? `1px solid ${colors.border}` : 'none',
+                  }}>
+                    {callState === 'calling' ? (
+                      <>
+                        {/* Pulsing dot */}
+                        <span style={{
+                          width: '10px', height: '10px', borderRadius: '50%',
+                          backgroundColor: '#6366f1', display: 'inline-block',
+                          animation: 'callDotPulse 1s infinite',
+                        }} />
+                        <span style={{ flex: 1, fontSize: '14px', fontWeight: '600', color: colors.text }}>
+                          Calling {callPeer?.userName}...
+                        </span>
+                        <button onClick={hangUp} style={{
+                          width: '36px', height: '36px', borderRadius: '50%', border: 'none',
+                          backgroundColor: '#ef4444', color: '#fff', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }} title="Cancel">
+                          <PhoneOff size={17} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <Phone size={17} style={{ color: '#fff', flexShrink: 0 }} />
+                        <span style={{ flex: 1, fontSize: '14px', fontWeight: '600', color: '#fff' }}>
+                          {callPeer?.userName} · {formatDuration(callDuration)}
+                        </span>
+                        {/* Mute */}
+                        <button onClick={toggleMute} style={{
+                          width: '36px', height: '36px', borderRadius: '50%', border: 'none',
+                          backgroundColor: isMuted ? '#ef4444' : 'rgba(255,255,255,0.2)',
+                          color: '#fff', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }} title={isMuted ? 'Unmute' : 'Mute'}>
+                          {isMuted ? <MicOff size={16} /> : <Mic size={16} />}
+                        </button>
+                        {/* Hang up */}
+                        <button onClick={hangUp} style={{
+                          width: '36px', height: '36px', borderRadius: '50%', border: 'none',
+                          backgroundColor: '#ef4444', color: '#fff', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }} title="End call">
+                          <PhoneOff size={17} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Messages */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {messages.map(msg => {
                   const isMine = msg.senderId === user?.id
+
+                  // CALL messages render as centered system messages
+                  if (msg.type === 'CALL') {
+                    const isMissed = msg.content === 'Missed call'
+                    return (
+                      <div key={msg.id} style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: '6px',
+                          padding: '6px 14px', borderRadius: '999px',
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+                          fontSize: '12px', color: isMissed ? '#ef4444' : colors.textMuted,
+                        }}>
+                          <Phone size={13} />
+                          <span>{msg.content}</span>
+                          <span style={{ opacity: 0.6 }}>
+                            · {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  }
+
                   return (
                     <div key={msg.id} style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start' }}>
                       <div style={{
@@ -469,8 +885,17 @@ export default function ChatPage() {
                         ) : (
                           <p style={{ fontSize: '14px', margin: 0, lineHeight: '1.5', wordBreak: 'break-word' }}>{msg.content}</p>
                         )}
-                        <p style={{ fontSize: '10px', margin: '4px 0 0', textAlign: 'right', opacity: 0.7 }}>
+                        <p style={{ fontSize: '10px', margin: '4px 0 0', textAlign: 'right', opacity: 0.7, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px' }}>
                           {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {isMine && (
+                            <span style={{
+                              color: otherLastRead && new Date(msg.createdAt) <= new Date(otherLastRead)
+                                ? '#60a5fa' : 'inherit',
+                              fontSize: '11px', fontWeight: '700', letterSpacing: '-1px',
+                            }}>
+                              {otherLastRead && new Date(msg.createdAt) <= new Date(otherLastRead) ? '✓✓' : '✓'}
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -480,7 +905,7 @@ export default function ChatPage() {
               </div>
 
               {/* Input Area */}
-              <div style={{ padding: '12px 20px', borderTop: `1px solid ${colors.border}`, backgroundColor: colors.card }}>
+              <div style={{ padding: '12px 20px', borderTop: `1px solid ${colors.border}`, backgroundColor: colors.card, flexShrink: 0 }}>
                 {/* Voice preview */}
                 {audioBlob && (
                   <div style={{
@@ -509,13 +934,11 @@ export default function ChatPage() {
                       backgroundColor: '#6366f1', color: '#fff', border: 'none',
                       borderRadius: '8px', padding: '6px 14px', fontSize: '12px',
                       fontWeight: '600', cursor: 'pointer',
-                    }}>
-                      Send
-                    </button>
+                    }}>Send</button>
                   </div>
                 )}
 
-                {/* Text input + mic */}
+                {/* Text + mic input */}
                 {!audioBlob && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <input
@@ -555,6 +978,7 @@ export default function ChatPage() {
                   </div>
                 )}
               </div>
+
             </>
           )}
         </div>
@@ -579,13 +1003,8 @@ function VoiceMessagePlayer({ audioData, duration, isMine, isDark }: {
       audio.ontimeupdate = () => setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0)
       audio.onended = () => { setPlaying(false); setProgress(0) }
     }
-    if (playing) {
-      audioRef.current.pause()
-      setPlaying(false)
-    } else {
-      audioRef.current.play()
-      setPlaying(true)
-    }
+    if (playing) { audioRef.current.pause(); setPlaying(false) }
+    else { audioRef.current.play(); setPlaying(true) }
   }
 
   return (

@@ -26,6 +26,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server
 
+  // In-memory tracking of online users
+  private onlineUsers = new Set<string>()
+  // Count of active socket connections per user (handles multiple tabs)
+  private connectionCount = new Map<string, number>()
+
   constructor(
     private jwtService: JwtService,
     private chatService: ChatService,
@@ -55,15 +60,44 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.data.userName = `${user.firstName} ${user.lastName}`
       client.join(`chat:user:${user.id}`)
 
+      // Track as online (increment connection count for multi-tab support)
+      const count = (this.connectionCount.get(user.id) ?? 0) + 1
+      this.connectionCount.set(user.id, count)
+      this.onlineUsers.add(user.id)
+
+      // Update lastSeenAt in DB (fire-and-forget)
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { lastSeenAt: new Date() },
+      }).catch(() => {})
+
+      // Tell everyone this user is online
       this.server.emit('user_online', { userId: user.id })
+
+      // Send the new client the full list of currently online users
+      client.emit('online_users_list', { userIds: Array.from(this.onlineUsers) })
     } catch {
       client.disconnect()
     }
   }
 
   handleDisconnect(client: Socket) {
-    if (client.data.userId) {
-      this.server.emit('user_offline', { userId: client.data.userId })
+    const userId = client.data?.userId
+    if (!userId) return
+
+    // Decrement connection count; only mark offline when last tab closes
+    const count = (this.connectionCount.get(userId) ?? 1) - 1
+    if (count <= 0) {
+      this.connectionCount.delete(userId)
+      this.onlineUsers.delete(userId)
+      // Update lastSeenAt on disconnect so "last seen" is accurate
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { lastSeenAt: new Date() },
+      }).catch(() => {})
+      this.server.emit('user_offline', { userId })
+    } else {
+      this.connectionCount.set(userId, count)
     }
   }
 
@@ -156,5 +190,82 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleMarkRead(client: Socket, conversationId: string) {
     if (!client.data.userId) return
     await this.chatService.markAsRead(conversationId, client.data.userId).catch(() => {})
+  }
+
+  // ── WebRTC Voice Call Signaling ───────────────────────────────
+
+  @SubscribeMessage('call_offer')
+  handleCallOffer(client: Socket, data: { targetUserId: string; conversationId: string; offer: RTCSessionDescriptionInit }) {
+    if (!client.data.userId) return
+    this.server.to(`chat:user:${data.targetUserId}`).emit('call_incoming', {
+      from: { userId: client.data.userId, userName: client.data.userName },
+      conversationId: data.conversationId,
+      offer: data.offer,
+    })
+  }
+
+  @SubscribeMessage('call_answer')
+  handleCallAnswer(client: Socket, data: { targetUserId: string; answer: RTCSessionDescriptionInit }) {
+    if (!client.data.userId) return
+    this.server.to(`chat:user:${data.targetUserId}`).emit('call_answered', { answer: data.answer })
+  }
+
+  @SubscribeMessage('call_reject')
+  handleCallReject(client: Socket, data: { targetUserId: string }) {
+    if (!client.data.userId) return
+    this.server.to(`chat:user:${data.targetUserId}`).emit('call_rejected', { userId: client.data.userId })
+  }
+
+  @SubscribeMessage('call_end')
+  async handleCallEnd(client: Socket, data: { targetUserId: string; conversationId?: string; duration?: number }) {
+    if (!client.data.userId) return
+    this.server.to(`chat:user:${data.targetUserId}`).emit('call_ended', { userId: client.data.userId })
+
+    // Save a CALL message in the conversation so both users see it in history
+    if (data.conversationId && data.duration != null && data.duration > 0) {
+      try {
+        const message = await this.chatService.createMessage({
+          conversationId: data.conversationId,
+          senderId: client.data.userId,
+          content: `Voice call · ${Math.floor(data.duration / 60)}:${String(data.duration % 60).padStart(2, '0')}`,
+          type: 'CALL' as any,
+          audioDuration: data.duration,
+        })
+        // Broadcast to conversation room
+        this.server.to(`conversation:${data.conversationId}`).emit('new_message', message)
+        // Update conversation list for both
+        const participants = await this.prisma.conversationParticipant.findMany({
+          where: { conversationId: data.conversationId },
+          select: { userId: true },
+        })
+        for (const p of participants) {
+          this.server.to(`chat:user:${p.userId}`).emit('conversation_updated', {
+            conversationId: data.conversationId,
+            lastMessage: message,
+          })
+        }
+      } catch { /* ignore — call history is nice-to-have, not critical */ }
+    }
+  }
+
+  @SubscribeMessage('call_missed')
+  async handleCallMissed(client: Socket, data: { conversationId: string; targetUserId: string }) {
+    if (!client.data.userId || !data.conversationId) return
+    try {
+      const message = await this.chatService.createMessage({
+        conversationId: data.conversationId,
+        senderId: client.data.userId,
+        content: 'Missed call',
+        type: 'CALL' as any,
+        audioDuration: 0,
+      })
+      this.server.to(`conversation:${data.conversationId}`).emit('new_message', message)
+    } catch { /* ignore */ }
+  }
+
+  @SubscribeMessage('ice_candidate')
+  handleIceCandidate(client: Socket, data: { targetUserId: string; candidate: RTCIceCandidateInit }) {
+    if (!client.data.userId) return
+    this.server.to(`chat:user:${data.targetUserId}`).emit('ice_candidate', { candidate: data.candidate })
   }
 }
