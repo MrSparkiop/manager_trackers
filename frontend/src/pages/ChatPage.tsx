@@ -66,6 +66,36 @@ export default function ChatPage() {
   const chatFont = chatTheme.font
   const bubbleRadius = chatTheme.bubbleRadius ?? '16px'
 
+  // Accent = first solid colour from myBubble (strip gradient fallback to indigo)
+  const accent = isDefaultTheme ? '#6366f1'
+    : myBubble.startsWith('linear') ? (chatTheme.inputBorder || chatTheme.text || '#6366f1')
+    : myBubble
+  const accentText = myBubbleText
+
+  // Ghost button style (mic, secondary actions)
+  const ghostBg = isDefaultTheme
+    ? (isDark ? '#1e293b' : '#f1f5f9')
+    : chatTheme.input
+  const ghostBorder = isDefaultTheme
+    ? colors.border
+    : chatTheme.inputBorder
+  const ghostText = isDefaultTheme ? colors.textMuted : chatTheme.textMuted
+
+  // Conversation active highlight
+  const activeConvBg = isDefaultTheme
+    ? (isDark ? 'rgba(99,102,241,0.1)' : 'rgba(99,102,241,0.05)')
+    : `${accent}22`
+
+  // Avatar bg — use accent for non-default themes
+  const avatarBg = isDefaultTheme
+    ? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
+    : (myBubble.startsWith('linear') ? myBubble : accent)
+  const avatarIsGradient = avatarBg.startsWith('linear')
+
+  // Input styles
+  const inputBg = isDefaultTheme ? (isDark ? '#1e293b' : '#f1f5f9') : chatTheme.input
+  const inputRadius = chatTheme.inputRadius ?? '12px'
+
   const queryClient = useQueryClient()
 
   // Persist active conversation across navigation via global store
@@ -778,11 +808,13 @@ export default function ChatPage() {
       {callState === 'ringing' && callPeer && (
         <div style={{
           position: 'fixed', top: '80px', right: '20px', zIndex: 1000,
-          backgroundColor: isDark ? '#1e293b' : '#fff',
-          borderRadius: '20px', padding: '24px',
+          backgroundColor: colors.card,
+          borderRadius: isDefaultTheme ? '20px' : inputRadius,
+          padding: '24px',
           boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
           width: '270px',
           border: `1px solid ${colors.border}`,
+          fontFamily: chatFont,
         }}>
           {/* Pulsing ring */}
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
@@ -794,9 +826,10 @@ export default function ChatPage() {
               }} />
               <div style={{
                 width: '64px', height: '64px', borderRadius: '50%',
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                background: avatarIsGradient ? avatarBg : undefined,
+                backgroundColor: avatarIsGradient ? undefined : accent,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '20px', fontWeight: '700', color: '#fff',
+                fontSize: '20px', fontWeight: '700', color: accentText,
               }}>
                 {callPeer.userName.charAt(0)}
               </div>
@@ -839,9 +872,10 @@ export default function ChatPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
               <h2 style={{ fontSize: '18px', fontWeight: '700', color: colors.text, margin: 0 }}>Messages</h2>
               <button onClick={() => setShowNewChat(!showNewChat)} style={{
-                backgroundColor: '#6366f1', color: '#fff', border: 'none',
-                borderRadius: '8px', padding: '6px 12px', fontSize: '12px',
-                fontWeight: '600', cursor: 'pointer',
+                backgroundColor: accent, color: accentText,
+                border: chatTheme.borderStyle ? `${chatTheme.borderStyle} ${chatTheme.border}` : 'none',
+                borderRadius: inputRadius, padding: '6px 12px', fontSize: '12px',
+                fontWeight: '600', cursor: 'pointer', fontFamily: chatFont,
               }}>
                 + New Chat
               </button>
@@ -860,14 +894,16 @@ export default function ChatPage() {
                 {chatUsers.map(u => (
                   <button key={u.id} onClick={() => startConvMutation.mutate(u.id)} style={{
                     display: 'flex', alignItems: 'center', gap: '10px', width: '100%',
-                    padding: '8px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                    padding: '8px', borderRadius: inputRadius, border: 'none', cursor: 'pointer',
                     backgroundColor: 'transparent', color: colors.text, textAlign: 'left',
+                    fontFamily: chatFont,
                   }}>
                     <div style={{
                       width: '32px', height: '32px', borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                      background: avatarBg,
+                      backgroundColor: avatarIsGradient ? undefined : accent,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '11px', fontWeight: '700', color: '#fff', flexShrink: 0,
+                      fontSize: '11px', fontWeight: '700', color: accentText, flexShrink: 0,
                     }}>
                       {u.firstName[0]}{u.lastName[0]}
                     </div>
@@ -901,16 +937,18 @@ export default function ChatPage() {
                 <button key={conv.id} onClick={() => setActiveConvId(conv.id)} style={{
                   display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
                   padding: '14px 16px', border: 'none', cursor: 'pointer', textAlign: 'left',
-                  backgroundColor: isActive ? (isDark ? 'rgba(99,102,241,0.1)' : 'rgba(99,102,241,0.05)') : 'transparent',
+                  backgroundColor: isActive ? activeConvBg : 'transparent',
                   borderBottom: `1px solid ${colors.border}`,
                   color: colors.text, transition: 'background 0.1s',
+                  fontFamily: chatFont,
                 }}>
                   <div style={{ position: 'relative', flexShrink: 0 }}>
                     <div style={{
                       width: '40px', height: '40px', borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                      background: avatarIsGradient ? avatarBg : undefined,
+                      backgroundColor: avatarIsGradient ? undefined : accent,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '13px', fontWeight: '700', color: '#fff',
+                      fontSize: '13px', fontWeight: '700', color: accentText,
                     }}>
                       {other.firstName[0]}{other.lastName[0]}
                     </div>
@@ -944,7 +982,7 @@ export default function ChatPage() {
                       </p>
                       {conv.unreadCount > 0 && (
                         <span style={{
-                          backgroundColor: '#6366f1', color: '#fff', borderRadius: '999px',
+                          backgroundColor: accent, color: accentText, borderRadius: '999px',
                           padding: '1px 6px', fontSize: '10px', fontWeight: '700', flexShrink: 0,
                         }}>
                           {conv.unreadCount}
@@ -987,9 +1025,10 @@ export default function ChatPage() {
                 )}
                 <div style={{
                   width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-                  background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  background: avatarIsGradient ? avatarBg : undefined,
+                  backgroundColor: avatarIsGradient ? undefined : accent,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '12px', fontWeight: '700', color: '#fff',
+                  fontSize: '12px', fontWeight: '700', color: accentText,
                 }}>
                   {otherUser?.firstName[0]}{otherUser?.lastName[0]}
                 </div>
@@ -1018,8 +1057,8 @@ export default function ChatPage() {
                 {callState === 'idle' && (
                   <button onClick={startCall} style={{
                     width: '36px', height: '36px', borderRadius: '50%', border: 'none',
-                    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
-                    color: '#22c55e', cursor: 'pointer',
+                    backgroundColor: ghostBg,
+                    color: colors.text, cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     transition: 'background 0.15s',
                   }} title="Start voice call">
@@ -1031,7 +1070,7 @@ export default function ChatPage() {
                 {(callState === 'calling' || callState === 'active') && (
                   <div style={{
                     position: 'absolute', inset: 0,
-                    backgroundColor: callState === 'active' ? '#16a34a' : (isDark ? '#1e293b' : '#f8fafc'),
+                    backgroundColor: callState === 'active' ? '#16a34a' : ghostBg,
                     display: 'flex', alignItems: 'center', gap: '12px', padding: '0 20px',
                     borderBottom: callState === 'calling' ? `1px solid ${colors.border}` : 'none',
                   }}>
@@ -1040,7 +1079,7 @@ export default function ChatPage() {
                         {/* Pulsing dot */}
                         <span style={{
                           width: '10px', height: '10px', borderRadius: '50%',
-                          backgroundColor: '#6366f1', display: 'inline-block',
+                          backgroundColor: accent, display: 'inline-block',
                           animation: 'callDotPulse 1s infinite',
                         }} />
                         <span style={{ flex: 1, fontSize: '14px', fontWeight: '600', color: colors.text }}>
@@ -1136,7 +1175,7 @@ export default function ChatPage() {
                         <div style={{
                           display: 'flex', alignItems: 'center', gap: '6px',
                           padding: '6px 14px', borderRadius: '999px',
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+                          backgroundColor: isDefaultTheme ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)') : `${accent}22`,
                           fontSize: '12px', color: isMissed ? '#ef4444' : colors.textMuted,
                         }}>
                           <Phone size={13} />
@@ -1195,20 +1234,20 @@ export default function ChatPage() {
                 {audioBlob && (
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px',
-                    padding: '10px 14px', borderRadius: '12px',
-                    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+                    padding: '10px 14px', borderRadius: inputRadius,
+                    backgroundColor: ghostBg,
                     border: `1px solid ${colors.border}`,
                   }}>
                     <button onClick={playPreview} style={{
                       width: '32px', height: '32px', borderRadius: '50%', border: 'none',
-                      backgroundColor: '#6366f1', color: '#fff', cursor: 'pointer',
+                      backgroundColor: accent, color: accentText, cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
                       {isPlaying ? <Pause size={14} /> : <Play size={14} />}
                     </button>
                     <div style={{ flex: 1 }}>
                       <div style={{ height: '4px', backgroundColor: colors.border, borderRadius: '999px' }}>
-                        <div style={{ height: '100%', width: '100%', backgroundColor: '#6366f1', borderRadius: '999px' }} />
+                        <div style={{ height: '100%', width: '100%', backgroundColor: accent, borderRadius: '999px' }} />
                       </div>
                     </div>
                     <span style={{ fontSize: '12px', color: colors.textMuted, fontWeight: '500' }}>{audioDuration}s</span>
@@ -1216,7 +1255,7 @@ export default function ChatPage() {
                       <X size={16} />
                     </button>
                     <button onClick={sendVoiceMessage} style={{
-                      backgroundColor: '#6366f1', color: '#fff', border: 'none',
+                      backgroundColor: accent, color: accentText, border: 'none',
                       borderRadius: '8px', padding: '6px 14px', fontSize: '12px',
                       fontWeight: '600', cursor: 'pointer',
                     }}>Send</button>
@@ -1232,20 +1271,21 @@ export default function ChatPage() {
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
                       placeholder="Type a message..."
                       style={{
-                        flex: 1, backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
-                        border: `1px solid ${colors.border}`, borderRadius: '12px',
+                        flex: 1, backgroundColor: inputBg,
+                        border: `1px solid ${ghostBorder}`, borderRadius: inputRadius,
                         padding: '10px 14px', color: colors.text, fontSize: '14px', outline: 'none',
+                        fontFamily: chatFont,
                       }}
                     />
                     <button
                       onClick={isRecording ? stopRecording : startRecording}
                       style={{
                         width: '40px', height: '40px', borderRadius: '50%',
-                        backgroundColor: isRecording ? '#ef4444' : (isDark ? '#1e293b' : '#f1f5f9'),
-                        color: isRecording ? '#fff' : colors.textMuted,
+                        backgroundColor: isRecording ? '#ef4444' : ghostBg,
+                        color: isRecording ? '#fff' : ghostText,
                         cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'all 0.2s',
-                        border: isRecording ? 'none' : `1px solid ${colors.border}`,
+                        border: isRecording ? 'none' : `1px solid ${ghostBorder}`,
                       }}
                       title={isRecording ? 'Stop recording' : 'Record voice message'}
                     >
@@ -1254,7 +1294,7 @@ export default function ChatPage() {
                     {message.trim() && (
                       <button onClick={sendMessage} style={{
                         width: '40px', height: '40px', borderRadius: '50%', border: 'none',
-                        backgroundColor: '#6366f1', color: '#fff', cursor: 'pointer',
+                        backgroundColor: accent, color: accentText, cursor: 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}>
                         <Send size={16} />
