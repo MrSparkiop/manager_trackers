@@ -1,17 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useBlocker } from 'react-router-dom'
 import {
   MessageSquare, Search, Send, Mic, Square, X, Play, Pause, ArrowLeft,
-  Phone, PhoneOff, PhoneCall, MicOff, Monitor,
+  Phone, PhoneOff, PhoneCall, MicOff, Monitor, Maximize2, Minimize2,
 } from 'lucide-react'
 import { useThemeStore } from '../store/themeStore'
 import { useAuthStore } from '../store/authStore'
 import { useIsMobile } from '../lib/useIsMobile'
 import { useColors } from '../lib/useColors'
 import { queryKeys } from '../lib/queryKeys'
-import { connectChatSocket, disconnectChatSocket, getChatSocket } from '../lib/chatSocket'
+import { connectChatSocket, getChatSocket } from '../lib/chatSocket'
 import api from '../lib/axios'
 import { startRingtone, stopRingtone, startCallingTone, stopCallingTone, playEndCallTone, stopAllCallSounds } from '../lib/callSounds'
+import { useChatStore } from '../store/chatStore'
 import type { Conversation, ChatMessage, ChatUser } from '../types'
 import toast from 'react-hot-toast'
 
@@ -37,7 +39,11 @@ export default function ChatPage() {
   const colors = useColors(isDark)
   const queryClient = useQueryClient()
 
-  const [activeConvId, setActiveConvId] = useState<string | null>(null)
+  // Persist active conversation across navigation via global store
+  const activeConvId = useChatStore(s => s.activeConvId)
+  const setActiveConvId = useChatStore(s => s.setActiveConvId)
+  const setCallSnapshot = useChatStore(s => s.setCallSnapshot)
+
   const [message, setMessage] = useState('')
   const [searchUsers, setSearchUsers] = useState('')
   const [showNewChat, setShowNewChat] = useState(false)
@@ -61,6 +67,7 @@ export default function ChatPage() {
   const [callDuration, setCallDuration] = useState(0)
   const [isScreenSharing, setIsScreenSharing] = useState(false)
   const [isRemoteScreenSharing, setIsRemoteScreenSharing] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   // Refs — always current even in stale socket closures
   const callStateRef = useRef<CallState>('idle')
@@ -152,10 +159,32 @@ export default function ChatPage() {
     },
   })
 
-  // ── Socket (connect once on mount) ────────────────────────────
+  // ── Sync call state to global store (for floating Layout widget) ────
+  useEffect(() => {
+    setCallSnapshot(callState, callPeer, callDuration)
+  }, [callState, callPeer, callDuration, setCallSnapshot])
+
+  // ── Navigation blocker during active/ringing/calling state ───────
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      callState !== 'idle' && currentLocation.pathname !== nextLocation.pathname,
+  )
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      const ok = window.confirm('You are in a call. Hang up and leave?')
+      if (ok) {
+        hangUp()
+        blocker.proceed()
+      } else {
+        blocker.reset()
+      }
+    }
+  }, [blocker.state]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Socket (registered once on mount, removed on unmount) ────────
 
   useEffect(() => {
-    const socket = connectChatSocket()
+    const socket = connectChatSocket() // returns already-connected socket from App.tsx
 
     // On (re)connect: re-join the active conversation room so we keep receiving messages
     socket.on('connect', () => {
@@ -266,7 +295,8 @@ export default function ChatPage() {
       setIsRemoteScreenSharing(false)
     })
 
-    return () => { disconnectChatSocket() }
+    // Remove all listeners on unmount (socket itself stays alive — managed by App.tsx)
+    return () => { socket.removeAllListeners() }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Join/leave conversation room
@@ -617,6 +647,101 @@ export default function ChatPage() {
       {/* Hidden remote audio element */}
       <audio ref={remoteAudioRef} autoPlay style={{ display: 'none' }} />
 
+      {/* ── Fullscreen call overlay ───────────────────────────── */}
+      {isFullscreen && callState === 'active' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'linear-gradient(135deg, #15803d 0%, #166534 100%)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: '24px', fontFamily: 'Inter, sans-serif',
+        }}>
+          {/* Minimize button */}
+          <button onClick={() => setIsFullscreen(false)} style={{
+            position: 'absolute', top: '20px', right: '20px',
+            background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%',
+            width: '44px', height: '44px', color: '#fff', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }} title="Exit fullscreen">
+            <Minimize2 size={20} />
+          </button>
+
+          {/* Remote screen share — shown fullscreen when active */}
+          {isRemoteScreenSharing && (
+            <div style={{
+              position: 'absolute', inset: '80px 0 160px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backgroundColor: '#000',
+            }}>
+              <video
+                autoPlay
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                ref={el => { if (el && remoteScreenVideoRef.current?.srcObject) { el.srcObject = remoteScreenVideoRef.current.srcObject } }}
+              />
+              <div style={{
+                position: 'absolute', top: '10px', left: '10px',
+                background: 'rgba(0,0,0,0.6)', borderRadius: '6px',
+                padding: '3px 10px', fontSize: '12px', color: '#fff',
+                display: 'flex', alignItems: 'center', gap: '5px',
+              }}>
+                <Monitor size={12} /> {callPeer?.userName} is sharing
+              </div>
+            </div>
+          )}
+
+          {/* Peer avatar + info */}
+          {!isRemoteScreenSharing && (
+            <div style={{ textAlign: 'center', color: '#fff' }}>
+              <div style={{
+                width: '96px', height: '96px', borderRadius: '50%',
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '32px', fontWeight: '800', margin: '0 auto 16px',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+              }}>
+                {callPeer?.userName.charAt(0)}
+              </div>
+              <p style={{ fontSize: '26px', fontWeight: '700', margin: '0 0 6px' }}>
+                {callPeer?.userName}
+              </p>
+              <p style={{ fontSize: '18px', opacity: 0.8, fontVariantNumeric: 'tabular-nums' }}>
+                {formatDuration(callDuration)}
+              </p>
+            </div>
+          )}
+
+          {/* Controls */}
+          <div style={{
+            position: 'absolute', bottom: '40px',
+            display: 'flex', gap: '20px', alignItems: 'center',
+          }}>
+            <button onClick={toggleMute} style={{
+              width: '60px', height: '60px', borderRadius: '50%', border: 'none',
+              backgroundColor: isMuted ? '#ef4444' : 'rgba(255,255,255,0.2)',
+              color: '#fff', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px',
+            }} title={isMuted ? 'Unmute' : 'Mute'}>
+              {isMuted ? <MicOff size={22} /> : <Mic size={22} />}
+            </button>
+            <button onClick={isScreenSharing ? stopScreenShare : startScreenShare} style={{
+              width: '60px', height: '60px', borderRadius: '50%', border: 'none',
+              backgroundColor: isScreenSharing ? '#f59e0b' : 'rgba(255,255,255,0.2)',
+              color: '#fff', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }} title={isScreenSharing ? 'Stop sharing' : 'Share screen'}>
+              <Monitor size={22} />
+            </button>
+            <button onClick={() => { hangUp(); setIsFullscreen(false) }} style={{
+              width: '72px', height: '72px', borderRadius: '50%', border: 'none',
+              backgroundColor: '#ef4444', color: '#fff', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 20px rgba(239,68,68,0.5)',
+            }} title="End call">
+              <PhoneOff size={26} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Incoming call overlay (fixed, top-right) ─────────── */}
       {callState === 'ringing' && callPeer && (
         <div style={{
@@ -915,6 +1040,15 @@ export default function ChatPage() {
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }} title={isScreenSharing ? 'Stop sharing' : 'Share screen'}>
                           <Monitor size={16} />
+                        </button>
+                        {/* Fullscreen */}
+                        <button onClick={() => setIsFullscreen(true)} style={{
+                          width: '36px', height: '36px', borderRadius: '50%', border: 'none',
+                          backgroundColor: 'rgba(255,255,255,0.2)',
+                          color: '#fff', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }} title="Fullscreen">
+                          <Maximize2 size={16} />
                         </button>
                         {/* Hang up */}
                         <button onClick={hangUp} style={{

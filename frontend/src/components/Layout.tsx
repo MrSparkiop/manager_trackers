@@ -3,9 +3,11 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { useIsMobile } from '../lib/useIsMobile'
+import { useChatStore } from '../store/chatStore'
 import {
   LayoutDashboard, FolderKanban, CheckSquare,
-  Timer, Calendar, LogOut, Sun, Moon, Settings, Menu, X, Tag, Users, Shield, BarChart2, Headphones, Zap, MessageSquare
+  Timer, Calendar, LogOut, Sun, Moon, Settings, Menu, X, Tag, Users, Shield, BarChart2, Headphones, Zap, MessageSquare,
+  Phone, PhoneOff,
 } from 'lucide-react'
 import AnnouncementBanner from './AnnouncementBanner'
 import MaintenanceBanner from './MaintenanceBanner'
@@ -14,6 +16,11 @@ import GlobalSearch from './GlobalSearch'
 import ChangelogModal from './ChangelogModal'
 import OnboardingModal from './OnboardingModal'
 import { Search } from 'lucide-react'
+
+function formatCallDuration(s: number) {
+  const m = Math.floor(s / 60)
+  return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+}
 
 const navItems = [
   { to: '/app/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
@@ -36,6 +43,12 @@ export default function Layout() {
   const location = useLocation()
   const isMobile = useIsMobile()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Floating call widget — shown when in a call and not on the chat page
+  const callState = useChatStore(s => s.callState)
+  const callPeer = useChatStore(s => s.callPeer)
+  const callDuration = useChatStore(s => s.callDuration)
+  const isOnChatPage = location.pathname === '/app/chat'
 
   const handleLogout = () => { logout(); navigate('/login') }
 
@@ -312,6 +325,33 @@ export default function Layout() {
       <GlobalSearch />
       <ChangelogModal />
       {user && !user.onboardingCompleted && <OnboardingModal />}
+
+      {/* ── Floating active-call bar (visible on all pages except chat) ── */}
+      {callState === 'active' && callPeer && !isOnChatPage && (
+        <div style={{
+          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 1000, display: 'flex', alignItems: 'center', gap: '14px',
+          backgroundColor: '#16a34a', borderRadius: '999px',
+          padding: '10px 18px', boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+          color: '#fff', fontSize: '14px', fontWeight: '600',
+          fontFamily: 'Inter, sans-serif', whiteSpace: 'nowrap',
+        }}>
+          <Phone size={16} style={{ flexShrink: 0 }} />
+          <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+            {callPeer.userName} · {formatCallDuration(callDuration)}
+          </span>
+          <button
+            onClick={() => navigate('/app/chat')}
+            style={{
+              background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '999px',
+              padding: '4px 12px', color: '#fff', cursor: 'pointer',
+              fontSize: '12px', fontWeight: '600',
+            }}
+          >
+            Return to call
+          </button>
+        </div>
+      )}
     </div>
   )
 }

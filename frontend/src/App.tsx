@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { connectSocket, disconnectSocket } from './lib/socket'
+import { connectChatSocket, disconnectChatSocket } from './lib/chatSocket'
 import Layout from './components/Layout'
 import AdminLayout from './components/AdminLayout'
 
@@ -108,8 +109,10 @@ export default function App() {
     if (isAuthenticated) {
       fetchMe()      // always get fresh user data (role, suspension, etc.)
       connectSocket()
+      connectChatSocket()
     } else {
       disconnectSocket()
+      disconnectChatSocket()
     }
   }, [isAuthenticated])
 
