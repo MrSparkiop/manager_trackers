@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
-import { User, Moon, Sun, Save, Download, Trash2, ShieldCheck, XCircle, Gift, Copy, Check } from 'lucide-react'
+import { useChatThemeStore } from '../store/chatThemeStore'
+import { CHAT_THEMES } from '../lib/chatThemes'
+import { User, Moon, Sun, Save, Download, Trash2, ShieldCheck, XCircle, Gift, Copy, Check, MessageSquare } from 'lucide-react'
 import { useColors } from '../lib/useColors'
 import { getInputStyle } from '../lib/formStyles'
 import api from '../lib/axios'
@@ -9,6 +11,7 @@ import api from '../lib/axios'
 export default function SettingsPage() {
   const { isDark } = useThemeStore()
   const { user } = useAuthStore()
+  const { chatThemeId, setChatThemeId } = useChatThemeStore()
   const [form, setForm] = useState({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
@@ -173,6 +176,99 @@ export default function SettingsPage() {
             }}>
               {isDark ? <><Sun size={15} /> Light Mode</> : <><Moon size={15} /> Dark Mode</>}
             </button>
+          </div>
+        </div>
+
+        {/* Chat Theme */}
+        <div style={card}>
+          <h2 style={{ fontSize: '16px', fontWeight: '600', color: colors.text, margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MessageSquare size={16} color="#6366f1" /> Chat Theme
+          </h2>
+          <p style={{ fontSize: '13px', color: colors.textMuted, margin: '0 0 20px' }}>
+            Give your chat a personality. From brutally 90s to criminally pink.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px' }}>
+            {CHAT_THEMES.map(theme => {
+              const isSelected = chatThemeId === theme.id
+              return (
+                <button
+                  key={theme.id}
+                  onClick={() => setChatThemeId(theme.id)}
+                  style={{
+                    border: isSelected ? '2px solid #6366f1' : `2px solid ${colors.border}`,
+                    borderRadius: '12px', padding: '0', cursor: 'pointer',
+                    backgroundColor: 'transparent', textAlign: 'left', overflow: 'hidden',
+                    outline: 'none', transition: 'border-color 0.15s, transform 0.1s',
+                    transform: isSelected ? 'scale(1.03)' : 'scale(1)',
+                    boxShadow: isSelected ? '0 0 0 3px rgba(99,102,241,0.25)' : 'none',
+                  }}
+                >
+                  {/* Mini chat preview */}
+                  <div style={{
+                    height: '80px', padding: '8px',
+                    background: theme.id === 'default'
+                      ? (isDark ? '#0f172a' : '#f1f5f9')
+                      : theme.bg,
+                    display: 'flex', flexDirection: 'column', gap: '5px', justifyContent: 'flex-end',
+                    fontFamily: theme.font,
+                    position: 'relative', overflow: 'hidden',
+                  }}>
+                    {/* Scanlines for terminal-y themes */}
+                    {theme.scanlines && (
+                      <div style={{
+                        position: 'absolute', inset: 0, pointerEvents: 'none',
+                        backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 3px)',
+                      }} />
+                    )}
+                    {/* Their bubble */}
+                    <div style={{
+                      alignSelf: 'flex-start',
+                      background: theme.id === 'default' ? (isDark ? '#1e293b' : '#e2e8f0') : theme.theirBubble,
+                      color: theme.id === 'default' ? (isDark ? '#e2e8f0' : '#0f172a') : theme.theirText,
+                      borderRadius: theme.bubbleRadius ?? '12px',
+                      padding: '3px 7px', fontSize: '9px',
+                      border: theme.borderStyle ? `${theme.borderStyle} ${theme.border}` : 'none',
+                      maxWidth: '70%',
+                    }}>
+                      Hello! 👋
+                    </div>
+                    {/* My bubble */}
+                    <div style={{
+                      alignSelf: 'flex-end',
+                      background: theme.myBubble.startsWith('linear') ? theme.myBubble : theme.myBubble,
+                      backgroundImage: theme.myBubble.startsWith('linear') ? theme.myBubble : undefined,
+                      backgroundColor: !theme.myBubble.startsWith('linear') ? theme.myBubble : undefined,
+                      color: theme.myText,
+                      borderRadius: theme.bubbleRadius ?? '12px',
+                      padding: '3px 7px', fontSize: '9px',
+                      border: theme.borderStyle ? `${theme.borderStyle} ${theme.border}` : 'none',
+                      maxWidth: '70%',
+                    }}>
+                      Hi there!
+                    </div>
+                  </div>
+                  {/* Label */}
+                  <div style={{
+                    padding: '8px 10px',
+                    backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+                    borderTop: `1px solid ${colors.border}`,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ fontSize: '14px' }}>{theme.emoji}</span>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: colors.text }}>{theme.name}</span>
+                      {isSelected && (
+                        <span style={{
+                          marginLeft: 'auto', fontSize: '9px', fontWeight: '700',
+                          color: '#6366f1', backgroundColor: 'rgba(99,102,241,0.12)',
+                          padding: '1px 5px', borderRadius: '4px',
+                        }}>ON</span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '10px', color: colors.textMuted, margin: '2px 0 0', lineHeight: 1.3 }}>{theme.description}</p>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </div>
 

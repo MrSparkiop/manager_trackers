@@ -8,6 +8,8 @@ import { useThemeStore } from '../store/themeStore'
 import { useAuthStore } from '../store/authStore'
 import { useIsMobile } from '../lib/useIsMobile'
 import { useColors } from '../lib/useColors'
+import { useChatThemeStore } from '../store/chatThemeStore'
+import { CHAT_THEMES } from '../lib/chatThemes'
 import { queryKeys } from '../lib/queryKeys'
 import { connectChatSocket, getChatSocket } from '../lib/chatSocket'
 import api from '../lib/axios'
@@ -35,7 +37,35 @@ export default function ChatPage() {
   const { isDark } = useThemeStore()
   const { user } = useAuthStore()
   const isMobile = useIsMobile()
-  const colors = useColors(isDark)
+  const baseColors = useColors(isDark)
+  const chatThemeId = useChatThemeStore(s => s.chatThemeId)
+  const chatTheme = CHAT_THEMES.find(t => t.id === chatThemeId) ?? CHAT_THEMES[0]
+  const isDefaultTheme = chatTheme.id === 'default'
+
+  // Merge theme overrides on top of base colors
+  const colors = {
+    ...baseColors,
+    ...(isDefaultTheme ? {} : {
+      bg: chatTheme.bg,
+      card: chatTheme.card,
+      sidebar: chatTheme.sidebar ?? chatTheme.card,
+      border: chatTheme.border,
+      input: chatTheme.input,
+      inputBorder: chatTheme.inputBorder,
+      text: chatTheme.text,
+      textMuted: chatTheme.textMuted,
+      subBg: chatTheme.sidebar ?? chatTheme.card,
+    }),
+  }
+
+  // Per-theme bubble colors
+  const myBubble = chatTheme.myBubble || '#6366f1'
+  const myBubbleText = chatTheme.myText || '#ffffff'
+  const theirBubble = isDefaultTheme ? (isDark ? '#1e293b' : '#f1f5f9') : chatTheme.theirBubble
+  const theirBubbleText = isDefaultTheme ? baseColors.text : chatTheme.theirText
+  const chatFont = chatTheme.font
+  const bubbleRadius = chatTheme.bubbleRadius ?? '16px'
+
   const queryClient = useQueryClient()
 
   // Persist active conversation across navigation via global store
@@ -635,11 +665,19 @@ export default function ChatPage() {
 
   return (
     <div style={{
-      display: 'flex', height: '100%', fontFamily: 'Inter, sans-serif',
-      backgroundColor: colors.bg, overflow: 'hidden',
+      display: 'flex', height: '100%', fontFamily: chatFont,
+      backgroundColor: colors.bg, overflow: 'hidden', position: 'relative',
     }}>
       {/* Hidden remote audio element */}
       <audio ref={remoteAudioRef} autoPlay style={{ display: 'none' }} />
+
+      {/* Scanlines overlay for terminal-style themes */}
+      {chatTheme.scanlines && (
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 9000,
+          backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.12) 0px, rgba(0,0,0,0.12) 1px, transparent 1px, transparent 3px)',
+        }} />
+      )}
 
       {/* ── Fullscreen call overlay ───────────────────────────── */}
       {isFullscreen && callState === 'active' && (
@@ -935,7 +973,11 @@ export default function ChatPage() {
               <div style={{
                 position: 'relative', display: 'flex', alignItems: 'center', gap: '12px',
                 padding: '14px 20px', borderBottom: `1px solid ${colors.border}`,
-                backgroundColor: colors.card, flexShrink: 0,
+                background: !isDefaultTheme && chatTheme.header.startsWith('linear')
+                  ? chatTheme.header : undefined,
+                backgroundColor: !isDefaultTheme && !chatTheme.header.startsWith('linear')
+                  ? chatTheme.header : (isDefaultTheme ? colors.card : undefined),
+                flexShrink: 0,
               }}>
                 {/* Normal header content */}
                 {isMobile && (
@@ -952,14 +994,15 @@ export default function ChatPage() {
                   {otherUser?.firstName[0]}{otherUser?.lastName[0]}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: '14px', fontWeight: '600', color: colors.text, margin: 0 }}>
+                  <p style={{ fontSize: '14px', fontWeight: '600', margin: 0,
+                    color: !isDefaultTheme && chatTheme.headerText ? chatTheme.headerText : colors.text }}>
                     {otherUser?.firstName} {otherUser?.lastName}
                   </p>
                   {typingUser ? (
-                    <p style={{ fontSize: '11px', color: '#6366f1', margin: 0, fontWeight: '500' }}>typing...</p>
+                    <p style={{ fontSize: '11px', color: !isDefaultTheme && chatTheme.headerText ? `${chatTheme.headerText}cc` : '#6366f1', margin: 0, fontWeight: '500' }}>typing...</p>
                   ) : otherUser && onlineUsers.has(otherUser.id) ? (
-                    <p style={{ fontSize: '11px', color: '#22c55e', margin: 0, fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block' }} />
+                    <p style={{ fontSize: '11px', color: !isDefaultTheme && chatTheme.headerText ? `${chatTheme.headerText}cc` : '#22c55e', margin: 0, fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: !isDefaultTheme && chatTheme.headerText ? chatTheme.headerText : '#22c55e', display: 'inline-block' }} />
                       Online
                     </p>
                   ) : (
@@ -1109,11 +1152,18 @@ export default function ChatPage() {
                   return (
                     <div key={msg.id} style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start' }}>
                       <div style={{
-                        maxWidth: '70%', padding: '10px 14px', borderRadius: '16px',
-                        backgroundColor: isMine ? '#6366f1' : (isDark ? '#1e293b' : '#f1f5f9'),
-                        color: isMine ? '#fff' : colors.text,
-                        borderBottomRightRadius: isMine ? '4px' : '16px',
-                        borderBottomLeftRadius: isMine ? '16px' : '4px',
+                        maxWidth: '70%', padding: '10px 14px', borderRadius: bubbleRadius,
+                        background: isMine
+                          ? (myBubble.startsWith('linear') ? myBubble : undefined)
+                          : undefined,
+                        backgroundColor: isMine
+                          ? (myBubble.startsWith('linear') ? undefined : myBubble)
+                          : theirBubble,
+                        color: isMine ? myBubbleText : theirBubbleText,
+                        borderBottomRightRadius: isMine && bubbleRadius === '16px' ? '4px' : undefined,
+                        borderBottomLeftRadius: !isMine && bubbleRadius === '16px' ? '4px' : undefined,
+                        border: chatTheme.borderStyle ? `${chatTheme.borderStyle} ${chatTheme.border}` : undefined,
+                        fontFamily: chatFont,
                       }}>
                         {msg.type === 'VOICE' ? (
                           <VoiceMessagePlayer audioData={msg.audioData!} duration={msg.audioDuration || 0} isMine={isMine} isDark={isDark} />
