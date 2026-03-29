@@ -5,7 +5,8 @@ let chatSocket: Socket | null = null
 export const connectChatSocket = (): Socket => {
   if (chatSocket?.connected) return chatSocket
 
-  chatSocket = io(`${import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001'}/chat`, {
+  const base = import.meta.env.VITE_SOCKET_URL || ''
+  chatSocket = io(base ? `${base}/chat` : '/chat', {
     transports: ['websocket'],
     withCredentials: true,
   })

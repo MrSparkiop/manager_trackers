@@ -7,7 +7,8 @@ export const connectSocket = (): Socket => {
 
   // The HttpOnly access_token cookie is sent automatically via withCredentials.
   // Reading it via document.cookie is impossible (blocked by the browser by design).
-  socket = io(`${import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001'}/notifications`, {
+  const base = import.meta.env.VITE_SOCKET_URL || ''
+  socket = io(base ? `${base}/notifications` : '/notifications', {
     transports: ['websocket'],
     withCredentials: true,
   })
