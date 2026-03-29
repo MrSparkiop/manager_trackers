@@ -268,4 +268,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!client.data.userId) return
     this.server.to(`chat:user:${data.targetUserId}`).emit('ice_candidate', { candidate: data.candidate })
   }
+
+  @SubscribeMessage('screen_offer')
+  handleScreenOffer(client: Socket, data: { targetUserId: string; offer: RTCSessionDescriptionInit }) {
+    if (!client.data.userId) return
+    this.server.to(`chat:user:${data.targetUserId}`).emit('screen_offer', { offer: data.offer })
+  }
+
+  @SubscribeMessage('screen_answer')
+  handleScreenAnswer(client: Socket, data: { targetUserId: string; answer: RTCSessionDescriptionInit }) {
+    if (!client.data.userId) return
+    this.server.to(`chat:user:${data.targetUserId}`).emit('screen_answer', { answer: data.answer })
+  }
+
+  @SubscribeMessage('screen_share_stopped')
+  handleScreenShareStopped(client: Socket, data: { targetUserId: string }) {
+    if (!client.data.userId) return
+    this.server.to(`chat:user:${data.targetUserId}`).emit('screen_share_stopped', {})
+  }
 }

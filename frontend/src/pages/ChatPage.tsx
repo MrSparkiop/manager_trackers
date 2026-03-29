@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   MessageSquare, Search, Send, Mic, Square, X, Play, Pause, ArrowLeft,
-  Phone, PhoneOff, PhoneCall, MicOff,
+  Phone, PhoneOff, PhoneCall, MicOff, Monitor,
 } from 'lucide-react'
 import { useThemeStore } from '../store/themeStore'
 import { useAuthStore } from '../store/authStore'
@@ -59,6 +59,8 @@ export default function ChatPage() {
   const [callPeer, setCallPeer] = useState<{ userId: string; userName: string } | null>(null)
   const [isMuted, setIsMuted] = useState(false)
   const [callDuration, setCallDuration] = useState(0)
+  const [isScreenSharing, setIsScreenSharing] = useState(false)
+  const [isRemoteScreenSharing, setIsRemoteScreenSharing] = useState(false)
 
   // Refs — always current even in stale socket closures
   const callStateRef = useRef<CallState>('idle')
@@ -79,6 +81,9 @@ export default function ChatPage() {
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([])
 
+  const screenStreamRef = useRef<MediaStream | null>(null)
+  const remoteScreenVideoRef = useRef<HTMLVideoElement | null>(null)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const activeConvIdRef = useRef<string | null>(null)
@@ -96,15 +101,20 @@ export default function ChatPage() {
     if (callTimeoutRef.current) { clearTimeout(callTimeoutRef.current); callTimeoutRef.current = null }
     localStreamRef.current?.getTracks().forEach(t => t.stop())
     localStreamRef.current = null
+    screenStreamRef.current?.getTracks().forEach(t => t.stop())
+    screenStreamRef.current = null
     peerConnectionRef.current?.close()
     peerConnectionRef.current = null
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null
+    if (remoteScreenVideoRef.current) remoteScreenVideoRef.current.srcObject = null
     incomingCallRef.current = null
     iceCandidateQueueRef.current = []
     setCallState('idle')
     setCallPeer(null)
     setCallDuration(0)
     setIsMuted(false)
+    setIsScreenSharing(false)
+    setIsRemoteScreenSharing(false)
   }, [])
 
   const cleanupCallRef = useRef(cleanupCall)
@@ -233,6 +243,29 @@ export default function ChatPage() {
       }
     })
 
+    socket.on('screen_offer', async (data: { offer: RTCSessionDescriptionInit }) => {
+      const pc = peerConnectionRef.current
+      const peer = callPeerRef.current
+      if (!pc || !peer) return
+      try {
+        await pc.setRemoteDescription(data.offer)
+        const answer = await pc.createAnswer()
+        await pc.setLocalDescription(answer)
+        getChatSocket()?.emit('screen_answer', { targetUserId: peer.userId, answer })
+      } catch { /* ignore */ }
+    })
+
+    socket.on('screen_answer', async (data: { answer: RTCSessionDescriptionInit }) => {
+      const pc = peerConnectionRef.current
+      if (!pc) return
+      try { await pc.setRemoteDescription(data.answer) } catch { /* ignore */ }
+    })
+
+    socket.on('screen_share_stopped', () => {
+      if (remoteScreenVideoRef.current) remoteScreenVideoRef.current.srcObject = null
+      setIsRemoteScreenSharing(false)
+    })
+
     return () => { disconnectChatSocket() }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -277,7 +310,10 @@ export default function ChatPage() {
     }
 
     pc.ontrack = (e) => {
-      if (remoteAudioRef.current) {
+      if (e.track.kind === 'video') {
+        if (remoteScreenVideoRef.current) remoteScreenVideoRef.current.srcObject = e.streams[0]
+        setIsRemoteScreenSharing(true)
+      } else if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = e.streams[0]
       }
     }
@@ -403,6 +439,46 @@ export default function ChatPage() {
     if (track) {
       track.enabled = !track.enabled
       setIsMuted(!track.enabled)
+    }
+  }, [])
+
+  const stopScreenShareRef = useRef<() => void>(() => {})
+
+  const stopScreenShare = useCallback(async () => {
+    const pc = peerConnectionRef.current
+    const peer = callPeerRef.current
+    screenStreamRef.current?.getTracks().forEach(t => t.stop())
+    screenStreamRef.current = null
+    setIsScreenSharing(false)
+    if (!pc || !peer) return
+    getChatSocket()?.emit('screen_share_stopped', { targetUserId: peer.userId })
+    const sender = pc.getSenders().find(s => s.track?.kind === 'video')
+    if (sender) pc.removeTrack(sender)
+    try {
+      const offer = await pc.createOffer()
+      await pc.setLocalDescription(offer)
+      getChatSocket()?.emit('screen_offer', { targetUserId: peer.userId, offer })
+    } catch { /* ignore */ }
+  }, [])
+
+  stopScreenShareRef.current = stopScreenShare
+
+  const startScreenShare = useCallback(async () => {
+    const pc = peerConnectionRef.current
+    const peer = callPeerRef.current
+    if (!pc || callStateRef.current !== 'active' || !peer) return
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+      screenStreamRef.current = stream
+      const videoTrack = stream.getVideoTracks()[0]
+      pc.addTrack(videoTrack, stream)
+      const offer = await pc.createOffer()
+      await pc.setLocalDescription(offer)
+      getChatSocket()?.emit('screen_offer', { targetUserId: peer.userId, offer })
+      setIsScreenSharing(true)
+      videoTrack.onended = () => stopScreenShareRef.current()
+    } catch (err: any) {
+      if (err?.name !== 'NotAllowedError') toast.error('Could not share screen')
     }
   }, [])
 
@@ -831,6 +907,15 @@ export default function ChatPage() {
                         }} title={isMuted ? 'Unmute' : 'Mute'}>
                           {isMuted ? <MicOff size={16} /> : <Mic size={16} />}
                         </button>
+                        {/* Share Screen */}
+                        <button onClick={isScreenSharing ? stopScreenShare : startScreenShare} style={{
+                          width: '36px', height: '36px', borderRadius: '50%', border: 'none',
+                          backgroundColor: isScreenSharing ? '#f59e0b' : 'rgba(255,255,255,0.2)',
+                          color: '#fff', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }} title={isScreenSharing ? 'Stop sharing' : 'Share screen'}>
+                          <Monitor size={16} />
+                        </button>
                         {/* Hang up */}
                         <button onClick={hangUp} style={{
                           width: '36px', height: '36px', borderRadius: '50%', border: 'none',
@@ -843,6 +928,28 @@ export default function ChatPage() {
                     )}
                   </div>
                 )}
+              </div>
+
+              {/* Remote Screen Share Panel — always mounted so ref is always set */}
+              <div style={{
+                flexShrink: 0, backgroundColor: '#000', position: 'relative',
+                display: isRemoteScreenSharing ? 'block' : 'none',
+                borderBottom: `1px solid ${colors.border}`,
+              }}>
+                <video
+                  ref={remoteScreenVideoRef}
+                  autoPlay
+                  style={{ width: '100%', maxHeight: '280px', objectFit: 'contain', display: 'block' }}
+                />
+                <div style={{
+                  position: 'absolute', top: '8px', left: '8px',
+                  backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: '6px',
+                  padding: '3px 8px', fontSize: '11px', color: '#fff',
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                }}>
+                  <Monitor size={11} />
+                  {callPeer?.userName} is sharing their screen
+                </div>
               </div>
 
               {/* Messages */}
