@@ -72,6 +72,10 @@ export default function ChatPage() {
     : myBubble
   const accentText = myBubbleText
 
+  // Header text — always readable against the header background
+  const headerTextColor = !isDefaultTheme && chatTheme.headerText ? chatTheme.headerText : colors.text
+  const headerMutedColor = !isDefaultTheme && chatTheme.headerText ? `${chatTheme.headerText}aa` : colors.textMuted
+
   // Ghost button style (mic, secondary actions)
   const ghostBg = isDefaultTheme
     ? (isDark ? '#1e293b' : '#f1f5f9')
@@ -1019,7 +1023,7 @@ export default function ChatPage() {
               }}>
                 {/* Normal header content */}
                 {isMobile && (
-                  <button onClick={() => setActiveConvId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, padding: 0 }}>
+                  <button onClick={() => setActiveConvId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: headerTextColor, padding: 0 }}>
                     <ArrowLeft size={20} />
                   </button>
                 )}
@@ -1033,19 +1037,18 @@ export default function ChatPage() {
                   {otherUser?.firstName[0]}{otherUser?.lastName[0]}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: '14px', fontWeight: '600', margin: 0,
-                    color: !isDefaultTheme && chatTheme.headerText ? chatTheme.headerText : colors.text }}>
+                  <p style={{ fontSize: '14px', fontWeight: '600', margin: 0, color: headerTextColor }}>
                     {otherUser?.firstName} {otherUser?.lastName}
                   </p>
                   {typingUser ? (
-                    <p style={{ fontSize: '11px', color: !isDefaultTheme && chatTheme.headerText ? `${chatTheme.headerText}cc` : '#6366f1', margin: 0, fontWeight: '500' }}>typing...</p>
+                    <p style={{ fontSize: '11px', color: headerMutedColor, margin: 0, fontWeight: '500' }}>typing...</p>
                   ) : otherUser && onlineUsers.has(otherUser.id) ? (
-                    <p style={{ fontSize: '11px', color: !isDefaultTheme && chatTheme.headerText ? `${chatTheme.headerText}cc` : '#22c55e', margin: 0, fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: !isDefaultTheme && chatTheme.headerText ? chatTheme.headerText : '#22c55e', display: 'inline-block' }} />
+                    <p style={{ fontSize: '11px', color: headerMutedColor, margin: 0, fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: headerTextColor, display: 'inline-block' }} />
                       Online
                     </p>
                   ) : (
-                    <p style={{ fontSize: '11px', color: colors.textMuted, margin: 0 }}>
+                    <p style={{ fontSize: '11px', color: headerMutedColor, margin: 0 }}>
                       {otherUser?.lastSeenAt
                         ? `Last seen ${new Date(otherUser.lastSeenAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
                         : 'Offline'}
@@ -1057,8 +1060,8 @@ export default function ChatPage() {
                 {callState === 'idle' && (
                   <button onClick={startCall} style={{
                     width: '36px', height: '36px', borderRadius: '50%', border: 'none',
-                    backgroundColor: ghostBg,
-                    color: colors.text, cursor: 'pointer',
+                    backgroundColor: !isDefaultTheme ? `${headerTextColor}22` : ghostBg,
+                    color: headerTextColor, cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     transition: 'background 0.15s',
                   }} title="Start voice call">
