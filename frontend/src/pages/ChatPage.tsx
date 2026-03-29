@@ -1029,10 +1029,12 @@ export default function ChatPage() {
                 )}
                 <div style={{
                   width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-                  background: avatarIsGradient ? avatarBg : undefined,
-                  backgroundColor: avatarIsGradient ? undefined : accent,
+                  // In themed headers flip avatar to headerText bg so it always contrasts
+                  background: !isDefaultTheme && chatTheme.headerText ? undefined : (avatarIsGradient ? avatarBg : undefined),
+                  backgroundColor: !isDefaultTheme && chatTheme.headerText ? chatTheme.headerText : (avatarIsGradient ? undefined : accent),
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '12px', fontWeight: '700', color: accentText,
+                  fontSize: '12px', fontWeight: '700',
+                  color: !isDefaultTheme && chatTheme.headerText ? (chatTheme.header.startsWith('linear') ? '#ffffff' : chatTheme.header) : accentText,
                 }}>
                   {otherUser?.firstName[0]}{otherUser?.lastName[0]}
                 </div>
