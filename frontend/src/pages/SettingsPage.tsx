@@ -264,7 +264,6 @@ export default function SettingsPage() {
                         }}>ON</span>
                       )}
                     </div>
-                    <p style={{ fontSize: '10px', color: colors.textMuted, margin: '2px 0 0', lineHeight: 1.3 }}>{theme.description}</p>
                   </div>
                 </button>
               )
