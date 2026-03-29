@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useBlocker } from 'react-router-dom'
 import {
   MessageSquare, Search, Send, Mic, Square, X, Play, Pause, ArrowLeft,
   Phone, PhoneOff, PhoneCall, MicOff, Monitor, Maximize2, Minimize2,
@@ -164,22 +163,17 @@ export default function ChatPage() {
     setCallSnapshot(callState, callPeer, callDuration)
   }, [callState, callPeer, callDuration, setCallSnapshot])
 
-  // ── Navigation blocker during active/ringing/calling state ───────
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      callState !== 'idle' && currentLocation.pathname !== nextLocation.pathname,
-  )
+  // ── Warn on tab close/refresh while in a call ─────────────────
   useEffect(() => {
-    if (blocker.state === 'blocked') {
-      const ok = window.confirm('You are in a call. Hang up and leave?')
-      if (ok) {
-        hangUp()
-        blocker.proceed()
-      } else {
-        blocker.reset()
+    const handler = (e: BeforeUnloadEvent) => {
+      if (callStateRef.current !== 'idle') {
+        e.preventDefault()
+        e.returnValue = ''
       }
     }
-  }, [blocker.state]) // eslint-disable-line react-hooks/exhaustive-deps
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [])
 
   // ── Socket (registered once on mount, removed on unmount) ────────
 
