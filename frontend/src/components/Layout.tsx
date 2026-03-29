@@ -4,6 +4,8 @@ import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import { useIsMobile } from '../lib/useIsMobile'
 import { useChatStore } from '../store/chatStore'
+import { useChatThemeStore } from '../store/chatThemeStore'
+import { CHAT_THEMES } from '../lib/chatThemes'
 import {
   LayoutDashboard, FolderKanban, CheckSquare,
   Timer, Calendar, LogOut, Sun, Moon, Settings, Menu, X, Tag, Users, Shield, BarChart2, Headphones, Zap, MessageSquare,
@@ -50,12 +52,22 @@ export default function Layout() {
   const callDuration = useChatStore(s => s.callDuration)
   const isOnChatPage = location.pathname === '/app/chat'
 
+  // Chat theme — overrides sidebar/shell colours on the chat page
+  const chatThemeId = useChatThemeStore(s => s.chatThemeId)
+  const chatTheme = CHAT_THEMES.find(t => t.id === chatThemeId) ?? CHAT_THEMES[0]
+  const isChatThemed = isOnChatPage && chatTheme.id !== 'default'
+
+  // Derive accent from myBubble
+  const chatAccent = chatTheme.myBubble.startsWith('linear')
+    ? (chatTheme.inputBorder || chatTheme.text)
+    : chatTheme.myBubble
+
   const handleLogout = () => { logout(); navigate('/login') }
 
   // Close sidebar on route change (mobile)
   useEffect(() => { setSidebarOpen(false) }, [location.pathname])
 
-  const colors = {
+  const baseColors = {
     bg: isDark ? '#030712' : '#f8fafc',
     sidebar: isDark ? '#0f172a' : '#ffffff',
     border: isDark ? '#1e293b' : '#e2e8f0',
@@ -67,6 +79,24 @@ export default function Layout() {
     main: isDark ? '#030712' : '#f1f5f9',
   }
 
+  const colors = isChatThemed ? {
+    bg: chatTheme.bg,
+    sidebar: chatTheme.sidebar,
+    border: chatTheme.border,
+    text: chatTheme.text,
+    textMuted: chatTheme.textMuted,
+    navActive: `${chatAccent}25`,
+    navActiveBorder: `${chatAccent}55`,
+    navActiveText: chatTheme.myBubble.startsWith('linear') ? chatTheme.text : chatTheme.myBubble,
+    main: chatTheme.bg,
+  } : baseColors
+
+  const layoutFont = isChatThemed ? chatTheme.font : 'Inter, sans-serif'
+  const logoAccentBg = isChatThemed
+    ? (chatTheme.myBubble.startsWith('linear') ? chatTheme.myBubble : chatAccent)
+    : '#6366f1'
+  const logoAccentText = isChatThemed ? chatTheme.myText : '#ffffff'
+
   const SidebarContent = () => (
     <>
       {/* Logo */}
@@ -74,10 +104,12 @@ export default function Layout() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
-              width: '34px', height: '34px', backgroundColor: '#6366f1',
+              width: '34px', height: '34px',
+              background: logoAccentBg.startsWith('linear') ? logoAccentBg : undefined,
+              backgroundColor: logoAccentBg.startsWith('linear') ? undefined : logoAccentBg,
               borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}>
-              <Timer size={16} color="#ffffff" />
+              <Timer size={16} color={logoAccentText} />
             </div>
             <div>
               <h1 style={{ fontSize: '15px', fontWeight: '700', color: colors.text, margin: 0 }}>TrackFlow</h1>
@@ -101,7 +133,7 @@ export default function Layout() {
                 transition: 'all 0.15s',
                 backgroundColor: 'transparent',
               }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = isDark ? '#1e293b' : '#f1f5f9'}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = isChatThemed ? `${chatAccent}22` : (isDark ? '#1e293b' : '#f1f5f9')}
               onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
             >
               <Search size={18} />
@@ -111,7 +143,7 @@ export default function Layout() {
                 background: 'none', border: `1px solid ${colors.border}`,
                 borderRadius: '8px', padding: '6px', cursor: 'pointer',
                 color: colors.textMuted, display: 'flex', alignItems: 'center',
-                backgroundColor: isDark ? '#1e293b' : '#f1f5f9'
+                backgroundColor: isChatThemed ? `${chatAccent}22` : (isDark ? '#1e293b' : '#f1f5f9')
               }}>
                 <X size={14} />
               </button>
@@ -175,7 +207,7 @@ export default function Layout() {
         <div style={{
           display: 'flex', alignItems: 'center', gap: '10px',
           padding: '9px 10px', borderRadius: '9px',
-          backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+          backgroundColor: isChatThemed ? `${chatAccent}18` : (isDark ? '#1e293b' : '#f8fafc'),
           border: `1px solid ${colors.border}`
         }}>
           <div style={{
@@ -234,7 +266,7 @@ export default function Layout() {
     <div style={{
       display: 'flex', height: '100vh',
       backgroundColor: colors.bg,
-      fontFamily: 'Inter, sans-serif', overflow: 'hidden'
+      fontFamily: layoutFont, overflow: 'hidden'
     }}>
 
       {/* Desktop Sidebar */}
@@ -287,17 +319,19 @@ export default function Layout() {
               background: 'none', border: `1px solid ${colors.border}`,
               borderRadius: '8px', padding: '7px', cursor: 'pointer',
               color: colors.textMuted, display: 'flex', alignItems: 'center',
-              backgroundColor: isDark ? '#1e293b' : '#f1f5f9'
+              backgroundColor: isChatThemed ? `${chatAccent}22` : (isDark ? '#1e293b' : '#f1f5f9')
             }}>
               <Menu size={18} />
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{
-                width: '28px', height: '28px', backgroundColor: '#6366f1',
+                width: '28px', height: '28px',
+                background: logoAccentBg.startsWith('linear') ? logoAccentBg : undefined,
+                backgroundColor: logoAccentBg.startsWith('linear') ? undefined : logoAccentBg,
                 borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
-                <Timer size={14} color="#ffffff" />
+                <Timer size={14} color={logoAccentText} />
               </div>
               <span style={{ fontSize: '15px', fontWeight: '700', color: colors.text }}>TrackFlow</span>
             </div>
@@ -308,7 +342,7 @@ export default function Layout() {
                 background: 'none', border: `1px solid ${colors.border}`,
                 borderRadius: '8px', padding: '7px', cursor: 'pointer',
                 color: colors.textMuted, display: 'flex', alignItems: 'center',
-                backgroundColor: isDark ? '#1e293b' : '#f1f5f9'
+                backgroundColor: isChatThemed ? `${chatAccent}22` : (isDark ? '#1e293b' : '#f1f5f9')
               }}>
                 {isDark ? <Sun size={16} /> : <Moon size={16} />}
               </button>
@@ -318,7 +352,7 @@ export default function Layout() {
 
         <MaintenanceBanner />
         <AnnouncementBanner />
-        <main style={{ flex: 1, overflow: 'auto', backgroundColor: colors.main }}>
+        <main style={{ flex: 1, overflow: isChatThemed ? 'hidden' : 'auto', backgroundColor: colors.main }}>
           <Outlet context={{ isDark, colors, isMobile }} />
         </main>
       </div>
