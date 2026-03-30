@@ -68,7 +68,7 @@ services:
         condition: service_healthy
       migrator:
         condition: service_completed_successfully
-    command: npm run start:dev
+    command: sh -c "npx prisma generate && npm run start:dev"
     volumes:
       # Mount the entire backend folder for config/schema hot-reloading
       - ./backend:/app
