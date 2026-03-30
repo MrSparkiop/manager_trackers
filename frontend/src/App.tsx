@@ -117,6 +117,14 @@ export default function App() {
     }
   }, [isAuthenticated])
 
+  // Re-fetch user when tab regains focus so pendingWarning (and role changes) show immediately
+  useEffect(() => {
+    if (!isAuthenticated) return
+    const handler = () => { if (document.visibilityState === 'visible') fetchMe() }
+    document.addEventListener('visibilitychange', handler)
+    return () => document.removeEventListener('visibilitychange', handler)
+  }, [isAuthenticated, fetchMe])
+
   return (
     <Sentry.ErrorBoundary fallback={
       <div style={{
