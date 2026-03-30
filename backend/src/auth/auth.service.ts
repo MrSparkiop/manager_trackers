@@ -203,7 +203,7 @@ export class AuthService {
         id: true, email: true, firstName: true, lastName: true, role: true,
         onboardingCompleted: true, trialEndsAt: true, referralCode: true,
         lastSeenChangelog: true, deletionRequestedAt: true, deletionScheduledFor: true,
-        createdAt: true,
+        createdAt: true, pendingWarning: true,
       }
     })
   }
@@ -212,6 +212,14 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: userId },
       data: { onboardingCompleted: true },
+    })
+    return { success: true }
+  }
+
+  async dismissWarning(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { pendingWarning: false },
     })
     return { success: true }
   }

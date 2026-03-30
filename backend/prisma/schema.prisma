@@ -18,6 +18,7 @@ model User {
   avatar               String?
   role                 Role      @default(USER)
   isSuspended          Boolean   @default(false)
+  pendingWarning       Boolean   @default(false)
   lastSeenAt           DateTime?
   refreshToken         String?
   resetPasswordToken   String?

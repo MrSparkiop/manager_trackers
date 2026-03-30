@@ -15,6 +15,7 @@ interface AuthState {
   register: (email: string, password: string, firstName: string, lastName: string, referralCode?: string) => Promise<void>
   logout: () => Promise<void>
   fetchMe: () => Promise<void>
+  dismissWarning: () => Promise<void>
   clearError: () => void
 }
 
@@ -84,6 +85,10 @@ export const useAuthStore = create<AuthState>()(
           Sentry.setUser(null)
           set({ user: null, isAuthenticated: false })
         }
+      },
+      dismissWarning: async () => {
+        await api.post('/auth/dismiss-warning')
+        set(state => ({ user: state.user ? { ...state.user, pendingWarning: false } : null }))
       },
     }),
     {

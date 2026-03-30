@@ -15,6 +15,7 @@ export interface User {
   deletionRequestedAt?: string | null
   deletionScheduledFor?: string | null
   createdAt?: string
+  pendingWarning?: boolean
 }
 
 export interface Task {

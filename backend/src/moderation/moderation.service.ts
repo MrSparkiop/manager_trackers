@@ -66,6 +66,10 @@ export class ModerationService {
     })
     if (!report) throw new NotFoundException('Report not found')
 
+    await this.prisma.user.update({
+      where: { id: report.message.senderId },
+      data: { pendingWarning: true },
+    })
     await this.prisma.messageReport.update({
       where: { id: reportId },
       data: { status: 'WARNED', resolvedAt: new Date(), adminNote: note },

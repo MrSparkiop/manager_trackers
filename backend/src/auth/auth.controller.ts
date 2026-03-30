@@ -67,4 +67,10 @@ export class AuthController {
   completeOnboarding(@CurrentUser() user: AuthUser) {
     return this.authService.completeOnboarding(user.id)
   }
+
+  @Post('dismiss-warning')
+  @UseGuards(AuthGuard('jwt'))
+  dismissWarning(@CurrentUser() user: AuthUser) {
+    return this.authService.dismissWarning(user.id)
+  }
 }

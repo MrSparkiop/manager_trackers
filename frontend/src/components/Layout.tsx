@@ -9,7 +9,7 @@ import { CHAT_THEMES } from '../lib/chatThemes'
 import {
   LayoutDashboard, FolderKanban, CheckSquare,
   Timer, Calendar, LogOut, Sun, Moon, Settings, Menu, X, Tag, Users, Shield, BarChart2, Headphones, Zap, MessageSquare,
-  Phone, PhoneOff,
+  Phone, PhoneOff, AlertTriangle,
 } from 'lucide-react'
 import AnnouncementBanner from './AnnouncementBanner'
 import MaintenanceBanner from './MaintenanceBanner'
@@ -39,7 +39,7 @@ const navItems = [
 ]
 
 export default function Layout() {
-  const { user, logout } = useAuthStore()
+  const { user, logout, dismissWarning } = useAuthStore()
   const { isDark, toggle } = useThemeStore()
   const navigate = useNavigate()
   const location = useLocation()
@@ -352,6 +352,30 @@ export default function Layout() {
 
         <MaintenanceBanner />
         <AnnouncementBanner />
+        {user?.pendingWarning && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '10px 16px',
+            backgroundColor: '#7c2d12',
+            borderBottom: '1px solid #9a3412',
+            flexShrink: 0,
+          }}>
+            <AlertTriangle size={16} color="#fbbf24" style={{ flexShrink: 0 }} />
+            <p style={{ margin: 0, fontSize: '13px', color: '#fef3c7', flex: 1, lineHeight: '1.4' }}>
+              <strong>Community guidelines warning:</strong> One of your messages was reviewed by our moderation team and found to violate our community guidelines. Please be respectful.
+            </p>
+            <button
+              onClick={dismissWarning}
+              style={{
+                background: 'none', border: '1px solid #9a3412', borderRadius: '6px',
+                padding: '4px 10px', cursor: 'pointer', color: '#fbbf24',
+                fontSize: '12px', fontWeight: '600', flexShrink: 0,
+              }}
+            >
+              Got it
+            </button>
+          </div>
+        )}
         <main style={{ flex: 1, overflow: isChatThemed ? 'hidden' : 'auto', backgroundColor: colors.main }}>
           <Outlet context={{ isDark, colors, isMobile }} />
         </main>
