@@ -156,6 +156,14 @@ export default function ChatPage() {
 
   const screenStreamRef = useRef<MediaStream | null>(null)
   const remoteScreenVideoRef = useRef<HTMLVideoElement | null>(null)
+  const callStatsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [callStats, setCallStats] = useState<{
+    rttMs: number | null
+    packetLossPct: number | null
+    jitterMs: number | null
+    bitrateKbps: number | null
+  } | null>(null)
+  const prevBytesRef = useRef<number>(0)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -182,6 +190,9 @@ export default function ChatPage() {
     if (remoteScreenVideoRef.current) remoteScreenVideoRef.current.srcObject = null
     incomingCallRef.current = null
     iceCandidateQueueRef.current = []
+    if (callStatsIntervalRef.current) { clearInterval(callStatsIntervalRef.current); callStatsIntervalRef.current = null }
+    prevBytesRef.current = 0
+    setCallStats(null)
     setCallState('idle')
     setCallPeer(null)
     setCallDuration(0)
@@ -321,6 +332,7 @@ export default function ChatPage() {
         callTimerRef.current = setInterval(() => {
           setCallDuration(Math.floor((Date.now() - callStartRef.current) / 1000))
         }, 1000)
+        startStatsPolling()
       } catch { /* ignore */ }
     })
 
@@ -397,6 +409,43 @@ export default function ChatPage() {
   // Cleanup call on unmount
   useEffect(() => {
     return () => { cleanupCallRef.current() }
+  }, [])
+
+  // ── WebRTC stats polling ───────────────────────────────────────
+  const startStatsPolling = useCallback(() => {
+    if (callStatsIntervalRef.current) clearInterval(callStatsIntervalRef.current)
+    prevBytesRef.current = 0
+    callStatsIntervalRef.current = setInterval(async () => {
+      const pc = peerConnectionRef.current
+      if (!pc) return
+      try {
+        const reports = await pc.getStats()
+        let rttMs: number | null = null
+        let packetLossPct: number | null = null
+        let jitterMs: number | null = null
+        let bytesReceived = 0
+
+        reports.forEach((report) => {
+          if (report.type === 'remote-inbound-rtp' && report.kind === 'audio') {
+            if (report.roundTripTime != null) rttMs = Math.round(report.roundTripTime * 1000)
+            if (report.fractionLost != null) packetLossPct = Math.round(report.fractionLost * 100)
+            if (report.jitter != null) jitterMs = Math.round(report.jitter * 1000)
+          }
+          if (report.type === 'inbound-rtp' && report.kind === 'audio') {
+            if (report.jitter != null) jitterMs = jitterMs ?? Math.round(report.jitter * 1000)
+            if (report.bytesReceived != null) bytesReceived = report.bytesReceived
+          }
+        })
+
+        const prevBytes = prevBytesRef.current
+        const bitrateKbps = prevBytes > 0
+          ? Math.round(((bytesReceived - prevBytes) * 8) / 2000) // 2s interval → kbps
+          : null
+        prevBytesRef.current = bytesReceived
+
+        setCallStats({ rttMs, packetLossPct, jitterMs, bitrateKbps })
+      } catch { /* ignore */ }
+    }, 2000)
   }, [])
 
   // ── Voice call handlers ────────────────────────────────────────
@@ -510,11 +559,12 @@ export default function ChatPage() {
       callTimerRef.current = setInterval(() => {
         setCallDuration(Math.floor((Date.now() - callStartRef.current) / 1000))
       }, 1000)
+      startStatsPolling()
     } catch {
       toast.error('Could not access microphone')
       rejectCall()
     }
-  }, [buildPeerConnection]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [buildPeerConnection, startStatsPolling]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const rejectCall = useCallback(() => {
     const incoming = incomingCallRef.current
@@ -783,9 +833,31 @@ export default function ChatPage() {
               <p style={{ fontSize: '26px', fontWeight: '700', margin: '0 0 6px' }}>
                 {callPeer?.userName}
               </p>
-              <p style={{ fontSize: '18px', opacity: 0.8, fontVariantNumeric: 'tabular-nums' }}>
+              <p style={{ fontSize: '18px', opacity: 0.8, fontVariantNumeric: 'tabular-nums', marginBottom: '12px' }}>
                 {formatDuration(callDuration)}
               </p>
+              {/* Connection stats */}
+              {callStats && (() => {
+                const rtt = callStats.rttMs ?? 999
+                const loss = callStats.packetLossPct ?? 0
+                const quality = rtt < 80 && loss < 2 ? 'good' : rtt < 200 && loss < 10 ? 'fair' : 'poor'
+                const qColor = quality === 'good' ? '#4ade80' : quality === 'fair' ? '#fbbf24' : '#f87171'
+                return (
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    {[
+                      { label: 'Latency', value: callStats.rttMs != null ? `${callStats.rttMs}ms` : '—' },
+                      { label: 'Packet loss', value: callStats.packetLossPct != null ? `${callStats.packetLossPct}%` : '—' },
+                      { label: 'Jitter', value: callStats.jitterMs != null ? `${callStats.jitterMs}ms` : '—' },
+                      { label: 'Bitrate', value: callStats.bitrateKbps != null ? `${callStats.bitrateKbps} kbps` : '—' },
+                    ].map(({ label, value }) => (
+                      <div key={label} style={{ textAlign: 'center' }}>
+                        <p style={{ margin: '0 0 2px', fontSize: '11px', opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+                        <p style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: label === 'Latency' ? qColor : 'rgba(255,255,255,0.9)' }}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
           )}
 
@@ -1118,6 +1190,25 @@ export default function ChatPage() {
                         <span style={{ flex: 1, fontSize: '14px', fontWeight: '600', color: '#fff' }}>
                           {callPeer?.userName} · {formatDuration(callDuration)}
                         </span>
+                        {/* Connection quality indicator */}
+                        {callStats && (() => {
+                          const rtt = callStats.rttMs ?? 999
+                          const loss = callStats.packetLossPct ?? 0
+                          const quality = rtt < 80 && loss < 2 ? 'good' : rtt < 200 && loss < 10 ? 'fair' : 'poor'
+                          const color = quality === 'good' ? '#4ade80' : quality === 'fair' ? '#fbbf24' : '#f87171'
+                          const label = quality === 'good' ? 'Good' : quality === 'fair' ? 'Fair' : 'Poor'
+                          return (
+                            <span title={`Latency: ${callStats.rttMs ?? '?'}ms · Loss: ${callStats.packetLossPct ?? '?'}% · Jitter: ${callStats.jitterMs ?? '?'}ms`} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '600', color, cursor: 'default', flexShrink: 0 }}>
+                              <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
+                                <rect x="0" y="8" width="3" height="4" rx="1" fill={color} opacity={1} />
+                                <rect x="4" y="5" width="3" height="7" rx="1" fill={color} opacity={quality !== 'poor' ? 1 : 0.3} />
+                                <rect x="8" y="2" width="3" height="10" rx="1" fill={color} opacity={quality === 'good' ? 1 : 0.3} />
+                                <rect x="12" y="0" width="2" height="12" rx="1" fill={color} opacity={quality === 'good' ? 1 : 0.15} />
+                              </svg>
+                              {label}
+                            </span>
+                          )
+                        })()}
                         {/* Mute */}
                         <button onClick={toggleMute} style={{
                           width: '36px', height: '36px', borderRadius: '50%', border: 'none',
