@@ -49,6 +49,7 @@ model User {
   referralsReceived Referral[]                @relation("ReferralsReceived")
   chatParticipants  ConversationParticipant[]
   chatMessages      ChatMessage[]
+  messageReports    MessageReport[]   @relation("reportsMade")
 
   @@map("users")
 }
@@ -553,10 +554,36 @@ model ChatMessage {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   senderId       String
   sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  reports        MessageReport[]
 
   @@index([conversationId, createdAt])
   @@index([senderId])
   @@map("chat_messages")
+}
+
+model MessageReport {
+  id        String       @id @default(cuid())
+  reason    String
+  status    ReportStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+  resolvedAt DateTime?
+  adminNote  String?
+
+  messageId  String
+  message    ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  reporterId String
+  reporter   User        @relation("reportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([messageId])
+  @@map("message_reports")
+}
+
+enum ReportStatus {
+  PENDING
+  WARNED
+  DELETED
+  DISMISSED
 }
 
 enum MessageType {

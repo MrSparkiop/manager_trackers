@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   MessageSquare, Search, Send, Mic, Square, X, Play, Pause, ArrowLeft,
-  Phone, PhoneOff, PhoneCall, MicOff, Monitor, Maximize2, Minimize2,
+  Phone, PhoneOff, PhoneCall, MicOff, Monitor, Maximize2, Minimize2, Flag,
 } from 'lucide-react'
 import { useThemeStore } from '../store/themeStore'
 import { useAuthStore } from '../store/authStore'
@@ -131,6 +131,9 @@ export default function ChatPage() {
   const [isScreenSharing, setIsScreenSharing] = useState(false)
   const [isRemoteScreenSharing, setIsRemoteScreenSharing] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null)
+  const [reportModal, setReportModal] = useState<{ messageId: string } | null>(null)
+  const [reportReason, setReportReason] = useState('')
 
   // Refs — always current even in stale socket closures
   const callStateRef = useRef<CallState>('idle')
@@ -220,6 +223,17 @@ export default function ChatPage() {
       setActiveConvId(conv.id)
       setShowNewChat(false)
     },
+  })
+
+  const reportMutation = useMutation({
+    mutationFn: ({ messageId, reason }: { messageId: string; reason: string }) =>
+      api.post('/moderation/reports', { messageId, reason }),
+    onSuccess: () => {
+      toast.success('Message reported')
+      setReportModal(null)
+      setReportReason('')
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.message || 'Failed to report'),
   })
 
   // ── Sync call state to global store (for floating Layout widget) ────
@@ -1194,7 +1208,26 @@ export default function ChatPage() {
                   }
 
                   return (
-                    <div key={msg.id} style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start' }}>
+                    <div
+                      key={msg.id}
+                      style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '4px' }}
+                      onMouseEnter={() => setHoveredMsgId(msg.id)}
+                      onMouseLeave={() => setHoveredMsgId(null)}
+                    >
+                      {!isMine && (
+                        <button
+                          onClick={() => { setReportModal({ messageId: msg.id }); setReportReason('') }}
+                          title="Report message"
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+                            color: colors.textMuted, opacity: hoveredMsgId === msg.id ? 0.7 : 0,
+                            transition: 'opacity 0.15s', flexShrink: 0,
+                            display: 'flex', alignItems: 'center',
+                          }}
+                        >
+                          <Flag size={12} />
+                        </button>
+                      )}
                       <div style={{
                         maxWidth: '70%', padding: '10px 14px', borderRadius: bubbleRadius,
                         background: isMine
@@ -1311,6 +1344,49 @@ export default function ChatPage() {
 
             </>
           )}
+        </div>
+      )}
+
+      {/* Report message modal */}
+      {reportModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setReportModal(null)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            backgroundColor: colors.card, borderRadius: '16px',
+            border: `1px solid ${colors.border}`, padding: '24px',
+            width: '100%', maxWidth: '400px', margin: '0 16px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <Flag size={18} color="#ef4444" />
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: colors.text }}>Report Message</h3>
+            </div>
+            <p style={{ fontSize: '13px', color: colors.textMuted, marginBottom: '16px' }}>
+              Let us know why this message is inappropriate. Admins will review your report.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              {['Spam', 'Harassment', 'Hate speech', 'Inappropriate content', 'Other'].map(r => (
+                <label key={r} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '8px 12px', borderRadius: '8px', backgroundColor: reportReason === r ? `${accent}15` : 'transparent', border: `1px solid ${reportReason === r ? accent : colors.border}` }}>
+                  <input type="radio" name="reason" value={r} checked={reportReason === r} onChange={() => setReportReason(r)} style={{ accentColor: accent }} />
+                  <span style={{ fontSize: '13px', color: colors.text }}>{r}</span>
+                </label>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setReportModal(null)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: `1px solid ${colors.border}`, backgroundColor: 'transparent', color: colors.textMuted, cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
+                Cancel
+              </button>
+              <button
+                onClick={() => reportReason && reportMutation.mutate({ messageId: reportModal.messageId, reason: reportReason })}
+                disabled={!reportReason || reportMutation.isPending}
+                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', backgroundColor: reportReason ? '#ef4444' : colors.border, color: reportReason ? '#fff' : colors.textMuted, cursor: reportReason ? 'pointer' : 'default', fontSize: '13px', fontWeight: '600' }}
+              >
+                {reportMutation.isPending ? 'Reporting…' : 'Submit Report'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

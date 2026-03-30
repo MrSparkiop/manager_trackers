@@ -4,17 +4,18 @@ import { useAuthStore } from '../store/authStore'
 import { useThemeStore } from '../store/themeStore'
 import {
   LayoutDashboard, Users, LogOut, User,
-  Sun, Moon, Menu, X, Shield, ArrowLeft, Activity, Search, Settings, Headphones, CreditCard
+  Sun, Moon, Menu, X, Shield, ArrowLeft, Activity, Search, Settings, Headphones, CreditCard, Flag
 } from 'lucide-react'
 
 const navItems = [
-  { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard'    },
-  { to: '/admin/users',     icon: Users,           label: 'Users'        },
-  { to: '/admin/billing',   icon: CreditCard,      label: 'Billing'      },
-  { to: '/admin/activity',  icon: Activity,        label: 'Activity Log' },
-  { to: '/admin/search',    icon: Search,          label: 'Search'       },
-  { to: '/admin/settings',  icon: Settings,        label: 'Settings'     },
-  { to: '/admin/support',   icon: Headphones,      label: 'Support Tickets' },
+  { to: '/admin/dashboard',   icon: LayoutDashboard, label: 'Dashboard'       },
+  { to: '/admin/users',       icon: Users,           label: 'Users'           },
+  { to: '/admin/billing',     icon: CreditCard,      label: 'Billing'         },
+  { to: '/admin/moderation',  icon: Flag,            label: 'Moderation'      },
+  { to: '/admin/activity',    icon: Activity,        label: 'Activity Log'    },
+  { to: '/admin/search',      icon: Search,          label: 'Search'          },
+  { to: '/admin/settings',    icon: Settings,        label: 'Settings'        },
+  { to: '/admin/support',     icon: Headphones,      label: 'Support Tickets' },
 ]
 
 function useIsMobile() {
