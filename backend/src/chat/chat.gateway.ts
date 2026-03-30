@@ -38,6 +38,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private notifications: NotificationsService,
   ) {}
 
+  getMetrics() {
+    return {
+      onlineUsers: this.onlineUsers.size,
+      socketConnections: this.server?.engine?.clientsCount ?? 0,
+    }
+  }
+
   async handleConnection(client: Socket) {
     try {
       const cookieHeader = client.handshake.headers?.cookie ?? ''

@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { JwtService } from '@nestjs/jwt'
 import { PrismaService } from '../prisma/prisma.service'
 import { AnnouncementType, TargetRole, Role } from '@prisma/client'
+import * as os from 'os'
+import Redis from 'ioredis'
 
 @Injectable()
 export class AdminService {
@@ -404,5 +406,69 @@ export class AdminService {
       orderBy: { createdAt: 'desc' },
       take: limit,
     })
+  }
+
+  async getSystemHealth(chatMetrics: { onlineUsers: number; socketConnections: number }) {
+    // DB check
+    let dbStatus = 'ok'
+    let dbLatencyMs = 0
+    try {
+      const t0 = Date.now()
+      await this.prisma.$queryRaw`SELECT 1`
+      dbLatencyMs = Date.now() - t0
+    } catch {
+      dbStatus = 'error'
+    }
+
+    // Redis check
+    let redisStatus = 'ok'
+    let redisLatencyMs = 0
+    if (process.env.REDIS_URL) {
+      const client = new Redis(process.env.REDIS_URL, { lazyConnect: true, connectTimeout: 3000 })
+      try {
+        const t0 = Date.now()
+        await client.connect()
+        await client.ping()
+        redisLatencyMs = Date.now() - t0
+      } catch {
+        redisStatus = 'error'
+      } finally {
+        client.disconnect()
+      }
+    } else {
+      redisStatus = 'not_configured'
+    }
+
+    // Memory
+    const mem = process.memoryUsage()
+    const totalMem = os.totalmem()
+    const freeMem = os.freemem()
+
+    // CPU
+    const loadAvg = os.loadavg()
+    const cpuCount = os.cpus().length
+
+    return {
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()),
+      db: { status: dbStatus, latencyMs: dbLatencyMs },
+      redis: { status: redisStatus, latencyMs: redisLatencyMs },
+      memory: {
+        heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+        heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024),
+        rssMb: Math.round(mem.rss / 1024 / 1024),
+        systemTotalMb: Math.round(totalMem / 1024 / 1024),
+        systemFreeMb: Math.round(freeMem / 1024 / 1024),
+        systemUsedPct: Math.round(((totalMem - freeMem) / totalMem) * 100),
+      },
+      cpu: {
+        load1: parseFloat(loadAvg[0].toFixed(2)),
+        load5: parseFloat(loadAvg[1].toFixed(2)),
+        load15: parseFloat(loadAvg[2].toFixed(2)),
+        cores: cpuCount,
+        loadPct: Math.min(100, Math.round((loadAvg[0] / cpuCount) * 100)),
+      },
+      sockets: chatMetrics,
+    }
   }
 }

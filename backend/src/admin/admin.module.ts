@@ -6,11 +6,13 @@ import { MaintenanceService } from './maintenance.service'
 import { MaintenancePublicController } from './maintenance.public.controller'
 import { PrismaModule } from '../../prisma/prisma.module'
 import { AuthModule } from '../auth/auth.module'
+import { ChatModule } from '../chat/chat.module'
 
 @Module({
   imports: [
     PrismaModule,
     AuthModule,
+    ChatModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'super-secret-jwt-key-change-in-production',
     }),

@@ -4,6 +4,7 @@ import { PermissionsGuard } from '../auth/permissions.guard'
 import { RequirePermissions } from '../auth/permissions'
 import { AdminService } from './admin.service'
 import { MaintenanceService } from './maintenance.service'
+import { ChatGateway } from '../chat/chat.gateway'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import type { Request } from 'express'
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
@@ -21,11 +22,16 @@ export class AdminController {
   constructor(
     private adminService: AdminService,
     private maintenanceService: MaintenanceService,
+    private chatGateway: ChatGateway,
   ) {}
 
   @Get('stats')
   @ApiOperation({ summary: 'Get platform stats' })
   getStats() { return this.adminService.getStats() }
+
+  @Get('system-health')
+  @ApiOperation({ summary: 'Get system health metrics' })
+  getSystemHealth() { return this.adminService.getSystemHealth(this.chatGateway.getMetrics()) }
 
   @Get('users')
   @ApiOperation({ summary: 'Get all users with pagination' })

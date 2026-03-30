@@ -44,6 +44,7 @@ const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'))
 const AdminSupportPage = lazy(() => import('./pages/admin/AdminSupportPage'))
 const AdminBillingPage = lazy(() => import('./pages/admin/AdminBillingPage'))
 const AdminModerationPage = lazy(() => import('./pages/admin/AdminModerationPage'))
+const AdminSystemHealthPage = lazy(() => import('./pages/admin/AdminSystemHealthPage'))
 
 function PageLoader() {
   return (
@@ -188,6 +189,7 @@ export default function App() {
             <Route path="support" element={<LazyPage><AdminSupportPage /></LazyPage>} />
             <Route path="billing" element={<LazyPage><AdminBillingPage /></LazyPage>} />
             <Route path="moderation" element={<LazyPage><AdminModerationPage /></LazyPage>} />
+            <Route path="system-health" element={<LazyPage><AdminSystemHealthPage /></LazyPage>} />
           </Route>
 
           {/* Catch all */}
