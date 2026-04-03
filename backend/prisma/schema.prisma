@@ -547,7 +547,8 @@ model ChatMessage {
   id            String      @id @default(cuid())
   content       String?
   type          MessageType @default(TEXT)
-  audioData     String?
+  audioData     String?  // @deprecated - use audioUrl (MinIO) for new messages
+  audioUrl      String?  // MinIO object key, served via /api/chat/audio/:key
   audioDuration Int?
   createdAt     DateTime    @default(now())
 

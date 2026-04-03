@@ -95,6 +95,7 @@ export interface ChatMessage {
   content?: string
   type: 'TEXT' | 'VOICE' | 'CALL'
   audioData?: string
+  audioUrl?: string
   audioDuration?: number
   createdAt: string
   conversationId: string

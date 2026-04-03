@@ -2,11 +2,13 @@ import {
   WebSocketGateway, WebSocketServer,
   SubscribeMessage, OnGatewayConnection, OnGatewayDisconnect,
 } from '@nestjs/websockets'
+import { OnModuleInit, OnModuleDestroy } from '@nestjs/common'
 import { Server, Socket } from 'socket.io'
 import { JwtService } from '@nestjs/jwt'
 import { ChatService } from './chat.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationsService } from '../notifications/notifications.service'
+import Redis from 'ioredis'
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
   .split(',')
@@ -22,14 +24,18 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
   },
   namespace: '/chat',
 })
-export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit, OnModuleDestroy {
   @WebSocketServer()
   server: Server
 
-  // In-memory tracking of online users
-  private onlineUsers = new Set<string>()
-  // Count of active socket connections per user (handles multiple tabs)
+  // Local per-instance connection count (handles multiple tabs on same instance)
   private connectionCount = new Map<string, number>()
+  // Local cache for fast reads; Redis is the source of truth across instances
+  private onlineUsers = new Set<string>()
+  // Redis client for cross-instance presence — null when REDIS_URL is not set
+  private redis: Redis | null = null
+
+  private readonly ONLINE_KEY = 'chat:online'
 
   constructor(
     private jwtService: JwtService,
@@ -38,9 +44,30 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private notifications: NotificationsService,
   ) {}
 
-  getMetrics() {
+  async onModuleInit() {
+    if (process.env.REDIS_URL) {
+      try {
+        this.redis = new Redis(process.env.REDIS_URL, { lazyConnect: true })
+        await this.redis.connect()
+        // Clear stale presence from a previous crash/restart
+        await this.redis.del(this.ONLINE_KEY)
+      } catch {
+        console.warn('[ChatGateway] Redis unavailable — using in-memory presence')
+        this.redis = null
+      }
+    }
+  }
+
+  async onModuleDestroy() {
+    this.redis?.disconnect()
+  }
+
+  async getMetrics() {
+    const onlineCount = this.redis
+      ? await this.redis.scard(this.ONLINE_KEY)
+      : this.onlineUsers.size
     return {
-      onlineUsers: this.onlineUsers.size,
+      onlineUsers: onlineCount,
       socketConnections: this.server?.engine?.clientsCount ?? 0,
     }
   }
@@ -67,10 +94,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.data.userName = `${user.firstName} ${user.lastName}`
       client.join(`chat:user:${user.id}`)
 
-      // Track as online (increment connection count for multi-tab support)
-      const count = (this.connectionCount.get(user.id) ?? 0) + 1
-      this.connectionCount.set(user.id, count)
+      // Increment local connection count (multi-tab on this instance)
+      const localCount = (this.connectionCount.get(user.id) ?? 0) + 1
+      this.connectionCount.set(user.id, localCount)
+
+      // Mark online in Redis (SADD is idempotent) or local Set
+      const wasOffline = !this.onlineUsers.has(user.id)
       this.onlineUsers.add(user.id)
+      if (this.redis) await this.redis.sadd(this.ONLINE_KEY, user.id)
 
       // Update lastSeenAt in DB (fire-and-forget)
       this.prisma.user.update({
@@ -78,33 +109,46 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         data: { lastSeenAt: new Date() },
       }).catch(() => {})
 
-      // Tell everyone this user is online
-      this.server.emit('user_online', { userId: user.id })
+      // Only broadcast user_online on their very first connection (cross-instance aware)
+      if (wasOffline) this.server.emit('user_online', { userId: user.id })
 
-      // Send the new client the full list of currently online users
-      client.emit('online_users_list', { userIds: Array.from(this.onlineUsers) })
+      // Send new client the full cross-instance online list
+      const onlineList = this.redis
+        ? await this.redis.smembers(this.ONLINE_KEY)
+        : Array.from(this.onlineUsers)
+      client.emit('online_users_list', { userIds: onlineList })
     } catch {
       client.disconnect()
     }
   }
 
-  handleDisconnect(client: Socket) {
+  async handleDisconnect(client: Socket) {
     const userId = client.data?.userId
     if (!userId) return
 
-    // Decrement connection count; only mark offline when last tab closes
-    const count = (this.connectionCount.get(userId) ?? 1) - 1
-    if (count <= 0) {
-      this.connectionCount.delete(userId)
+    const localCount = (this.connectionCount.get(userId) ?? 1) - 1
+    if (localCount > 0) {
+      // Still has other tabs open on this instance — stay online
+      this.connectionCount.set(userId, localCount)
+      return
+    }
+
+    this.connectionCount.delete(userId)
+
+    // Check if user still has sockets on ANY instance via Socket.IO room
+    // (works correctly when the Redis adapter is active)
+    const remaining = await this.server.in(`chat:user:${userId}`).fetchSockets()
+    const hasOtherSockets = remaining.some(s => s.id !== client.id)
+
+    if (!hasOtherSockets) {
+      // Truly offline across all instances
       this.onlineUsers.delete(userId)
-      // Update lastSeenAt on disconnect so "last seen" is accurate
+      if (this.redis) await this.redis.srem(this.ONLINE_KEY, userId)
       this.prisma.user.update({
         where: { id: userId },
         data: { lastSeenAt: new Date() },
       }).catch(() => {})
       this.server.emit('user_offline', { userId })
-    } else {
-      this.connectionCount.set(userId, count)
     }
   }
 
@@ -126,6 +170,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     content?: string
     type: 'TEXT' | 'VOICE'
     audioData?: string
+    audioUrl?: string
     audioDuration?: number
   }) {
     if (!client.data.userId) return
@@ -143,6 +188,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         content: data.content,
         type: data.type,
         audioData: data.audioData,
+        audioUrl: data.audioUrl,
         audioDuration: data.audioDuration,
       })
 

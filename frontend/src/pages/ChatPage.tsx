@@ -692,22 +692,25 @@ export default function ChatPage() {
 
   const sendVoiceMessage = async () => {
     if (!activeConvId || !audioBlob) return
-    const reader = new FileReader()
-    reader.onloadend = async () => {
-      const base64 = (reader.result as string).split(',')[1]
-      try {
-        const { data: newMsg } = await api.post(`/chat/conversations/${activeConvId}/messages`, {
-          type: 'VOICE', audioData: base64, audioDuration,
-        })
-        queryClient.setQueryData<{ messages: ChatMessage[] }>(
-          queryKeys.chat.messages(activeConvId),
-          (old) => old ? { ...old, messages: [...old.messages, newMsg] } : { messages: [newMsg] },
-        )
-        queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
-        cancelRecording()
-      } catch { toast.error('Failed to send voice message') }
-    }
-    reader.readAsDataURL(audioBlob)
+    try {
+      // Upload audio to MinIO via backend proxy
+      const formData = new FormData()
+      formData.append('audio', audioBlob, 'voice.webm')
+      const { data: uploadResult } = await api.post('/chat/audio', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      const audioKey: string = uploadResult.key
+
+      const { data: newMsg } = await api.post(`/chat/conversations/${activeConvId}/messages`, {
+        type: 'VOICE', audioUrl: audioKey, audioDuration,
+      })
+      queryClient.setQueryData<{ messages: ChatMessage[] }>(
+        queryKeys.chat.messages(activeConvId),
+        (old) => old ? { ...old, messages: [...old.messages, newMsg] } : { messages: [newMsg] },
+      )
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
+      cancelRecording()
+    } catch { toast.error('Failed to send voice message') }
   }
 
   const playPreview = () => {
@@ -1334,7 +1337,7 @@ export default function ChatPage() {
                         fontFamily: chatFont,
                       }}>
                         {msg.type === 'VOICE' ? (
-                          <VoiceMessagePlayer audioData={msg.audioData!} duration={msg.audioDuration || 0} isMine={isMine} isDark={isDark} />
+                          <VoiceMessagePlayer audioData={msg.audioData ?? undefined} audioUrl={msg.audioUrl ?? undefined} duration={msg.audioDuration || 0} isMine={isMine} isDark={isDark} />
                         ) : (
                           <p style={{ fontSize: '14px', margin: 0, lineHeight: '1.5', wordBreak: 'break-word' }}>{msg.content}</p>
                         )}
@@ -1486,16 +1489,26 @@ export default function ChatPage() {
 
 // ── Voice message playback component ─────────────────────────────
 
-function VoiceMessagePlayer({ audioData, duration, isMine, isDark }: {
-  audioData: string; duration: number; isMine: boolean; isDark: boolean
+function VoiceMessagePlayer({ audioData, audioUrl, duration, isMine, isDark }: {
+  audioData?: string; audioUrl?: string; duration: number; isMine: boolean; isDark: boolean
 }) {
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
+  const getAudioSrc = () => {
+    // Prefer MinIO-backed URL (served via backend proxy)
+    if (audioUrl) return `/api/chat/audio/${audioUrl}`
+    // Fallback: legacy base64 stored in DB
+    if (audioData) return `data:audio/webm;codecs=opus;base64,${audioData}`
+    return null
+  }
+
   const toggle = () => {
     if (!audioRef.current) {
-      const audio = new Audio(`data:audio/webm;codecs=opus;base64,${audioData}`)
+      const src = getAudioSrc()
+      if (!src) return
+      const audio = new Audio(src)
       audioRef.current = audio
       audio.ontimeupdate = () => setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0)
       audio.onended = () => { setPlaying(false); setProgress(0) }
