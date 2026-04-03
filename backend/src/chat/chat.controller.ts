@@ -117,8 +117,8 @@ export class ChatController {
     return { key }
   }
 
-  @Get('audio/:key(*)')
-  async streamAudio(@Param('key') key: string, @Res() res: Response) {
+  @Get('audio')
+  async streamAudio(@Query('key') key: string, @Res() res: Response) {
     try {
       const { stream, contentType } = await this.storageService.getAudioStream(key)
       res.setHeader('Content-Type', contentType)

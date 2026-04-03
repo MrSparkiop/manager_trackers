@@ -288,7 +288,7 @@ function VoiceMessagePlayer({ audioData, audioUrl, duration, isMine, isDark }: {
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const getAudioSrc = () => {
-    if (audioUrl) return `/api/chat/audio/${audioUrl}`
+    if (audioUrl) return `/api/chat/audio?key=${encodeURIComponent(audioUrl)}`
     if (audioData) return `data:audio/webm;codecs=opus;base64,${audioData}`
     return null
   }
