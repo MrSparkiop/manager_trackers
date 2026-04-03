@@ -97,6 +97,8 @@ export interface ChatMessage {
   audioData?: string
   audioUrl?: string
   audioDuration?: number
+  editedAt?: string | null
+  deletedAt?: string | null
   createdAt: string
   conversationId: string
   senderId: string

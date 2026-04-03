@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import {
-  MessageSquare, Search, Send, Mic, Square, X, Play, Pause, ArrowLeft,
-  Phone, PhoneOff, PhoneCall, MicOff, Monitor, Maximize2, Minimize2, Flag,
+  MessageSquare, ArrowLeft,
+  Phone, PhoneOff, Mic, MicOff, Monitor, Maximize2, Flag,
 } from 'lucide-react'
 import { useThemeStore } from '../store/themeStore'
 import { useAuthStore } from '../store/authStore'
@@ -15,6 +15,10 @@ import { connectChatSocket, getChatSocket } from '../lib/chatSocket'
 import api from '../lib/axios'
 import { startRingtone, stopRingtone, startCallingTone, stopCallingTone, playEndCallTone, stopAllCallSounds } from '../lib/callSounds'
 import { useChatStore } from '../store/chatStore'
+import { ConversationSidebar } from '../components/chat/ConversationSidebar'
+import { MessageList } from '../components/chat/MessageList'
+import { MessageInput } from '../components/chat/MessageInput'
+import { CallOverlay, type CallState } from '../components/chat/CallOverlay'
 import type { Conversation, ChatMessage, ChatUser } from '../types'
 import toast from 'react-hot-toast'
 
@@ -26,7 +30,13 @@ const ICE_SERVERS: RTCConfiguration = {
   ],
 }
 
-type CallState = 'idle' | 'calling' | 'ringing' | 'active'
+interface MsgPage {
+  messages: ChatMessage[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
 
 function formatDuration(s: number) {
   const m = Math.floor(s / 60)
@@ -42,7 +52,6 @@ export default function ChatPage() {
   const chatTheme = CHAT_THEMES.find(t => t.id === chatThemeId) ?? CHAT_THEMES[0]
   const isDefaultTheme = chatTheme.id === 'default'
 
-  // Merge theme overrides on top of base colors
   const colors = {
     ...baseColors,
     ...(isDefaultTheme ? {} : {
@@ -58,7 +67,6 @@ export default function ChatPage() {
     }),
   }
 
-  // Per-theme bubble colors
   const myBubble = chatTheme.myBubble || '#6366f1'
   const myBubbleText = chatTheme.myText || '#ffffff'
   const theirBubble = isDefaultTheme ? (isDark ? '#1e293b' : '#f1f5f9') : chatTheme.theirBubble
@@ -66,43 +74,32 @@ export default function ChatPage() {
   const chatFont = chatTheme.font
   const bubbleRadius = chatTheme.bubbleRadius ?? '16px'
 
-  // Accent = first solid colour from myBubble (strip gradient fallback to indigo)
   const accent = isDefaultTheme ? '#6366f1'
     : myBubble.startsWith('linear') ? (chatTheme.inputBorder || chatTheme.text || '#6366f1')
     : myBubble
   const accentText = myBubbleText
 
-  // Header text — always readable against the header background
   const headerTextColor = !isDefaultTheme && chatTheme.headerText ? chatTheme.headerText : colors.text
   const headerMutedColor = !isDefaultTheme && chatTheme.headerText ? `${chatTheme.headerText}aa` : colors.textMuted
 
-  // Ghost button style (mic, secondary actions)
-  const ghostBg = isDefaultTheme
-    ? (isDark ? '#1e293b' : '#f1f5f9')
-    : chatTheme.input
-  const ghostBorder = isDefaultTheme
-    ? colors.border
-    : chatTheme.inputBorder
+  const ghostBg = isDefaultTheme ? (isDark ? '#1e293b' : '#f1f5f9') : chatTheme.input
+  const ghostBorder = isDefaultTheme ? colors.border : chatTheme.inputBorder
   const ghostText = isDefaultTheme ? colors.textMuted : chatTheme.textMuted
 
-  // Conversation active highlight
   const activeConvBg = isDefaultTheme
     ? (isDark ? 'rgba(99,102,241,0.1)' : 'rgba(99,102,241,0.05)')
     : `${accent}22`
 
-  // Avatar bg — use accent for non-default themes
   const avatarBg = isDefaultTheme
     ? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
     : (myBubble.startsWith('linear') ? myBubble : accent)
   const avatarIsGradient = avatarBg.startsWith('linear')
 
-  // Input styles
   const inputBg = isDefaultTheme ? (isDark ? '#1e293b' : '#f1f5f9') : chatTheme.input
   const inputRadius = chatTheme.inputRadius ?? '12px'
 
   const queryClient = useQueryClient()
 
-  // Persist active conversation across navigation via global store
   const activeConvId = useChatStore(s => s.activeConvId)
   const setActiveConvId = useChatStore(s => s.setActiveConvId)
   const setCallSnapshot = useChatStore(s => s.setCallSnapshot)
@@ -112,18 +109,10 @@ export default function ChatPage() {
   const [showNewChat, setShowNewChat] = useState(false)
   const [typingUser, setTypingUser] = useState<string | null>(null)
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
+  const [reportModal, setReportModal] = useState<{ messageId: string } | null>(null)
+  const [reportReason, setReportReason] = useState('')
 
-  // Voice message recording
-  const [isRecording, setIsRecording] = useState(false)
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
-  const [audioDuration, setAudioDuration] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioChunksRef = useRef<Blob[]>([])
-  const recordingStartRef = useRef<number>(0)
-  const audioPlayerRef = useRef<HTMLAudioElement | null>(null)
-
-  // ── Voice call state ─────────────────────────────────────────
+  // ── Voice call state ─────────────────────────────────────────────
   const [callState, setCallState] = useState<CallState>('idle')
   const [callPeer, setCallPeer] = useState<{ userId: string; userName: string } | null>(null)
   const [isMuted, setIsMuted] = useState(false)
@@ -131,11 +120,10 @@ export default function ChatPage() {
   const [isScreenSharing, setIsScreenSharing] = useState(false)
   const [isRemoteScreenSharing, setIsRemoteScreenSharing] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null)
-  const [reportModal, setReportModal] = useState<{ messageId: string } | null>(null)
-  const [reportReason, setReportReason] = useState('')
+  const [callStats, setCallStats] = useState<{
+    rttMs: number | null; packetLossPct: number | null; jitterMs: number | null; bitrateKbps: number | null
+  } | null>(null)
 
-  // Refs — always current even in stale socket closures
   const callStateRef = useRef<CallState>('idle')
   callStateRef.current = callState
   const callPeerRef = useRef<{ userId: string; userName: string } | null>(null)
@@ -144,6 +132,7 @@ export default function ChatPage() {
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null)
+  const remoteScreenVideoRef = useRef<HTMLVideoElement | null>(null)
   const incomingCallRef = useRef<{
     from: { userId: string; userName: string }
     conversationId: string
@@ -153,28 +142,15 @@ export default function ChatPage() {
   const callStartRef = useRef<number>(0)
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([])
-
   const screenStreamRef = useRef<MediaStream | null>(null)
-  const remoteScreenVideoRef = useRef<HTMLVideoElement | null>(null)
   const callStatsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const [callStats, setCallStats] = useState<{
-    rttMs: number | null
-    packetLossPct: number | null
-    jitterMs: number | null
-    bitrateKbps: number | null
-  } | null>(null)
   const prevBytesRef = useRef<number>(0)
-
-  const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const activeConvIdRef = useRef<string | null>(null)
   activeConvIdRef.current = activeConvId
-
-  // Keep a ref to otherUser so startCall always has the current value (typed below after getOtherUser)
   const otherUserRef = useRef<{ id: string; firstName: string; lastName: string } | undefined>(undefined)
 
-
-  // ── cleanupCall (stored in ref so socket handlers can call it) ─
+  // ── cleanupCall ──────────────────────────────────────────────────
   const cleanupCall = useCallback(() => {
     stopAllCallSounds()
     if (callStateRef.current === 'active') playEndCallTone()
@@ -204,7 +180,7 @@ export default function ChatPage() {
   const cleanupCallRef = useRef(cleanupCall)
   cleanupCallRef.current = cleanupCall
 
-  // ── Queries ────────────────────────────────────────────────────
+  // ── Queries ──────────────────────────────────────────────────────
 
   const { data: conversations = [] } = useQuery<Conversation[]>({
     queryKey: queryKeys.chat.conversations,
@@ -212,14 +188,27 @@ export default function ChatPage() {
     refetchInterval: 30000,
   })
 
-  const { data: messagesData } = useQuery<{ messages: ChatMessage[] }>({
+  const {
+    data: messagesInfinite,
+    fetchPreviousPage,
+    hasPreviousPage,
+    isFetchingPreviousPage,
+  } = useInfiniteQuery<MsgPage>({
     queryKey: queryKeys.chat.messages(activeConvId || ''),
-    queryFn: () => api.get(`/chat/conversations/${activeConvId}/messages?limit=100`).then(r => r.data),
+    queryFn: ({ pageParam }) =>
+      api.get(`/chat/conversations/${activeConvId}/messages?page=${pageParam}&limit=50`).then(r => r.data),
+    initialPageParam: 1,
+    getNextPageParam: () => undefined,
+    getPreviousPageParam: (firstPage: MsgPage) =>
+      firstPage.page < firstPage.totalPages ? firstPage.page + 1 : undefined,
     enabled: !!activeConvId,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   })
-  const messages = messagesData?.messages ?? []
+
+  // pages[0] = page1 (newest 50, ascending). fetchPreviousPage prepends older pages.
+  // flatMap gives: [older_pages..., newest_page] = chronological order.
+  const messages = messagesInfinite?.pages.flatMap(p => p.messages) ?? []
 
   const { data: chatUsers = [] } = useQuery<ChatUser[]>({
     queryKey: [...queryKeys.chat.users, searchUsers],
@@ -236,6 +225,18 @@ export default function ChatPage() {
     },
   })
 
+  const editMutation = useMutation({
+    mutationFn: ({ convId, msgId, content }: { convId: string; msgId: string; content: string }) =>
+      api.patch(`/chat/conversations/${convId}/messages/${msgId}`, { content }).then(r => r.data),
+    onError: () => toast.error('Failed to edit message'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: ({ convId, msgId }: { convId: string; msgId: string }) =>
+      api.delete(`/chat/conversations/${convId}/messages/${msgId}`).then(r => r.data),
+    onError: () => toast.error('Failed to delete message'),
+  })
+
   const reportMutation = useMutation({
     mutationFn: ({ messageId, reason }: { messageId: string; reason: string }) =>
       api.post('/moderation/reports', { messageId, reason }),
@@ -247,29 +248,39 @@ export default function ChatPage() {
     onError: (err: any) => toast.error(err?.response?.data?.message || 'Failed to report'),
   })
 
-  // ── Sync call state to global store (for floating Layout widget) ────
+  // ── Helpers for cache updates ────────────────────────────────────
+
+  const appendMessageToCache = useCallback((convId: string, msg: ChatMessage) => {
+    queryClient.setQueryData<InfiniteData<MsgPage>>(
+      queryKeys.chat.messages(convId),
+      (old) => {
+        if (!old?.pages.length) return old
+        const pages = [...old.pages]
+        const last = pages[pages.length - 1]
+        pages[pages.length - 1] = { ...last, messages: [...last.messages, msg] }
+        return { ...old, pages }
+      },
+    )
+  }, [queryClient])
+
+  // ── Effects ──────────────────────────────────────────────────────
+
   useEffect(() => {
     setCallSnapshot(callState, callPeer, callDuration)
   }, [callState, callPeer, callDuration, setCallSnapshot])
 
-  // ── Warn on tab close/refresh while in a call ─────────────────
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (callStateRef.current !== 'idle') {
-        e.preventDefault()
-        e.returnValue = ''
-      }
+      if (callStateRef.current !== 'idle') { e.preventDefault(); e.returnValue = '' }
     }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [])
 
-  // ── Socket (registered once on mount, removed on unmount) ────────
-
+  // ── Socket (registered once on mount) ───────────────────────────
   useEffect(() => {
-    const socket = connectChatSocket() // returns already-connected socket from App.tsx
+    const socket = connectChatSocket()
 
-    // On (re)connect: re-join the active conversation room so we keep receiving messages
     socket.on('connect', () => {
       const convId = activeConvIdRef.current
       if (convId) {
@@ -278,7 +289,6 @@ export default function ChatPage() {
       }
     })
 
-    // ── Presence ──
     socket.on('online_users_list', (data: { userIds: string[] }) => {
       setOnlineUsers(new Set(data.userIds))
     })
@@ -289,17 +299,61 @@ export default function ChatPage() {
       setOnlineUsers(prev => { const s = new Set(prev); s.delete(data.userId); return s })
     })
 
-    // ── Messages ──
     socket.on('new_message', (msg: ChatMessage) => {
-      queryClient.setQueryData<{ messages: ChatMessage[] }>(
-        queryKeys.chat.messages(msg.conversationId ?? activeConvIdRef.current ?? ''),
-        (old) => old ? { ...old, messages: [...old.messages, msg] } : old,
+      const convId = msg.conversationId ?? activeConvIdRef.current ?? ''
+      // Append to newest page (last in pages array)
+      queryClient.setQueryData<InfiniteData<MsgPage>>(
+        queryKeys.chat.messages(convId),
+        (old) => {
+          if (!old?.pages.length) return old
+          const pages = [...old.pages]
+          const last = pages[pages.length - 1]
+          pages[pages.length - 1] = { ...last, messages: [...last.messages, msg] }
+          return { ...old, pages }
+        },
       )
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
     })
+
     socket.on('conversation_updated', () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
     })
+
+    socket.on('message_updated', (updated: ChatMessage) => {
+      if (!activeConvIdRef.current) return
+      queryClient.setQueryData<InfiniteData<MsgPage>>(
+        queryKeys.chat.messages(updated.conversationId ?? activeConvIdRef.current),
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            pages: old.pages.map(page => ({
+              ...page,
+              messages: page.messages.map(m => m.id === updated.id ? updated : m),
+            })),
+          }
+        },
+      )
+    })
+
+    socket.on('message_deleted', (data: { id: string; conversationId: string; deletedAt: string }) => {
+      queryClient.setQueryData<InfiniteData<MsgPage>>(
+        queryKeys.chat.messages(data.conversationId),
+        (old) => {
+          if (!old) return old
+          return {
+            ...old,
+            pages: old.pages.map(page => ({
+              ...page,
+              messages: page.messages.map(m =>
+                m.id === data.id ? { ...m, deletedAt: data.deletedAt } : m
+              ),
+            })),
+          }
+        },
+      )
+    })
+
     socket.on('user_typing', (data: { userId: string; userName: string }) => {
       if (data.userId !== user?.id) setTypingUser(data.userName)
     })
@@ -342,9 +396,7 @@ export default function ChatPage() {
     })
 
     socket.on('call_ended', () => {
-      if (callStateRef.current !== 'idle') {
-        cleanupCallRef.current()
-      }
+      if (callStateRef.current !== 'idle') cleanupCallRef.current()
     })
 
     socket.on('ice_candidate', async (data: { candidate: RTCIceCandidateInit }) => {
@@ -379,11 +431,9 @@ export default function ChatPage() {
       setIsRemoteScreenSharing(false)
     })
 
-    // Remove all listeners on unmount (socket itself stays alive — managed by App.tsx)
     return () => { socket.removeAllListeners() }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Join/leave conversation room
   useEffect(() => {
     const socket = getChatSocket()
     if (!socket || !activeConvId) return
@@ -392,26 +442,11 @@ export default function ChatPage() {
     return () => { socket.emit('leave_conversation', activeConvId) }
   }, [activeConvId])
 
-  // Auto-scroll on new messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  // Poll messages every 3s as reliability fallback
-  useEffect(() => {
-    if (!activeConvId) return
-    const interval = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.chat.messages(activeConvId) })
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [activeConvId, queryClient])
-
-  // Cleanup call on unmount
   useEffect(() => {
     return () => { cleanupCallRef.current() }
   }, [])
 
-  // ── WebRTC stats polling ───────────────────────────────────────
+  // ── WebRTC stats ─────────────────────────────────────────────────
   const startStatsPolling = useCallback(() => {
     if (callStatsIntervalRef.current) clearInterval(callStatsIntervalRef.current)
     prevBytesRef.current = 0
@@ -424,7 +459,6 @@ export default function ChatPage() {
         let packetLossPct: number | null = null
         let jitterMs: number | null = null
         let bytesReceived = 0
-
         reports.forEach((report) => {
           if (report.type === 'remote-inbound-rtp' && report.kind === 'audio') {
             if (report.roundTripTime != null) rttMs = Math.round(report.roundTripTime * 1000)
@@ -436,30 +470,22 @@ export default function ChatPage() {
             if (report.bytesReceived != null) bytesReceived = report.bytesReceived
           }
         })
-
         const prevBytes = prevBytesRef.current
-        const bitrateKbps = prevBytes > 0
-          ? Math.round(((bytesReceived - prevBytes) * 8) / 2000) // 2s interval → kbps
-          : null
+        const bitrateKbps = prevBytes > 0 ? Math.round(((bytesReceived - prevBytes) * 8) / 2000) : null
         prevBytesRef.current = bytesReceived
-
         setCallStats({ rttMs, packetLossPct, jitterMs, bitrateKbps })
       } catch { /* ignore */ }
     }, 2000)
   }, [])
 
-  // ── Voice call handlers ────────────────────────────────────────
+  // ── WebRTC handlers ──────────────────────────────────────────────
 
   const buildPeerConnection = useCallback((targetUserId: string) => {
     const pc = new RTCPeerConnection(ICE_SERVERS)
     peerConnectionRef.current = pc
-
     pc.onicecandidate = (e) => {
-      if (e.candidate) {
-        getChatSocket()?.emit('ice_candidate', { targetUserId, candidate: e.candidate.toJSON() })
-      }
+      if (e.candidate) getChatSocket()?.emit('ice_candidate', { targetUserId, candidate: e.candidate.toJSON() })
     }
-
     pc.ontrack = (e) => {
       if (e.track.kind === 'video') {
         if (remoteScreenVideoRef.current) remoteScreenVideoRef.current.srcObject = e.streams[0]
@@ -468,51 +494,31 @@ export default function ChatPage() {
         remoteAudioRef.current.srcObject = e.streams[0]
       }
     }
-
     pc.onconnectionstatechange = () => {
-      if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
-        cleanupCallRef.current()
-      }
+      if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) cleanupCallRef.current()
     }
-
     return pc
   }, [])
 
   const startCall = useCallback(async () => {
-    // Use refs — always current, no stale-closure risk
     const convId = activeConvIdRef.current
     const target = otherUserRef.current
     if (!convId) { toast.error('No conversation selected'); return }
     if (callStateRef.current !== 'idle') { toast.error('Already in a call'); return }
     if (!target) { toast.error('Could not find the other user'); return }
-
     const socket = getChatSocket()
-    if (!socket?.connected) {
-      toast.error('Chat connection lost — please refresh the page')
-      return
-    }
-
+    if (!socket?.connected) { toast.error('Chat connection lost — please refresh the page'); return }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       localStreamRef.current = stream
-
       const pc = buildPeerConnection(target.id)
       stream.getTracks().forEach(track => pc.addTrack(track, stream))
-
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
-
-      socket.emit('call_offer', {
-        conversationId: convId,
-        offer,
-        targetUserId: target.id,
-      })
-
+      socket.emit('call_offer', { conversationId: convId, offer, targetUserId: target.id })
       setCallState('calling')
       setCallPeer({ userId: target.id, userName: `${target.firstName} ${target.lastName}` })
       startCallingTone()
-
-      // Auto-hangup after 30s if nobody answers
       callTimeoutRef.current = setTimeout(() => {
         if (callStateRef.current === 'calling') {
           getChatSocket()?.emit('call_end', { targetUserId: target.id })
@@ -532,28 +538,17 @@ export default function ChatPage() {
     const incoming = incomingCallRef.current
     if (callStateRef.current !== 'ringing' || !incoming) return
     stopRingtone()
-
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       localStreamRef.current = stream
-
       const pc = buildPeerConnection(incoming.from.userId)
       stream.getTracks().forEach(track => pc.addTrack(track, stream))
-
       await pc.setRemoteDescription(incoming.offer)
-      for (const c of iceCandidateQueueRef.current) {
-        await pc.addIceCandidate(c).catch(() => {})
-      }
+      for (const c of iceCandidateQueueRef.current) await pc.addIceCandidate(c).catch(() => {})
       iceCandidateQueueRef.current = []
-
       const answer = await pc.createAnswer()
       await pc.setLocalDescription(answer)
-
-      getChatSocket()?.emit('call_answer', {
-        targetUserId: incoming.from.userId,
-        answer,
-      })
-
+      getChatSocket()?.emit('call_answer', { targetUserId: incoming.from.userId, answer })
       setCallState('active')
       callStartRef.current = Date.now()
       callTimerRef.current = setInterval(() => {
@@ -568,9 +563,7 @@ export default function ChatPage() {
 
   const rejectCall = useCallback(() => {
     const incoming = incomingCallRef.current
-    if (incoming) {
-      getChatSocket()?.emit('call_reject', { targetUserId: incoming.from.userId })
-    }
+    if (incoming) getChatSocket()?.emit('call_reject', { targetUserId: incoming.from.userId })
     cleanupCallRef.current()
   }, [])
 
@@ -588,10 +581,7 @@ export default function ChatPage() {
 
   const toggleMute = useCallback(() => {
     const track = localStreamRef.current?.getAudioTracks()[0]
-    if (track) {
-      track.enabled = !track.enabled
-      setIsMuted(!track.enabled)
-    }
+    if (track) { track.enabled = !track.enabled; setIsMuted(!track.enabled) }
   }, [])
 
   const stopScreenShareRef = useRef<() => void>(() => {})
@@ -634,7 +624,7 @@ export default function ChatPage() {
     }
   }, [])
 
-  // ── Text message handlers ──────────────────────────────────────
+  // ── Message handlers ─────────────────────────────────────────────
 
   const sendMessage = useCallback(async () => {
     if (!activeConvId || !message.trim()) return
@@ -644,105 +634,56 @@ export default function ChatPage() {
       const { data: newMsg } = await api.post(`/chat/conversations/${activeConvId}/messages`, {
         content: text, type: 'TEXT',
       })
-      queryClient.setQueryData<{ messages: ChatMessage[] }>(
-        queryKeys.chat.messages(activeConvId),
-        (old) => old ? { ...old, messages: [...old.messages, newMsg] } : { messages: [newMsg] },
-      )
+      appendMessageToCache(activeConvId, newMsg)
       queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
       getChatSocket()?.emit('stop_typing', activeConvId)
     } catch {
       setMessage(text)
       toast.error('Failed to send message')
     }
-  }, [activeConvId, message, queryClient])
+  }, [activeConvId, message, queryClient, appendMessageToCache])
 
+  // Debounced typing: emit once per burst, not every keystroke
   const handleTyping = useCallback(() => {
     const socket = getChatSocket()
     if (!socket || !activeConvId) return
-    socket.emit('typing', activeConvId)
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+    if (!typingTimeoutRef.current) socket.emit('typing', activeConvId)
+    clearTimeout(typingTimeoutRef.current ?? undefined)
     typingTimeoutRef.current = setTimeout(() => {
       socket.emit('stop_typing', activeConvId)
+      typingTimeoutRef.current = null
     }, 2000)
   }, [activeConvId])
 
-  // ── Voice message recording ────────────────────────────────────
+  const handleSendVoice = useCallback(async (blob: Blob, duration: number) => {
+    if (!activeConvId) return
+    const formData = new FormData()
+    formData.append('audio', blob, 'voice.webm')
+    const { data: uploadResult } = await api.post('/chat/audio', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    const { data: newMsg } = await api.post(`/chat/conversations/${activeConvId}/messages`, {
+      type: 'VOICE', audioUrl: uploadResult.key, audioDuration: duration,
+    })
+    appendMessageToCache(activeConvId, newMsg)
+    queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
+  }, [activeConvId, queryClient, appendMessageToCache])
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
-      mediaRecorderRef.current = mediaRecorder
-      audioChunksRef.current = []
-      recordingStartRef.current = Date.now()
-      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm;codecs=opus' })
-        setAudioBlob(blob)
-        setAudioDuration(Math.round((Date.now() - recordingStartRef.current) / 1000))
-        stream.getTracks().forEach(t => t.stop())
-      }
-      mediaRecorder.start()
-      setIsRecording(true)
-    } catch { toast.error('Microphone access denied') }
-  }
-
-  const stopRecording = () => { mediaRecorderRef.current?.stop(); setIsRecording(false) }
-  const cancelRecording = () => { setAudioBlob(null); setAudioDuration(0); setIsPlaying(false) }
-
-  const sendVoiceMessage = async () => {
-    if (!activeConvId || !audioBlob) return
-    try {
-      // Upload audio to MinIO via backend proxy
-      const formData = new FormData()
-      formData.append('audio', audioBlob, 'voice.webm')
-      const { data: uploadResult } = await api.post('/chat/audio', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      const audioKey: string = uploadResult.key
-
-      const { data: newMsg } = await api.post(`/chat/conversations/${activeConvId}/messages`, {
-        type: 'VOICE', audioUrl: audioKey, audioDuration,
-      })
-      queryClient.setQueryData<{ messages: ChatMessage[] }>(
-        queryKeys.chat.messages(activeConvId),
-        (old) => old ? { ...old, messages: [...old.messages, newMsg] } : { messages: [newMsg] },
-      )
-      queryClient.invalidateQueries({ queryKey: queryKeys.chat.conversations })
-      cancelRecording()
-    } catch { toast.error('Failed to send voice message') }
-  }
-
-  const playPreview = () => {
-    if (!audioBlob) return
-    if (isPlaying) { audioPlayerRef.current?.pause(); setIsPlaying(false); return }
-    const url = URL.createObjectURL(audioBlob)
-    const audio = new Audio(url)
-    audioPlayerRef.current = audio
-    audio.onended = () => setIsPlaying(false)
-    audio.play()
-    setIsPlaying(true)
-  }
-
-  // ── Helpers ────────────────────────────────────────────────────
+  // ── Helpers ──────────────────────────────────────────────────────
 
   const getOtherUser = (conv: Conversation) =>
     conv.participants.find(p => p.userId !== user?.id)?.user
 
   const activeConversation = conversations.find(c => c.id === activeConvId)
   const otherUser = activeConversation ? getOtherUser(activeConversation) : null
-  // Keep ref in sync so startCall/hangUp can read the latest value without stale closures
   otherUserRef.current = otherUser ?? undefined
 
-  // Other participant's lastReadAt — for read receipts
-  const otherLastRead = activeConversation
-    ?.participants.find(p => p.userId !== user?.id)?.lastReadAt
+  const otherLastRead = activeConversation?.participants.find(p => p.userId !== user?.id)?.lastReadAt
 
   const showList = isMobile ? !activeConvId : true
   const showChat = isMobile ? !!activeConvId : true
 
-  // ── PRO gate ───────────────────────────────────────────────────
-
+  // ── PRO gate ──────────────────────────────────────────────────────
   if (user?.role === 'USER') {
     return (
       <div style={{
@@ -762,17 +703,16 @@ export default function ChatPage() {
     )
   }
 
-  // ── Render ─────────────────────────────────────────────────────
-
+  // ── Render ────────────────────────────────────────────────────────
   return (
     <div style={{
       display: 'flex', height: '100%', fontFamily: chatFont,
       backgroundColor: colors.bg, overflow: 'hidden', position: 'relative',
     }}>
-      {/* Hidden remote audio element */}
+      {/* Hidden remote audio */}
       <audio ref={remoteAudioRef} autoPlay style={{ display: 'none' }} />
 
-      {/* Scanlines overlay for terminal-style themes */}
+      {/* Scanlines overlay */}
       {chatTheme.scanlines && (
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 9000,
@@ -780,317 +720,62 @@ export default function ChatPage() {
         }} />
       )}
 
-      {/* ── Fullscreen call overlay ───────────────────────────── */}
-      {isFullscreen && callState === 'active' && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'linear-gradient(135deg, #15803d 0%, #166534 100%)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: '24px', fontFamily: 'Inter, sans-serif',
-        }}>
-          {/* Minimize button */}
-          <button onClick={() => setIsFullscreen(false)} style={{
-            position: 'absolute', top: '20px', right: '20px',
-            background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%',
-            width: '44px', height: '44px', color: '#fff', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }} title="Exit fullscreen">
-            <Minimize2 size={20} />
-          </button>
+      {/* Call overlays (fullscreen + incoming card) */}
+      <CallOverlay
+        callState={callState}
+        callPeer={callPeer}
+        callDuration={callDuration}
+        isMuted={isMuted}
+        isScreenSharing={isScreenSharing}
+        isRemoteScreenSharing={isRemoteScreenSharing}
+        isFullscreen={isFullscreen}
+        setIsFullscreen={setIsFullscreen}
+        callStats={callStats}
+        remoteScreenVideoRef={remoteScreenVideoRef}
+        onToggleMute={toggleMute}
+        onStartScreenShare={startScreenShare}
+        onStopScreenShare={stopScreenShare}
+        onHangUp={hangUp}
+        onAnswerCall={answerCall}
+        onRejectCall={rejectCall}
+        colors={colors}
+        accent={accent}
+        accentText={accentText}
+        avatarBg={avatarBg}
+        avatarIsGradient={avatarIsGradient}
+        inputRadius={inputRadius}
+        chatFont={chatFont}
+      />
 
-          {/* Remote screen share — shown fullscreen when active */}
-          {isRemoteScreenSharing && (
-            <div style={{
-              position: 'absolute', inset: '80px 0 160px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              backgroundColor: '#000',
-            }}>
-              <video
-                autoPlay
-                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                ref={el => { if (el && remoteScreenVideoRef.current?.srcObject) { el.srcObject = remoteScreenVideoRef.current.srcObject } }}
-              />
-              <div style={{
-                position: 'absolute', top: '10px', left: '10px',
-                background: 'rgba(0,0,0,0.6)', borderRadius: '6px',
-                padding: '3px 10px', fontSize: '12px', color: '#fff',
-                display: 'flex', alignItems: 'center', gap: '5px',
-              }}>
-                <Monitor size={12} /> {callPeer?.userName} is sharing
-              </div>
-            </div>
-          )}
-
-          {/* Peer avatar + info */}
-          {!isRemoteScreenSharing && (
-            <div style={{ textAlign: 'center', color: '#fff' }}>
-              <div style={{
-                width: '96px', height: '96px', borderRadius: '50%',
-                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '32px', fontWeight: '800', margin: '0 auto 16px',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-              }}>
-                {callPeer?.userName.charAt(0)}
-              </div>
-              <p style={{ fontSize: '26px', fontWeight: '700', margin: '0 0 6px' }}>
-                {callPeer?.userName}
-              </p>
-              <p style={{ fontSize: '18px', opacity: 0.8, fontVariantNumeric: 'tabular-nums', marginBottom: '12px' }}>
-                {formatDuration(callDuration)}
-              </p>
-              {/* Connection stats */}
-              {callStats && (() => {
-                const rtt = callStats.rttMs ?? 999
-                const loss = callStats.packetLossPct ?? 0
-                const quality = rtt < 80 && loss < 2 ? 'good' : rtt < 200 && loss < 10 ? 'fair' : 'poor'
-                const qColor = quality === 'good' ? '#4ade80' : quality === 'fair' ? '#fbbf24' : '#f87171'
-                return (
-                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                    {[
-                      { label: 'Latency', value: callStats.rttMs != null ? `${callStats.rttMs}ms` : '—' },
-                      { label: 'Packet loss', value: callStats.packetLossPct != null ? `${callStats.packetLossPct}%` : '—' },
-                      { label: 'Jitter', value: callStats.jitterMs != null ? `${callStats.jitterMs}ms` : '—' },
-                      { label: 'Bitrate', value: callStats.bitrateKbps != null ? `${callStats.bitrateKbps} kbps` : '—' },
-                    ].map(({ label, value }) => (
-                      <div key={label} style={{ textAlign: 'center' }}>
-                        <p style={{ margin: '0 0 2px', fontSize: '11px', opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
-                        <p style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: label === 'Latency' ? qColor : 'rgba(255,255,255,0.9)' }}>{value}</p>
-                      </div>
-                    ))}
-                  </div>
-                )
-              })()}
-            </div>
-          )}
-
-          {/* Controls */}
-          <div style={{
-            position: 'absolute', bottom: '40px',
-            display: 'flex', gap: '20px', alignItems: 'center',
-          }}>
-            <button onClick={toggleMute} style={{
-              width: '60px', height: '60px', borderRadius: '50%', border: 'none',
-              backgroundColor: isMuted ? '#ef4444' : 'rgba(255,255,255,0.2)',
-              color: '#fff', cursor: 'pointer',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px',
-            }} title={isMuted ? 'Unmute' : 'Mute'}>
-              {isMuted ? <MicOff size={22} /> : <Mic size={22} />}
-            </button>
-            <button onClick={isScreenSharing ? stopScreenShare : startScreenShare} style={{
-              width: '60px', height: '60px', borderRadius: '50%', border: 'none',
-              backgroundColor: isScreenSharing ? '#f59e0b' : 'rgba(255,255,255,0.2)',
-              color: '#fff', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }} title={isScreenSharing ? 'Stop sharing' : 'Share screen'}>
-              <Monitor size={22} />
-            </button>
-            <button onClick={() => { hangUp(); setIsFullscreen(false) }} style={{
-              width: '72px', height: '72px', borderRadius: '50%', border: 'none',
-              backgroundColor: '#ef4444', color: '#fff', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 20px rgba(239,68,68,0.5)',
-            }} title="End call">
-              <PhoneOff size={26} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Incoming call overlay (fixed, top-right) ─────────── */}
-      {callState === 'ringing' && callPeer && (
-        <div style={{
-          position: 'fixed', top: '80px', right: '20px', zIndex: 1000,
-          backgroundColor: colors.card,
-          borderRadius: isDefaultTheme ? '20px' : inputRadius,
-          padding: '24px',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
-          width: '270px',
-          border: `1px solid ${colors.border}`,
-          fontFamily: chatFont,
-        }}>
-          {/* Pulsing ring */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-            <div style={{ position: 'relative', width: '64px', height: '64px' }}>
-              <div style={{
-                position: 'absolute', inset: 0, borderRadius: '50%',
-                backgroundColor: 'rgba(34,197,94,0.15)',
-                animation: 'callRingPulse 1.5s infinite',
-              }} />
-              <div style={{
-                width: '64px', height: '64px', borderRadius: '50%',
-                background: avatarIsGradient ? avatarBg : undefined,
-                backgroundColor: avatarIsGradient ? undefined : accent,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '20px', fontWeight: '700', color: accentText,
-              }}>
-                {callPeer.userName.charAt(0)}
-              </div>
-            </div>
-          </div>
-          <p style={{ textAlign: 'center', fontSize: '16px', fontWeight: '700', color: colors.text, margin: '0 0 4px' }}>
-            {callPeer.userName}
-          </p>
-          <p style={{ textAlign: 'center', fontSize: '13px', color: colors.textMuted, margin: '0 0 20px' }}>
-            Incoming voice call...
-          </p>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            <button onClick={rejectCall} style={{
-              width: '52px', height: '52px', borderRadius: '50%', border: 'none',
-              backgroundColor: '#ef4444', color: '#fff', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }} title="Decline">
-              <PhoneOff size={22} />
-            </button>
-            <button onClick={answerCall} style={{
-              width: '52px', height: '52px', borderRadius: '50%', border: 'none',
-              backgroundColor: '#22c55e', color: '#fff', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }} title="Accept">
-              <PhoneCall size={22} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Conversation List ─────────────────────────────────── */}
+      {/* Conversation sidebar */}
       {showList && (
-        <div style={{
-          width: isMobile ? '100%' : '320px', minWidth: isMobile ? '100%' : '320px',
-          backgroundColor: colors.card, display: 'flex', flexDirection: 'column',
-          borderRight: `1px solid ${colors.border}`, minHeight: 0,
-        }}>
-          {/* Header */}
-          <div style={{ padding: '16px', borderBottom: `1px solid ${colors.border}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '700', color: colors.text, margin: 0 }}>Messages</h2>
-              <button onClick={() => setShowNewChat(!showNewChat)} style={{
-                backgroundColor: accent, color: accentText,
-                border: chatTheme.borderStyle ? `${chatTheme.borderStyle} ${chatTheme.border}` : 'none',
-                borderRadius: inputRadius, padding: '6px 12px', fontSize: '12px',
-                fontWeight: '600', cursor: 'pointer', fontFamily: chatFont,
-              }}>
-                + New Chat
-              </button>
-            </div>
-          </div>
-
-          {/* New Chat User Search */}
-          {showNewChat && (
-            <div style={{ padding: '12px', borderBottom: `1px solid ${colors.border}`, backgroundColor: colors.subBg }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: colors.input, borderRadius: '8px', padding: '8px 10px', border: `1px solid ${colors.inputBorder}` }}>
-                <Search size={14} color={colors.textMuted} />
-                <input value={searchUsers} onChange={e => setSearchUsers(e.target.value)} placeholder="Search PRO users..."
-                  style={{ background: 'none', border: 'none', color: colors.text, fontSize: '13px', outline: 'none', width: '100%' }} />
-              </div>
-              <div style={{ marginTop: '8px', maxHeight: '200px', overflowY: 'auto' }}>
-                {chatUsers.map(u => (
-                  <button key={u.id} onClick={() => startConvMutation.mutate(u.id)} style={{
-                    display: 'flex', alignItems: 'center', gap: '10px', width: '100%',
-                    padding: '8px', borderRadius: inputRadius, border: 'none', cursor: 'pointer',
-                    backgroundColor: 'transparent', color: colors.text, textAlign: 'left',
-                    fontFamily: chatFont,
-                  }}>
-                    <div style={{
-                      width: '32px', height: '32px', borderRadius: '50%',
-                      background: avatarBg,
-                      backgroundColor: avatarIsGradient ? undefined : accent,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '11px', fontWeight: '700', color: accentText, flexShrink: 0,
-                    }}>
-                      {u.firstName[0]}{u.lastName[0]}
-                    </div>
-                    <div>
-                      <p style={{ fontSize: '13px', fontWeight: '500', margin: 0 }}>{u.firstName} {u.lastName}</p>
-                      <p style={{ fontSize: '11px', color: colors.textMuted, margin: 0 }}>{u.email}</p>
-                    </div>
-                  </button>
-                ))}
-                {chatUsers.length === 0 && searchUsers && (
-                  <p style={{ fontSize: '12px', color: colors.textMuted, textAlign: 'center', padding: '12px' }}>No PRO users found</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Conversation List */}
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            {conversations.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 20px', color: colors.textMuted }}>
-                <MessageSquare size={32} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.5 }} />
-                <p style={{ fontSize: '14px', margin: 0 }}>No conversations yet</p>
-                <p style={{ fontSize: '12px', marginTop: '4px' }}>Start chatting with a PRO user</p>
-              </div>
-            ) : conversations.map(conv => {
-              const other = getOtherUser(conv)
-              if (!other) return null
-              const isActive = conv.id === activeConvId
-              const lastMsg = conv.lastMessage
-              return (
-                <button key={conv.id} onClick={() => setActiveConvId(conv.id)} style={{
-                  display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
-                  padding: '14px 16px', border: 'none', cursor: 'pointer', textAlign: 'left',
-                  backgroundColor: isActive ? activeConvBg : 'transparent',
-                  borderBottom: `1px solid ${colors.border}`,
-                  color: colors.text, transition: 'background 0.1s',
-                  fontFamily: chatFont,
-                }}>
-                  <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <div style={{
-                      width: '40px', height: '40px', borderRadius: '50%',
-                      background: avatarIsGradient ? avatarBg : undefined,
-                      backgroundColor: avatarIsGradient ? undefined : accent,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '13px', fontWeight: '700', color: accentText,
-                    }}>
-                      {other.firstName[0]}{other.lastName[0]}
-                    </div>
-                    {onlineUsers.has(other.id) && (
-                      <span style={{
-                        position: 'absolute', bottom: '1px', right: '1px',
-                        width: '10px', height: '10px', borderRadius: '50%',
-                        backgroundColor: '#22c55e', border: `2px solid ${colors.card}`,
-                      }} />
-                    )}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <p style={{
-                        fontSize: '13px', fontWeight: conv.unreadCount > 0 ? '700' : '500', margin: 0,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
-                        {other.firstName} {other.lastName}
-                      </p>
-                      {lastMsg && (
-                        <span style={{ fontSize: '10px', color: colors.textMuted, flexShrink: 0 }}>
-                          {new Date(lastMsg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
-                      <p style={{ fontSize: '12px', color: colors.textMuted, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {lastMsg?.type === 'CALL' ? '📞 ' + lastMsg.content
-                          : lastMsg?.type === 'VOICE' ? '🎙 Voice message'
-                          : lastMsg?.content || 'No messages yet'}
-                      </p>
-                      {conv.unreadCount > 0 && (
-                        <span style={{
-                          backgroundColor: accent, color: accentText, borderRadius: '999px',
-                          padding: '1px 6px', fontSize: '10px', fontWeight: '700', flexShrink: 0,
-                        }}>
-                          {conv.unreadCount}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
+        <ConversationSidebar
+          conversations={conversations}
+          activeConvId={activeConvId}
+          onSelectConv={setActiveConvId}
+          onlineUsers={onlineUsers}
+          currentUserId={user?.id ?? ''}
+          showNewChat={showNewChat}
+          setShowNewChat={setShowNewChat}
+          searchUsers={searchUsers}
+          setSearchUsers={setSearchUsers}
+          chatUsers={chatUsers}
+          onStartConversation={(userId) => startConvMutation.mutate(userId)}
+          isMobile={isMobile}
+          colors={colors}
+          accent={accent}
+          accentText={accentText}
+          avatarBg={avatarBg}
+          avatarIsGradient={avatarIsGradient}
+          activeConvBg={activeConvBg}
+          chatFont={chatFont}
+          inputRadius={inputRadius}
+          borderStyle={chatTheme.borderStyle}
+          themeBorder={chatTheme.border}
+        />
       )}
 
-      {/* ── Message Area ─────────────────────────────────────── */}
+      {/* Message area */}
       {showChat && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
           {!activeConvId ? (
@@ -1100,17 +785,15 @@ export default function ChatPage() {
             </div>
           ) : (
             <>
-              {/* Chat Header */}
+              {/* ── Chat Header ── */}
               <div style={{
                 position: 'relative', display: 'flex', alignItems: 'center', gap: '12px',
                 padding: '14px 20px', borderBottom: `1px solid ${colors.border}`,
-                background: !isDefaultTheme && chatTheme.header.startsWith('linear')
-                  ? chatTheme.header : undefined,
+                background: !isDefaultTheme && chatTheme.header.startsWith('linear') ? chatTheme.header : undefined,
                 backgroundColor: !isDefaultTheme && !chatTheme.header.startsWith('linear')
                   ? chatTheme.header : (isDefaultTheme ? colors.card : undefined),
                 flexShrink: 0,
               }}>
-                {/* Normal header content */}
                 {isMobile && (
                   <button onClick={() => setActiveConvId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: headerTextColor, padding: 0 }}>
                     <ArrowLeft size={20} />
@@ -1118,7 +801,6 @@ export default function ChatPage() {
                 )}
                 <div style={{
                   width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-                  // In themed headers flip avatar to headerText bg so it always contrasts
                   background: !isDefaultTheme && chatTheme.headerText ? undefined : (avatarIsGradient ? avatarBg : undefined),
                   backgroundColor: !isDefaultTheme && chatTheme.headerText ? chatTheme.headerText : (avatarIsGradient ? undefined : accent),
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1147,20 +829,17 @@ export default function ChatPage() {
                   )}
                 </div>
 
-                {/* Call button (idle only) */}
                 {callState === 'idle' && (
                   <button onClick={startCall} style={{
                     width: '36px', height: '36px', borderRadius: '50%', border: 'none',
                     backgroundColor: !isDefaultTheme ? `${headerTextColor}22` : ghostBg,
                     color: headerTextColor, cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'background 0.15s',
                   }} title="Start voice call">
                     <Phone size={17} />
                   </button>
                 )}
 
-                {/* Calling overlay bar */}
                 {(callState === 'calling' || callState === 'active') && (
                   <div style={{
                     position: 'absolute', inset: 0,
@@ -1170,20 +849,11 @@ export default function ChatPage() {
                   }}>
                     {callState === 'calling' ? (
                       <>
-                        {/* Pulsing dot */}
-                        <span style={{
-                          width: '10px', height: '10px', borderRadius: '50%',
-                          backgroundColor: accent, display: 'inline-block',
-                          animation: 'callDotPulse 1s infinite',
-                        }} />
+                        <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: accent, display: 'inline-block', animation: 'callDotPulse 1s infinite' }} />
                         <span style={{ flex: 1, fontSize: '14px', fontWeight: '600', color: colors.text }}>
                           Calling {callPeer?.userName}...
                         </span>
-                        <button onClick={hangUp} style={{
-                          width: '36px', height: '36px', borderRadius: '50%', border: 'none',
-                          backgroundColor: '#ef4444', color: '#fff', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }} title="Cancel">
+                        <button onClick={hangUp} style={{ width: '36px', height: '36px', borderRadius: '50%', border: 'none', backgroundColor: '#ef4444', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Cancel">
                           <PhoneOff size={17} />
                         </button>
                       </>
@@ -1193,7 +863,6 @@ export default function ChatPage() {
                         <span style={{ flex: 1, fontSize: '14px', fontWeight: '600', color: '#fff' }}>
                           {callPeer?.userName} · {formatDuration(callDuration)}
                         </span>
-                        {/* Connection quality indicator */}
                         {callStats && (() => {
                           const rtt = callStats.rttMs ?? 999
                           const loss = callStats.packetLossPct ?? 0
@@ -1212,39 +881,16 @@ export default function ChatPage() {
                             </span>
                           )
                         })()}
-                        {/* Mute */}
-                        <button onClick={toggleMute} style={{
-                          width: '36px', height: '36px', borderRadius: '50%', border: 'none',
-                          backgroundColor: isMuted ? '#ef4444' : 'rgba(255,255,255,0.2)',
-                          color: '#fff', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }} title={isMuted ? 'Unmute' : 'Mute'}>
+                        <button onClick={toggleMute} style={{ width: '36px', height: '36px', borderRadius: '50%', border: 'none', backgroundColor: isMuted ? '#ef4444' : 'rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={isMuted ? 'Unmute' : 'Mute'}>
                           {isMuted ? <MicOff size={16} /> : <Mic size={16} />}
                         </button>
-                        {/* Share Screen */}
-                        <button onClick={isScreenSharing ? stopScreenShare : startScreenShare} style={{
-                          width: '36px', height: '36px', borderRadius: '50%', border: 'none',
-                          backgroundColor: isScreenSharing ? '#f59e0b' : 'rgba(255,255,255,0.2)',
-                          color: '#fff', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }} title={isScreenSharing ? 'Stop sharing' : 'Share screen'}>
+                        <button onClick={isScreenSharing ? stopScreenShare : startScreenShare} style={{ width: '36px', height: '36px', borderRadius: '50%', border: 'none', backgroundColor: isScreenSharing ? '#f59e0b' : 'rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={isScreenSharing ? 'Stop sharing' : 'Share screen'}>
                           <Monitor size={16} />
                         </button>
-                        {/* Fullscreen */}
-                        <button onClick={() => setIsFullscreen(true)} style={{
-                          width: '36px', height: '36px', borderRadius: '50%', border: 'none',
-                          backgroundColor: 'rgba(255,255,255,0.2)',
-                          color: '#fff', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }} title="Fullscreen">
+                        <button onClick={() => setIsFullscreen(true)} style={{ width: '36px', height: '36px', borderRadius: '50%', border: 'none', backgroundColor: 'rgba(255,255,255,0.2)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Fullscreen">
                           <Maximize2 size={16} />
                         </button>
-                        {/* Hang up */}
-                        <button onClick={hangUp} style={{
-                          width: '36px', height: '36px', borderRadius: '50%', border: 'none',
-                          backgroundColor: '#ef4444', color: '#fff', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }} title="End call">
+                        <button onClick={hangUp} style={{ width: '36px', height: '36px', borderRadius: '50%', border: 'none', backgroundColor: '#ef4444', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="End call">
                           <PhoneOff size={17} />
                         </button>
                       </>
@@ -1253,7 +899,7 @@ export default function ChatPage() {
                 )}
               </div>
 
-              {/* Remote Screen Share Panel — always mounted so ref is always set */}
+              {/* Remote screen share panel */}
               <div style={{
                 flexShrink: 0, backgroundColor: '#000', position: 'relative',
                 display: isRemoteScreenSharing ? 'block' : 'none',
@@ -1270,172 +916,56 @@ export default function ChatPage() {
                   padding: '3px 8px', fontSize: '11px', color: '#fff',
                   display: 'flex', alignItems: 'center', gap: '5px',
                 }}>
-                  <Monitor size={11} />
-                  {callPeer?.userName} is sharing their screen
+                  <Monitor size={11} /> {callPeer?.userName} is sharing their screen
                 </div>
               </div>
 
-              {/* Messages */}
-              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {messages.map(msg => {
-                  const isMine = msg.senderId === user?.id
+              {/* Message list with infinite scroll */}
+              <MessageList
+                messages={messages}
+                currentUserId={user?.id ?? ''}
+                otherLastRead={otherLastRead}
+                onReport={(messageId) => { setReportModal({ messageId }); setReportReason('') }}
+                onEditSave={(msgId, content) => {
+                  if (activeConvId) editMutation.mutate({ convId: activeConvId, msgId, content })
+                }}
+                onDelete={(msgId) => {
+                  if (activeConvId) deleteMutation.mutate({ convId: activeConvId, msgId })
+                }}
+                fetchPreviousPage={fetchPreviousPage}
+                hasPreviousPage={hasPreviousPage ?? false}
+                isFetchingPreviousPage={isFetchingPreviousPage}
+                isDark={isDark}
+                isDefaultTheme={isDefaultTheme}
+                myBubble={myBubble}
+                myBubbleText={myBubbleText}
+                theirBubble={theirBubble ?? (isDark ? '#1e293b' : '#f1f5f9')}
+                theirBubbleText={theirBubbleText ?? colors.text}
+                chatFont={chatFont}
+                bubbleRadius={bubbleRadius}
+                accent={accent}
+                colors={colors}
+                chatThemeBorderStyle={chatTheme.borderStyle}
+                chatThemeBorder={chatTheme.border}
+              />
 
-                  // CALL messages render as centered system messages
-                  if (msg.type === 'CALL') {
-                    const isMissed = msg.content === 'Missed call'
-                    return (
-                      <div key={msg.id} style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
-                        <div style={{
-                          display: 'flex', alignItems: 'center', gap: '6px',
-                          padding: '6px 14px', borderRadius: '999px',
-                          backgroundColor: isDefaultTheme ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)') : `${accent}22`,
-                          fontSize: '12px', color: isMissed ? '#ef4444' : colors.textMuted,
-                        }}>
-                          <Phone size={13} />
-                          <span>{msg.content}</span>
-                          <span style={{ opacity: 0.6 }}>
-                            · {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  }
-
-                  return (
-                    <div
-                      key={msg.id}
-                      style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '4px' }}
-                      onMouseEnter={() => setHoveredMsgId(msg.id)}
-                      onMouseLeave={() => setHoveredMsgId(null)}
-                    >
-                      {!isMine && (
-                        <button
-                          onClick={() => { setReportModal({ messageId: msg.id }); setReportReason('') }}
-                          title="Report message"
-                          style={{
-                            background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
-                            color: colors.textMuted, opacity: hoveredMsgId === msg.id ? 0.7 : 0,
-                            transition: 'opacity 0.15s', flexShrink: 0,
-                            display: 'flex', alignItems: 'center',
-                          }}
-                        >
-                          <Flag size={12} />
-                        </button>
-                      )}
-                      <div style={{
-                        maxWidth: '70%', padding: '10px 14px', borderRadius: bubbleRadius,
-                        background: isMine
-                          ? (myBubble.startsWith('linear') ? myBubble : undefined)
-                          : undefined,
-                        backgroundColor: isMine
-                          ? (myBubble.startsWith('linear') ? undefined : myBubble)
-                          : theirBubble,
-                        color: isMine ? myBubbleText : theirBubbleText,
-                        borderBottomRightRadius: isMine && bubbleRadius === '16px' ? '4px' : undefined,
-                        borderBottomLeftRadius: !isMine && bubbleRadius === '16px' ? '4px' : undefined,
-                        border: chatTheme.borderStyle ? `${chatTheme.borderStyle} ${chatTheme.border}` : undefined,
-                        fontFamily: chatFont,
-                      }}>
-                        {msg.type === 'VOICE' ? (
-                          <VoiceMessagePlayer audioData={msg.audioData ?? undefined} audioUrl={msg.audioUrl ?? undefined} duration={msg.audioDuration || 0} isMine={isMine} isDark={isDark} />
-                        ) : (
-                          <p style={{ fontSize: '14px', margin: 0, lineHeight: '1.5', wordBreak: 'break-word' }}>{msg.content}</p>
-                        )}
-                        <p style={{ fontSize: '10px', margin: '4px 0 0', textAlign: 'right', opacity: 0.7, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px' }}>
-                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          {isMine && (
-                            <span style={{
-                              color: otherLastRead && new Date(msg.createdAt) <= new Date(otherLastRead)
-                                ? '#60a5fa' : 'inherit',
-                              fontSize: '11px', fontWeight: '700', letterSpacing: '-1px',
-                            }}>
-                              {otherLastRead && new Date(msg.createdAt) <= new Date(otherLastRead) ? '✓✓' : '✓'}
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  )
-                })}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Input Area */}
-              <div style={{ padding: '12px 20px', borderTop: `1px solid ${colors.border}`, backgroundColor: colors.card, flexShrink: 0 }}>
-                {/* Voice preview */}
-                {audioBlob && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px',
-                    padding: '10px 14px', borderRadius: inputRadius,
-                    backgroundColor: ghostBg,
-                    border: `1px solid ${colors.border}`,
-                  }}>
-                    <button onClick={playPreview} style={{
-                      width: '32px', height: '32px', borderRadius: '50%', border: 'none',
-                      backgroundColor: accent, color: accentText, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      {isPlaying ? <Pause size={14} /> : <Play size={14} />}
-                    </button>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ height: '4px', backgroundColor: colors.border, borderRadius: '999px' }}>
-                        <div style={{ height: '100%', width: '100%', backgroundColor: accent, borderRadius: '999px' }} />
-                      </div>
-                    </div>
-                    <span style={{ fontSize: '12px', color: colors.textMuted, fontWeight: '500' }}>{audioDuration}s</span>
-                    <button onClick={cancelRecording} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textMuted, padding: '2px' }}>
-                      <X size={16} />
-                    </button>
-                    <button onClick={sendVoiceMessage} style={{
-                      backgroundColor: accent, color: accentText, border: 'none',
-                      borderRadius: '8px', padding: '6px 14px', fontSize: '12px',
-                      fontWeight: '600', cursor: 'pointer',
-                    }}>Send</button>
-                  </div>
-                )}
-
-                {/* Text + mic input */}
-                {!audioBlob && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input
-                      value={message}
-                      onChange={e => { setMessage(e.target.value); handleTyping() }}
-                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
-                      placeholder="Type a message..."
-                      style={{
-                        flex: 1, backgroundColor: inputBg,
-                        border: `1px solid ${ghostBorder}`, borderRadius: inputRadius,
-                        padding: '10px 14px', color: colors.text, fontSize: '14px', outline: 'none',
-                        fontFamily: chatFont,
-                      }}
-                    />
-                    <button
-                      onClick={isRecording ? stopRecording : startRecording}
-                      style={{
-                        width: '40px', height: '40px', borderRadius: '50%',
-                        backgroundColor: isRecording ? '#ef4444' : ghostBg,
-                        color: isRecording ? '#fff' : ghostText,
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.2s',
-                        border: isRecording ? 'none' : `1px solid ${ghostBorder}`,
-                      }}
-                      title={isRecording ? 'Stop recording' : 'Record voice message'}
-                    >
-                      {isRecording ? <Square size={16} fill="#fff" /> : <Mic size={18} />}
-                    </button>
-                    {message.trim() && (
-                      <button onClick={sendMessage} style={{
-                        width: '40px', height: '40px', borderRadius: '50%', border: 'none',
-                        backgroundColor: accent, color: accentText, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        <Send size={16} />
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-
+              {/* Message input */}
+              <MessageInput
+                message={message}
+                setMessage={setMessage}
+                onSend={sendMessage}
+                onTyping={handleTyping}
+                onSendVoice={handleSendVoice}
+                colors={colors}
+                accent={accent}
+                accentText={accentText}
+                inputBg={inputBg}
+                inputRadius={inputRadius}
+                ghostBg={ghostBg}
+                ghostBorder={ghostBorder}
+                ghostText={ghostText}
+                chatFont={chatFont}
+              />
             </>
           )}
         </div>
@@ -1483,62 +1013,6 @@ export default function ChatPage() {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-// ── Voice message playback component ─────────────────────────────
-
-function VoiceMessagePlayer({ audioData, audioUrl, duration, isMine, isDark }: {
-  audioData?: string; audioUrl?: string; duration: number; isMine: boolean; isDark: boolean
-}) {
-  const [playing, setPlaying] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-
-  const getAudioSrc = () => {
-    // Prefer MinIO-backed URL (served via backend proxy)
-    if (audioUrl) return `/api/chat/audio/${audioUrl}`
-    // Fallback: legacy base64 stored in DB
-    if (audioData) return `data:audio/webm;codecs=opus;base64,${audioData}`
-    return null
-  }
-
-  const toggle = () => {
-    if (!audioRef.current) {
-      const src = getAudioSrc()
-      if (!src) return
-      const audio = new Audio(src)
-      audioRef.current = audio
-      audio.ontimeupdate = () => setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0)
-      audio.onended = () => { setPlaying(false); setProgress(0) }
-    }
-    if (playing) { audioRef.current.pause(); setPlaying(false) }
-    else { audioRef.current.play(); setPlaying(true) }
-  }
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '180px' }}>
-      <button onClick={toggle} style={{
-        width: '30px', height: '30px', borderRadius: '50%', border: 'none', flexShrink: 0,
-        backgroundColor: isMine ? 'rgba(255,255,255,0.2)' : (isDark ? '#334155' : '#e2e8f0'),
-        color: isMine ? '#fff' : '#6366f1', cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        {playing ? <Pause size={12} /> : <Play size={12} />}
-      </button>
-      <div style={{ flex: 1 }}>
-        <div style={{
-          height: '4px', borderRadius: '999px',
-          backgroundColor: isMine ? 'rgba(255,255,255,0.2)' : (isDark ? '#334155' : '#e2e8f0'),
-        }}>
-          <div style={{
-            height: '100%', width: `${progress}%`, borderRadius: '999px',
-            backgroundColor: isMine ? '#fff' : '#6366f1', transition: 'width 0.1s',
-          }} />
-        </div>
-      </div>
-      <span style={{ fontSize: '11px', opacity: 0.8, flexShrink: 0 }}>{duration}s</span>
     </div>
   )
 }

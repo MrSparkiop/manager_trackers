@@ -172,6 +172,39 @@ export class ChatService {
     return message
   }
 
+  private static readonly EDIT_WINDOW_MS = 15 * 60 * 1000
+
+  /** Edit a text message (within 15 minutes, sender only) */
+  async editMessage(conversationId: string, messageId: string, userId: string, content: string) {
+    const msg = await this.prisma.chatMessage.findUnique({ where: { id: messageId } })
+    if (!msg || msg.conversationId !== conversationId) throw new NotFoundException('Message not found')
+    if (msg.senderId !== userId) throw new ForbiddenException('Cannot edit another user\'s message')
+    if (msg.deletedAt) throw new ForbiddenException('Cannot edit a deleted message')
+    if (Date.now() - msg.createdAt.getTime() > ChatService.EDIT_WINDOW_MS) {
+      throw new ForbiddenException('Edit window expired (15 minutes)')
+    }
+    return this.prisma.chatMessage.update({
+      where: { id: messageId },
+      data: { content, editedAt: new Date() },
+      include: { sender: { select: { id: true, firstName: true, lastName: true } } },
+    })
+  }
+
+  /** Soft-delete a message (within 15 minutes, sender only) */
+  async deleteMessage(conversationId: string, messageId: string, userId: string) {
+    const msg = await this.prisma.chatMessage.findUnique({ where: { id: messageId } })
+    if (!msg || msg.conversationId !== conversationId) throw new NotFoundException('Message not found')
+    if (msg.senderId !== userId) throw new ForbiddenException('Cannot delete another user\'s message')
+    if (Date.now() - msg.createdAt.getTime() > ChatService.EDIT_WINDOW_MS) {
+      throw new ForbiddenException('Delete window expired (15 minutes)')
+    }
+    return this.prisma.chatMessage.update({
+      where: { id: messageId },
+      data: { deletedAt: new Date() },
+      include: { sender: { select: { id: true, firstName: true, lastName: true } } },
+    })
+  }
+
   /** Mark a conversation as read */
   async markAsRead(conversationId: string, userId: string) {
     return this.prisma.conversationParticipant.update({

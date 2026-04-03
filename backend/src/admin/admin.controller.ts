@@ -31,7 +31,7 @@ export class AdminController {
 
   @Get('system-health')
   @ApiOperation({ summary: 'Get system health metrics' })
-  getSystemHealth() { return this.adminService.getSystemHealth(this.chatGateway.getMetrics()) }
+  async getSystemHealth() { return this.adminService.getSystemHealth(await this.chatGateway.getMetrics()) }
 
   @Get('users')
   @ApiOperation({ summary: 'Get all users with pagination' })

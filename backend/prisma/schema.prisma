@@ -550,6 +550,8 @@ model ChatMessage {
   audioData     String?  // @deprecated - use audioUrl (MinIO) for new messages
   audioUrl      String?  // MinIO object key, served via /api/chat/audio/:key
   audioDuration Int?
+  editedAt      DateTime?
+  deletedAt     DateTime?
   createdAt     DateTime    @default(now())
 
   conversationId String
