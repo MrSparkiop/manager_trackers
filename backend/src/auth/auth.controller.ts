@@ -6,6 +6,8 @@ import { AuthService } from './auth.service'
 import type { Response, Request } from 'express'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
+import { ForgotPasswordDto } from './dto/forgot-password.dto'
+import { ResetPasswordDto } from './dto/reset-password.dto'
 import { CurrentUser, type AuthUser } from './current-user.decorator'
 
 @Controller('auth')
@@ -52,14 +54,16 @@ export class AuthController {
   @Throttle({ medium: { ttl: 60000, limit: 3 } })
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request a password reset email' })
-  forgotPassword(@Body() body: { email: string }) {
-    return this.authService.forgotPassword(body.email)
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email)
   }
 
+  // 5 reset attempts per minute — prevents brute-force on reset tokens
+  @Throttle({ medium: { ttl: 60000, limit: 5 } })
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset password using token from email' })
-  resetPassword(@Body() body: { token: string; password: string }) {
-    return this.authService.resetPassword(body.token, body.password)
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.password)
   }
 
   @Post('complete-onboarding')

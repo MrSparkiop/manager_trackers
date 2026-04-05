@@ -4,6 +4,7 @@ import { PermissionsGuard } from '../auth/permissions.guard'
 import { RequirePermissions } from '../auth/permissions'
 import { SupportService } from './support.service'
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
+import { CreateTicketDto } from './dto/create-ticket.dto'
 
 // ── User-facing support endpoints ────────────────────────────────
 @UseGuards(AuthGuard('jwt'))
@@ -12,8 +13,8 @@ export class SupportController {
   constructor(private service: SupportService) {}
 
   @Post('tickets')
-  createTicket(@CurrentUser() user: AuthUser, @Body() body: any) {
-    return this.service.createTicket(user.id, body)
+  createTicket(@CurrentUser() user: AuthUser, @Body() dto: CreateTicketDto) {
+    return this.service.createTicket(user.id, dto)
   }
 
   @Get('tickets')

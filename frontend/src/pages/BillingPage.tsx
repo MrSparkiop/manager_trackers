@@ -8,6 +8,10 @@ import {
   FileText, AlertCircle, RefreshCw, Download, Clock,
 } from 'lucide-react'
 
+function isSafeStripeUrl(url: string): boolean {
+  try { return new URL(url).hostname.endsWith('.stripe.com') } catch { return false }
+}
+
 interface Invoice {
   id: string
   number: string | null
@@ -63,14 +67,18 @@ export default function BillingPage() {
   // ── Checkout ─────────────────────────────────────────────────────────
   const checkoutMutation = useMutation({
     mutationFn: () => api.post('/billing/checkout').then(r => r.data),
-    onSuccess: (data) => { if (data.url) window.location.href = data.url },
+    onSuccess: (data) => {
+      if (data.url && isSafeStripeUrl(data.url)) window.location.href = data.url
+    },
     onError: (e: any) => toast.error(e?.response?.data?.message || 'Could not start checkout'),
   })
 
   // ── Customer Portal ───────────────────────────────────────────────────
   const portalMutation = useMutation({
     mutationFn: () => api.post('/billing/portal').then(r => r.data),
-    onSuccess: (data) => { if (data.url) window.location.href = data.url },
+    onSuccess: (data) => {
+      if (data.url && isSafeStripeUrl(data.url)) window.location.href = data.url
+    },
     onError: (e: any) => toast.error(e?.response?.data?.message || 'Could not open portal'),
   })
 

@@ -134,12 +134,14 @@ export class TeamsController {
   }
 
   @Put('projects/:projectId')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Update team project' })
   updateTeamProject(@Param('projectId') projectId: string, @CurrentUser() user: AuthUser, @Body() dto: UpdateTeamProjectDto) {
     return this.teamsService.updateTeamProject(projectId, user.id, dto)
   }
 
   @Delete('projects/:projectId')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Delete team project' })
   deleteTeamProject(@Param('projectId') projectId: string, @CurrentUser() user: AuthUser) {
     return this.teamsService.deleteTeamProject(projectId, user.id)
@@ -147,24 +149,28 @@ export class TeamsController {
 
   // ── Team Tasks ───────────────────────────────────────────────────
   @Get('projects/:projectId/tasks')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Get team project tasks' })
   getTeamTasks(@Param('projectId') projectId: string, @CurrentUser() user: AuthUser) {
     return this.teamsService.getTeamTasks(projectId, user.id)
   }
 
   @Post('projects/:projectId/tasks')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Create team task' })
   createTeamTask(@Param('projectId') projectId: string, @CurrentUser() user: AuthUser, @Body() body: { title: string; description?: string; status?: string; priority?: string; dueDate?: string; assigneeId?: string; recurrence?: string }) {
     return this.teamsService.createTeamTask(projectId, user.id, body)
   }
 
   @Put('tasks/:taskId')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Update team task' })
   updateTeamTask(@Param('taskId') taskId: string, @CurrentUser() user: AuthUser, @Body() dto: UpdateTeamTaskDto) {
     return this.teamsService.updateTeamTask(taskId, user.id, dto)
   }
 
   @Delete('tasks/:taskId')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Delete team task' })
   deleteTeamTask(@Param('taskId') taskId: string, @CurrentUser() user: AuthUser) {
     return this.teamsService.deleteTeamTask(taskId, user.id)
@@ -172,12 +178,14 @@ export class TeamsController {
 
   // ── Recurring Team Tasks ─────────────────────────────────────────
   @Post('tasks/:taskId/next-occurrence')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Create next occurrence of a recurring team task' })
   createNextTeamOccurrence(@Param('taskId') taskId: string, @CurrentUser() user: AuthUser) {
     return this.teamsService.createNextTeamOccurrence(taskId, user.id)
   }
 
   @Post('tasks/:taskId/skip-occurrence')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Skip next occurrence of a recurring team task' })
   skipNextTeamOccurrence(@Param('taskId') taskId: string, @CurrentUser() user: AuthUser) {
     return this.teamsService.skipNextTeamOccurrence(taskId, user.id)
@@ -185,12 +193,14 @@ export class TeamsController {
 
   // ── Comments ─────────────────────────────────────────────────────
   @Post('tasks/:taskId/comments')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Add comment to task' })
   addComment(@Param('taskId') taskId: string, @CurrentUser() user: AuthUser, @Body() body: { content: string }) {
     return this.teamsService.addComment(taskId, user.id, body.content)
   }
 
   @Delete('comments/:commentId')
+  @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Delete comment' })
   deleteComment(@Param('commentId') commentId: string, @CurrentUser() user: AuthUser) {
     return this.teamsService.deleteComment(commentId, user.id)

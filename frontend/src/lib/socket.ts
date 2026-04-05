@@ -13,8 +13,10 @@ export const connectSocket = (): Socket => {
     withCredentials: true,
   })
 
-  socket.on('connect', () => console.log('🔔 Socket connected'))
-  socket.on('disconnect', () => console.log('🔔 Socket disconnected'))
+  if (import.meta.env.DEV) {
+    socket.on('connect', () => console.debug('Socket connected'))
+    socket.on('disconnect', () => console.debug('Socket disconnected'))
+  }
 
   return socket
 }

@@ -7,12 +7,12 @@ import { useThemeStore } from '../store/themeStore'
 const RECENT_KEY = 'trackflow_recent_searches'
 
 function getRecent(): string[] {
-  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]') } catch { return [] }
+  try { return JSON.parse(sessionStorage.getItem(RECENT_KEY) || '[]') } catch { return [] }
 }
 
 function saveRecent(q: string) {
   const recent = [q, ...getRecent().filter(r => r !== q)].slice(0, 5)
-  localStorage.setItem(RECENT_KEY, JSON.stringify(recent))
+  sessionStorage.setItem(RECENT_KEY, JSON.stringify(recent))
 }
 
 const statusColors: Record<string, string> = {

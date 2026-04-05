@@ -11,8 +11,10 @@ export const connectChatSocket = (): Socket => {
     withCredentials: true,
   })
 
-  chatSocket.on('connect', () => console.log('Chat socket connected'))
-  chatSocket.on('disconnect', () => console.log('Chat socket disconnected'))
+  if (import.meta.env.DEV) {
+    chatSocket.on('connect', () => console.debug('Chat socket connected'))
+    chatSocket.on('disconnect', () => console.debug('Chat socket disconnected'))
+  }
 
   return chatSocket
 }

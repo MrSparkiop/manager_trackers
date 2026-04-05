@@ -13,7 +13,7 @@ export class TagsService {
     })
   }
 
-  async create(userId: string, dto: { name: string; color: string }) {
+  async create(userId: string, dto: { name: string; color?: string }) {
     return this.prisma.tag.create({
       data: { name: dto.name, color: dto.color || '#6366f1', userId },
     })

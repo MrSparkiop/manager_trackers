@@ -528,7 +528,7 @@ export default function ChatPage() {
         }
       }, 30_000)
     } catch (err) {
-      console.error('[startCall] error:', err)
+      if (import.meta.env.DEV) console.error('[startCall] error:', err)
       toast.error('Could not start call — check microphone permissions')
       cleanupCallRef.current()
     }

@@ -338,14 +338,20 @@ export class AdminService {
 
   // ── Billing management ─────────────────────────────────────────────
   async getBillingOverview() {
-    const users = await this.prisma.user.findMany({
+    const raw = await this.prisma.user.findMany({
       select: {
         id: true, email: true, firstName: true, lastName: true,
         role: true, isSuspended: true, createdAt: true,
-        stripeCustomerId: true, stripeSubscriptionId: true,
+        stripeSubscriptionId: true,
       },
       orderBy: [{ role: 'asc' }, { createdAt: 'desc' }],
     })
+
+    // Strip raw Stripe IDs — expose only a boolean flag
+    const users = raw.map(({ stripeSubscriptionId, ...rest }) => ({
+      ...rest,
+      hasSubscription: stripeSubscriptionId !== null,
+    }))
 
     const stats = {
       total: users.length,

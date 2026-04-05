@@ -7,6 +7,7 @@ import {
   HeadBucketCommand,
 } from '@aws-sdk/client-s3'
 import { Readable } from 'stream'
+import { randomUUID } from 'crypto'
 
 @Injectable()
 export class StorageService implements OnModuleInit {
@@ -44,7 +45,7 @@ export class StorageService implements OnModuleInit {
   /** Upload a buffer, return the object key */
   async uploadAudio(buffer: Buffer, mimeType: string): Promise<string> {
     const ext = mimeType.includes('ogg') ? 'ogg' : 'webm'
-    const key = `voice/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const key = `voice/${Date.now()}-${randomUUID()}.${ext}`
 
     await this.s3.send(new PutObjectCommand({
       Bucket: this.bucket,

@@ -2,6 +2,8 @@ import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nes
 import { AuthGuard } from '@nestjs/passport'
 import { TagsService } from './tags.service'
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
+import { CreateTagDto } from './dto/create-tag.dto'
+import { UpdateTagDto } from './dto/update-tag.dto'
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('tags')
@@ -14,13 +16,13 @@ export class TagsController {
   }
 
   @Post()
-  create(@Body() body: any, @CurrentUser() user: AuthUser) {
-    return this.tagsService.create(user.id, body)
+  create(@Body() dto: CreateTagDto, @CurrentUser() user: AuthUser) {
+    return this.tagsService.create(user.id, dto)
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() body: any, @CurrentUser() user: AuthUser) {
-    return this.tagsService.update(id, user.id, body)
+  update(@Param('id') id: string, @Body() dto: UpdateTagDto, @CurrentUser() user: AuthUser) {
+    return this.tagsService.update(id, user.id, dto)
   }
 
   @Delete(':id')

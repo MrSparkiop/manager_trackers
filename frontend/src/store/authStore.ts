@@ -68,7 +68,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           await api.post('/auth/logout')
         } catch (error) {
-          console.warn('Server logout failed, clearing local state anyway', error)
+          if (import.meta.env.DEV) console.warn('Server logout failed', error)
         } finally {
           disconnectSocket()
           Sentry.setUser(null)

@@ -113,6 +113,11 @@ export class ChatController {
     if (!file.mimetype.startsWith('audio/')) {
       throw new BadRequestException('Only audio files are accepted')
     }
+    const allowedExts = ['.ogg', '.webm', '.wav', '.mp3', '.m4a', '.aac']
+    const ext = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase()
+    if (!allowedExts.includes(ext)) {
+      throw new BadRequestException('File extension not allowed. Accepted: ogg, webm, wav, mp3, m4a, aac')
+    }
     const key = await this.storageService.uploadAudio(file.buffer, file.mimetype)
     return { key }
   }

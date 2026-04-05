@@ -99,7 +99,7 @@ export class AdminController {
 
   @Get('search')
   @ApiOperation({ summary: 'Global search' })
-  globalSearch(@Query('q') q = '') { return this.adminService.globalSearch(q) }
+  globalSearch(@Query('q') q = '') { return this.adminService.globalSearch(q.trim().slice(0, 200)) }
 
   // ── System Config ────────────────────────────────────────────────
   @Get('config')

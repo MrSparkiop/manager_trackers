@@ -14,10 +14,14 @@ export default function JoinTeamPage() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      navigate(`/login?redirect=/app/join?code=${code}`)
+      if (code && /^[a-f0-9]{32}$/.test(code)) {
+        navigate(`/login?redirect=${encodeURIComponent(`/app/join?code=${code}`)}`)
+      } else {
+        navigate('/login')
+      }
       return
     }
-    if (!code) { setStatus('error'); setMessage('Invalid invite link'); return }
+    if (!code || !/^[a-f0-9]{32}$/.test(code)) { setStatus('error'); setMessage('Invalid invite link'); return }
 
     api.post('/teams/join', { inviteCode: code })
       .then(res => {
