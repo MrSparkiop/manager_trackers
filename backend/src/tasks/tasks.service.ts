@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlanLimitsService } from '../common/plan-limits.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -131,6 +131,7 @@ export class TasksService {
 
   async bulkRemove(ids: string[], userId: string) {
     if (!ids?.length) return { count: 0 }
+    if (ids.length > 100) throw new BadRequestException('Max 100 tasks per bulk delete')
     const result = await this.prisma.task.deleteMany({
       where: { id: { in: ids }, userId, teamId: null },
     })

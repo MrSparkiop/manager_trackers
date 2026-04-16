@@ -586,6 +586,7 @@ model MessageReport {
 enum ReportStatus {
   PENDING
   WARNED
+  SUSPENDED
   DELETED
   DISMISSED
 }

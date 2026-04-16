@@ -59,6 +59,9 @@ export class StorageService implements OnModuleInit {
 
   /** Get a readable stream for an object */
   async getAudioStream(key: string): Promise<{ stream: Readable; contentType: string }> {
+    if (!/^voice\/\d+-[a-f0-9-]+\.(ogg|webm|wav|mp3|m4a|aac)$/.test(key)) {
+      throw new Error('Invalid audio key format')
+    }
     const res = await this.s3.send(new GetObjectCommand({
       Bucket: this.bucket,
       Key: key,

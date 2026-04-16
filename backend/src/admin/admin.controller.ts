@@ -13,6 +13,10 @@ import { UpdateAnnouncementDto } from './dto/update-announcement.dto'
 import { AdminUpdateUserDto } from './dto/update-user.dto'
 import { CreateMaintenanceDto } from './dto/create-maintenance.dto'
 import { UpdateMaintenanceDto } from './dto/update-maintenance.dto'
+import { UpdateUserRoleDto } from './dto/update-user-role.dto'
+import { SuspendUserDto } from './dto/suspend-user.dto'
+import { UpdateSystemConfigsDto } from './dto/update-system-configs.dto'
+import { Throttle } from '@nestjs/throttler'
 
 @ApiTags('Admin')
 @UseGuards(AuthGuard('jwt'), PermissionsGuard)
@@ -57,18 +61,20 @@ export class AdminController {
 
   @Put('users/:id/role')
   @ApiOperation({ summary: 'Update a user role' })
-  updateUserRole(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: { role: string }) {
+  updateUserRole(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateUserRoleDto) {
     return this.adminService.updateUser(user.id, id, { role: dto.role })
   }
 
   @Put('users/:id/suspend')
   @ApiOperation({ summary: 'Suspend or unsuspend a user' })
-  suspendUser(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: { suspend: boolean }) {
+  @Throttle({ medium: { ttl: 60000, limit: 10 } })
+  suspendUser(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: SuspendUserDto) {
     return this.adminService.suspendUser(user.id, id, dto.suspend)
   }
 
   @Delete('users/:id')
   @ApiOperation({ summary: 'Delete a user' })
+  @Throttle({ medium: { ttl: 60000, limit: 5 } })
   deleteUser(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.adminService.deleteUser(user.id, id)
   }
@@ -80,12 +86,14 @@ export class AdminController {
 
   @Post('billing/:userId/grant-pro')
   @ApiOperation({ summary: 'Manually grant PRO to a user' })
+  @Throttle({ medium: { ttl: 60000, limit: 10 } })
   grantPro(@CurrentUser() user: AuthUser, @Param('userId') userId: string) {
     return this.adminService.setUserRole(user.id, userId, 'PRO')
   }
 
   @Post('billing/:userId/revoke-pro')
   @ApiOperation({ summary: 'Revoke PRO from a user' })
+  @Throttle({ medium: { ttl: 60000, limit: 10 } })
   revokePro(@CurrentUser() user: AuthUser, @Param('userId') userId: string) {
     return this.adminService.setUserRole(user.id, userId, 'USER')
   }
@@ -108,8 +116,9 @@ export class AdminController {
 
   @Put('config')
   @ApiOperation({ summary: 'Update system config (bulk)' })
-  updateSystemConfigs(@Body() body: Record<string, string>) {
-    return this.adminService.updateSystemConfigs(body)
+  @Throttle({ medium: { ttl: 60000, limit: 10 } })
+  updateSystemConfigs(@Body() dto: UpdateSystemConfigsDto) {
+    return this.adminService.updateSystemConfigs(dto as Record<string, string>)
   }
 
   // ── Announcements ────────────────────────────────────────────────
@@ -164,7 +173,8 @@ export class AdminController {
 
   // ── Impersonation ─────────────────────────────────────────────────
   @Post('impersonate/:userId')
-  @ApiOperation({ summary: 'Generate a 1-hour token scoped as the target user (logged to audit trail)' })
+  @Throttle({ medium: { ttl: 60000, limit: 5 } })
+  @ApiOperation({ summary: 'Generate a short-lived token scoped as the target user (logged to audit trail)' })
   impersonateUser(@Param('userId') userId: string, @Req() req: Request, @CurrentUser() user: AuthUser) {
     const ip = req.headers['x-forwarded-for'] as string ?? req.socket?.remoteAddress
     return this.adminService.impersonateUser(user.id, userId, ip)

@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { Cron } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
 
 @Injectable()
 export class TrialExpiryCron {
+  private readonly logger = new Logger(TrialExpiryCron.name)
+
   constructor(private prisma: PrismaService) {}
 
   @Cron('0 * * * *') // every hour
@@ -17,7 +19,7 @@ export class TrialExpiryCron {
       data: { role: 'USER' },
     })
     if (result.count > 0) {
-      console.log(`Expired ${result.count} trial(s)`)
+      this.logger.log(`Expired ${result.count} trial(s)`)
     }
   }
 }

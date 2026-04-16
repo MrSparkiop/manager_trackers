@@ -72,6 +72,7 @@ export const useAuthStore = create<AuthState>()(
         } finally {
           disconnectSocket()
           Sentry.setUser(null)
+          sessionStorage.clear()
           set({ user: null, isAuthenticated: false, isLoading: false, error: null })
         }
       },

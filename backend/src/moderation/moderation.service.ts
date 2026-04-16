@@ -98,7 +98,7 @@ export class ModerationService {
     })
     await this.prisma.messageReport.update({
       where: { id: reportId },
-      data: { status: 'WARNED', resolvedAt: new Date(), adminNote: note },
+      data: { status: 'SUSPENDED', resolvedAt: new Date(), adminNote: note },
     })
     await this.prisma.adminAuditLog.create({
       data: {
@@ -130,12 +130,20 @@ export class ModerationService {
   }
 
   async getStats() {
-    const [pending, warned, deleted, dismissed] = await Promise.all([
+    const [pending, warned, suspended, deleted, dismissed] = await Promise.all([
       this.prisma.messageReport.count({ where: { status: 'PENDING' } }),
       this.prisma.messageReport.count({ where: { status: 'WARNED' } }),
+      this.prisma.messageReport.count({ where: { status: 'SUSPENDED' } }),
       this.prisma.messageReport.count({ where: { status: 'DELETED' } }),
       this.prisma.messageReport.count({ where: { status: 'DISMISSED' } }),
     ])
-    return { pending, warned, deleted, dismissed, total: pending + warned + deleted + dismissed }
+    return {
+      pending,
+      warned,
+      suspended,
+      deleted,
+      dismissed,
+      total: pending + warned + suspended + deleted + dismissed,
+    }
   }
 }

@@ -9,6 +9,16 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger'
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
 import { UpdateTeamProjectDto } from './dto/update-team-project.dto'
 import { UpdateTeamTaskDto } from './dto/update-team-task.dto'
+import { CreateTeamDto } from './dto/create-team.dto'
+import { UpdateTeamDto } from './dto/update-team.dto'
+import { JoinTeamDto } from './dto/join-team.dto'
+import { UpdateMemberRoleDto } from './dto/update-member-role.dto'
+import { CreateTeamProjectDto } from './dto/create-team-project.dto'
+import { CreateTeamTaskDto } from './dto/create-team-task.dto'
+import { AddCommentDto } from './dto/add-comment.dto'
+import { CreateCustomRoleDto } from './dto/create-custom-role.dto'
+import { UpdateCustomRoleDto } from './dto/update-custom-role.dto'
+import { AssignCustomRoleDto } from './dto/assign-custom-role.dto'
 
 @ApiTags('Teams')
 @UseGuards(AuthGuard('jwt'))
@@ -30,8 +40,8 @@ export class TeamsController {
   @UseGuards(PermissionsGuard)
   @RequirePermissions('create:team')
   @ApiOperation({ summary: 'Create a team' })
-  createTeam(@CurrentUser() user: AuthUser, @Body() body: { name: string; description?: string; color?: string }) {
-    return this.teamsService.createTeam(user.id, body, user.role)
+  createTeam(@CurrentUser() user: AuthUser, @Body() dto: CreateTeamDto) {
+    return this.teamsService.createTeam(user.id, dto, user.role)
   }
 
   @Get('join')
@@ -44,8 +54,8 @@ export class TeamsController {
   @UseGuards(PermissionsGuard)
   @RequirePermissions('join:team')
   @ApiOperation({ summary: 'Join a team via invite code' })
-  joinTeam(@CurrentUser() user: AuthUser, @Body() body: { inviteCode: string }) {
-    return this.teamsService.joinTeam(body.inviteCode, user.id)
+  joinTeam(@CurrentUser() user: AuthUser, @Body() dto: JoinTeamDto) {
+    return this.teamsService.joinTeam(dto.inviteCode, user.id)
   }
 
   @Get(':id')
@@ -58,8 +68,8 @@ export class TeamsController {
   @Put(':id')
   @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Update team' })
-  updateTeam(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() body: { name?: string; description?: string; color?: string }) {
-    return this.teamsService.updateTeam(id, user.id, body)
+  updateTeam(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() dto: UpdateTeamDto) {
+    return this.teamsService.updateTeam(id, user.id, dto)
   }
 
   @Delete(':id')
@@ -114,8 +124,8 @@ export class TeamsController {
   @Patch(':id/members/:memberId/role')
   @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Update member role (Owner only)' })
-  updateMemberRole(@Param('id') id: string, @Param('memberId') memberId: string, @CurrentUser() user: AuthUser, @Body() body: { role: string }) {
-    return this.teamsService.updateMemberRole(id, user.id, memberId, body.role)
+  updateMemberRole(@Param('id') id: string, @Param('memberId') memberId: string, @CurrentUser() user: AuthUser, @Body() dto: UpdateMemberRoleDto) {
+    return this.teamsService.updateMemberRole(id, user.id, memberId, dto.role)
   }
 
   // ── Team Projects ────────────────────────────────────────────────
@@ -129,8 +139,8 @@ export class TeamsController {
   @Post(':id/projects')
   @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Create team project' })
-  createTeamProject(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() body: { name: string; description?: string; color?: string }) {
-    return this.teamsService.createTeamProject(id, user.id, body)
+  createTeamProject(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() dto: CreateTeamProjectDto) {
+    return this.teamsService.createTeamProject(id, user.id, dto)
   }
 
   @Put('projects/:projectId')
@@ -158,8 +168,8 @@ export class TeamsController {
   @Post('projects/:projectId/tasks')
   @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Create team task' })
-  createTeamTask(@Param('projectId') projectId: string, @CurrentUser() user: AuthUser, @Body() body: { title: string; description?: string; status?: string; priority?: string; dueDate?: string; assigneeId?: string; recurrence?: string }) {
-    return this.teamsService.createTeamTask(projectId, user.id, body)
+  createTeamTask(@Param('projectId') projectId: string, @CurrentUser() user: AuthUser, @Body() dto: CreateTeamTaskDto) {
+    return this.teamsService.createTeamTask(projectId, user.id, dto)
   }
 
   @Put('tasks/:taskId')
@@ -195,8 +205,8 @@ export class TeamsController {
   @Post('tasks/:taskId/comments')
   @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Add comment to task' })
-  addComment(@Param('taskId') taskId: string, @CurrentUser() user: AuthUser, @Body() body: { content: string }) {
-    return this.teamsService.addComment(taskId, user.id, body.content)
+  addComment(@Param('taskId') taskId: string, @CurrentUser() user: AuthUser, @Body() dto: AddCommentDto) {
+    return this.teamsService.addComment(taskId, user.id, dto.content)
   }
 
   @Delete('comments/:commentId')
@@ -217,15 +227,15 @@ export class TeamsController {
   @Post(':id/custom-roles')
   @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Create a custom role (Owner only)' })
-  createCustomRole(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() body: { name: string; canInviteMembers?: boolean; canManageProjects?: boolean; canDeleteTasks?: boolean; canManageSettings?: boolean }) {
-    return this.customRolesService.create(id, user.id, body)
+  createCustomRole(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() dto: CreateCustomRoleDto) {
+    return this.customRolesService.create(id, user.id, dto)
   }
 
   @Put(':id/custom-roles/:roleId')
   @UseGuards(TeamMemberGuard)
   @ApiOperation({ summary: 'Update a custom role (Owner only)' })
-  updateCustomRole(@Param('id') id: string, @Param('roleId') roleId: string, @CurrentUser() user: AuthUser, @Body() body: { name?: string; canInviteMembers?: boolean; canManageProjects?: boolean; canDeleteTasks?: boolean; canManageSettings?: boolean }) {
-    return this.customRolesService.update(id, roleId, user.id, body)
+  updateCustomRole(@Param('id') id: string, @Param('roleId') roleId: string, @CurrentUser() user: AuthUser, @Body() dto: UpdateCustomRoleDto) {
+    return this.customRolesService.update(id, roleId, user.id, dto)
   }
 
   @Delete(':id/custom-roles/:roleId')
@@ -242,8 +252,8 @@ export class TeamsController {
     @Param('id') id: string,
     @Param('memberId') memberId: string,
     @CurrentUser() user: AuthUser,
-    @Body() body: { customRoleId: string | null },
+    @Body() dto: AssignCustomRoleDto,
   ) {
-    return this.customRolesService.assignToMember(id, memberId, user.id, body.customRoleId)
+    return this.customRolesService.assignToMember(id, memberId, user.id, dto.customRoleId)
   }
 }

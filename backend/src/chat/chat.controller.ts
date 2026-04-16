@@ -12,6 +12,9 @@ import { StorageService } from '../storage/storage.service'
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
 import type { Response } from 'express'
 import type { Express } from 'express'
+import { StartConversationDto } from './dto/start-conversation.dto'
+import { SendMessageDto } from './dto/send-message.dto'
+import { EditMessageDto } from './dto/edit-message.dto'
 
 @UseGuards(AuthGuard('jwt'), PermissionsGuard)
 @RequirePermissions('use:chat')
@@ -34,8 +37,8 @@ export class ChatController {
   }
 
   @Post('conversations')
-  startConversation(@CurrentUser() user: AuthUser, @Body() body: { userId: string }) {
-    return this.chatService.getOrCreateConversation(user.id, body.userId)
+  startConversation(@CurrentUser() user: AuthUser, @Body() dto: StartConversationDto) {
+    return this.chatService.getOrCreateConversation(user.id, dto.userId)
   }
 
   @Get('conversations/:id/messages')
@@ -52,16 +55,15 @@ export class ChatController {
   sendMessage(
     @Param('id') id: string,
     @CurrentUser() user: AuthUser,
-    @Body() body: { content?: string; type?: string; audioData?: string; audioUrl?: string; audioDuration?: number },
+    @Body() dto: SendMessageDto,
   ) {
     return this.chatService.createMessage({
       conversationId: id,
       senderId: user.id,
-      content: body.content,
-      type: (body.type as any) || 'TEXT',
-      audioData: body.audioData,
-      audioUrl: body.audioUrl,
-      audioDuration: body.audioDuration,
+      content: dto.content,
+      type: (dto.type as any) || 'TEXT',
+      audioUrl: dto.audioUrl,
+      audioDuration: dto.audioDuration,
     })
   }
 
@@ -70,9 +72,9 @@ export class ChatController {
     @Param('convId') convId: string,
     @Param('msgId') msgId: string,
     @CurrentUser() user: AuthUser,
-    @Body() body: { content: string },
+    @Body() dto: EditMessageDto,
   ) {
-    const msg = await this.chatService.editMessage(convId, msgId, user.id, body.content)
+    const msg = await this.chatService.editMessage(convId, msgId, user.id, dto.content)
     this.chatGateway.server.to(`conversation:${convId}`).emit('message_updated', msg)
     return msg
   }

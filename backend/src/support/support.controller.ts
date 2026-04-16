@@ -5,6 +5,8 @@ import { RequirePermissions } from '../auth/permissions'
 import { SupportService } from './support.service'
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
 import { CreateTicketDto } from './dto/create-ticket.dto'
+import { ReplyTicketDto } from './dto/reply-ticket.dto'
+import { UpdateTicketDto } from './dto/update-ticket.dto'
 
 // ── User-facing support endpoints ────────────────────────────────
 @UseGuards(AuthGuard('jwt'))
@@ -28,8 +30,8 @@ export class SupportController {
   }
 
   @Post('tickets/:id/replies')
-  replyToTicket(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() body: { content: string }) {
-    return this.service.replyToTicket(id, user.id, body.content)
+  replyToTicket(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() dto: ReplyTicketDto) {
+    return this.service.replyToTicket(id, user.id, dto.content)
   }
 
   @Put('tickets/:id/close')
@@ -65,12 +67,12 @@ export class AdminSupportController {
   }
 
   @Post('tickets/:id/replies')
-  adminReply(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() body: { content: string }) {
-    return this.service.adminReply(id, user.id, body.content)
+  adminReply(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() dto: ReplyTicketDto) {
+    return this.service.adminReply(id, user.id, dto.content)
   }
 
   @Put('tickets/:id')
-  updateTicket(@Param('id') id: string, @Body() body: { status?: string; priority?: string }) {
-    return this.service.updateTicket(id, body)
+  updateTicket(@Param('id') id: string, @Body() dto: UpdateTicketDto) {
+    return this.service.updateTicket(id, dto)
   }
 }

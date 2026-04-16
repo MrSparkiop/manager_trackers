@@ -1,7 +1,10 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards, ForbiddenException } from '@nestjs/common'
+import { Controller, Get, Post, Delete, Body, Param, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '@nestjs/passport'
+import { PermissionsGuard } from '../auth/permissions.guard'
+import { RequirePermissions } from '../auth/permissions'
 import { ChangelogService } from './changelog.service'
 import { CurrentUser, type AuthUser } from '../auth/current-user.decorator'
+import { CreateChangelogDto } from './dto/create-changelog.dto'
 
 @Controller('changelog')
 @UseGuards(AuthGuard('jwt'))
@@ -19,14 +22,16 @@ export class ChangelogController {
   }
 
   @Post()
-  create(@CurrentUser() user: AuthUser, @Body() body: { version: string; title: string; content: string }) {
-    if (user.role !== 'ADMIN') throw new ForbiddenException('Admin only')
-    return this.changelogService.create(body)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions('access:admin')
+  create(@Body() dto: CreateChangelogDto) {
+    return this.changelogService.create(dto)
   }
 
   @Delete(':id')
-  remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    if (user.role !== 'ADMIN') throw new ForbiddenException('Admin only')
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions('access:admin')
+  remove(@Param('id') id: string) {
     return this.changelogService.remove(id)
   }
 }

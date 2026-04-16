@@ -397,12 +397,12 @@ export class AdminService {
     // lets server-side code detect impersonated sessions if needed.
     const token = this.jwtService.sign(
       { sub: targetUserId, impersonatedBy: adminId },
-      { expiresIn: '1h' },
+      { expiresIn: '15m' },
     )
 
     return {
       token,
-      expiresIn: 3600,
+      expiresIn: 900,
       user: target,
     }
   }

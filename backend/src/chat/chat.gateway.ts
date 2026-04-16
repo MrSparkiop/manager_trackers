@@ -9,6 +9,7 @@ import { ChatService } from './chat.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import Redis from 'ioredis'
+import { isNonEmptyString, isValidMessageType, isObject, isNonNegativeNumber } from './ws-validation.utils'
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
   .split(',')
@@ -154,13 +155,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
 
   @SubscribeMessage('join_conversation')
   async handleJoin(client: Socket, conversationId: string) {
-    if (!client.data.userId) return
+    if (!client.data.userId || !isNonEmptyString(conversationId)) return
     client.join(`conversation:${conversationId}`)
     await this.chatService.markAsRead(conversationId, client.data.userId).catch(() => {})
   }
 
   @SubscribeMessage('leave_conversation')
   handleLeave(client: Socket, conversationId: string) {
+    if (!isNonEmptyString(conversationId)) return
     client.leave(`conversation:${conversationId}`)
   }
 
@@ -173,7 +175,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     audioUrl?: string
     audioDuration?: number
   }) {
-    if (!client.data.userId) return
+    if (!client.data.userId || !isObject(data)) return
+    if (!isNonEmptyString(data.conversationId) || !isValidMessageType(data.type)) {
+      client.emit('error', { message: 'Invalid message payload' })
+      return
+    }
+    if (data.content && (typeof data.content !== 'string' || data.content.length > 5000)) {
+      client.emit('error', { message: 'Message content too long (max 5000 chars)' })
+      return
+    }
 
     // Validate voice message size (max ~500KB base64, roughly 60s of opus audio)
     if (data.type === 'VOICE' && data.audioData && data.audioData.length > 700_000) {
@@ -224,7 +234,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
 
   @SubscribeMessage('typing')
   handleTyping(client: Socket, conversationId: string) {
-    if (!client.data.userId) return
+    if (!client.data.userId || !isNonEmptyString(conversationId)) return
     client.to(`conversation:${conversationId}`).emit('user_typing', {
       userId: client.data.userId,
       userName: client.data.userName,
@@ -233,7 +243,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
 
   @SubscribeMessage('stop_typing')
   handleStopTyping(client: Socket, conversationId: string) {
-    if (!client.data.userId) return
+    if (!client.data.userId || !isNonEmptyString(conversationId)) return
     client.to(`conversation:${conversationId}`).emit('user_stop_typing', {
       userId: client.data.userId,
     })
@@ -241,7 +251,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
 
   @SubscribeMessage('mark_read')
   async handleMarkRead(client: Socket, conversationId: string) {
-    if (!client.data.userId) return
+    if (!client.data.userId || !isNonEmptyString(conversationId)) return
     await this.chatService.markAsRead(conversationId, client.data.userId).catch(() => {})
   }
 
@@ -249,7 +259,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
 
   @SubscribeMessage('call_offer')
   handleCallOffer(client: Socket, data: { targetUserId: string; conversationId: string; offer: RTCSessionDescriptionInit }) {
-    if (!client.data.userId) return
+    if (!client.data.userId || !isObject(data) || !isNonEmptyString(data.targetUserId) || !isNonEmptyString(data.conversationId) || !isObject(data.offer)) return
     this.server.to(`chat:user:${data.targetUserId}`).emit('call_incoming', {
       from: { userId: client.data.userId, userName: client.data.userName },
       conversationId: data.conversationId,
@@ -259,19 +269,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
 
   @SubscribeMessage('call_answer')
   handleCallAnswer(client: Socket, data: { targetUserId: string; answer: RTCSessionDescriptionInit }) {
-    if (!client.data.userId) return
+    if (!client.data.userId || !isObject(data) || !isNonEmptyString(data.targetUserId) || !isObject(data.answer)) return
     this.server.to(`chat:user:${data.targetUserId}`).emit('call_answered', { answer: data.answer })
   }
 
   @SubscribeMessage('call_reject')
   handleCallReject(client: Socket, data: { targetUserId: string }) {
-    if (!client.data.userId) return
+    if (!client.data.userId || !isObject(data) || !isNonEmptyString(data.targetUserId)) return
     this.server.to(`chat:user:${data.targetUserId}`).emit('call_rejected', { userId: client.data.userId })
   }
 
   @SubscribeMessage('call_end')
   async handleCallEnd(client: Socket, data: { targetUserId: string; conversationId?: string; duration?: number }) {
-    if (!client.data.userId) return
+    if (!client.data.userId || !isObject(data) || !isNonEmptyString(data.targetUserId)) return
+    if (data.duration !== undefined && !isNonNegativeNumber(data.duration)) return
     this.server.to(`chat:user:${data.targetUserId}`).emit('call_ended', { userId: client.data.userId })
 
     // Save a CALL message in the conversation so both users see it in history
@@ -303,7 +314,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
 
   @SubscribeMessage('call_missed')
   async handleCallMissed(client: Socket, data: { conversationId: string; targetUserId: string }) {
-    if (!client.data.userId || !data.conversationId) return
+    if (!client.data.userId || !isObject(data) || !isNonEmptyString(data.conversationId)) return
     try {
       const message = await this.chatService.createMessage({
         conversationId: data.conversationId,
@@ -318,25 +329,25 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
 
   @SubscribeMessage('ice_candidate')
   handleIceCandidate(client: Socket, data: { targetUserId: string; candidate: RTCIceCandidateInit }) {
-    if (!client.data.userId) return
+    if (!client.data.userId || !isObject(data) || !isNonEmptyString(data.targetUserId) || !isObject(data.candidate)) return
     this.server.to(`chat:user:${data.targetUserId}`).emit('ice_candidate', { candidate: data.candidate })
   }
 
   @SubscribeMessage('screen_offer')
   handleScreenOffer(client: Socket, data: { targetUserId: string; offer: RTCSessionDescriptionInit }) {
-    if (!client.data.userId) return
+    if (!client.data.userId || !isObject(data) || !isNonEmptyString(data.targetUserId) || !isObject(data.offer)) return
     this.server.to(`chat:user:${data.targetUserId}`).emit('screen_offer', { offer: data.offer })
   }
 
   @SubscribeMessage('screen_answer')
   handleScreenAnswer(client: Socket, data: { targetUserId: string; answer: RTCSessionDescriptionInit }) {
-    if (!client.data.userId) return
+    if (!client.data.userId || !isObject(data) || !isNonEmptyString(data.targetUserId) || !isObject(data.answer)) return
     this.server.to(`chat:user:${data.targetUserId}`).emit('screen_answer', { answer: data.answer })
   }
 
   @SubscribeMessage('screen_share_stopped')
   handleScreenShareStopped(client: Socket, data: { targetUserId: string }) {
-    if (!client.data.userId) return
+    if (!client.data.userId || !isObject(data) || !isNonEmptyString(data.targetUserId)) return
     this.server.to(`chat:user:${data.targetUserId}`).emit('screen_share_stopped', {})
   }
 }
